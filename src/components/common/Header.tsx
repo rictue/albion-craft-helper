@@ -18,6 +18,7 @@ export default function Header() {
         </div>
         <nav className="flex gap-2">
           <NavLink to="/" className={linkClass}>Calculator</NavLink>
+          <NavLink to="/suggested" className={linkClass}>Suggested</NavLink>
           <NavLink to="/planner" className={linkClass}>Planner</NavLink>
           <NavLink to="/database" className={linkClass}>Database</NavLink>
         </nav>

@@ -3,6 +3,7 @@ import Header from './components/common/Header';
 import CraftingCalculator from './components/calculator/CraftingCalculator';
 import CraftingPlanner from './components/planner/CraftingPlanner';
 import CustomDatabase from './components/database/CustomDatabase';
+import SuggestedCrafts from './components/suggester/SuggestedCrafts';
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
         <Header />
         <Routes>
           <Route path="/" element={<CraftingCalculator />} />
+          <Route path="/suggested" element={<SuggestedCrafts />} />
           <Route path="/planner" element={<CraftingPlanner />} />
           <Route path="/database" element={<CustomDatabase />} />
         </Routes>
