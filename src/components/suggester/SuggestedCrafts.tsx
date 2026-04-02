@@ -22,6 +22,12 @@ interface ScanResult {
   profit: number;
   margin: number;
   itemId: string;
+  // BM specific
+  bmBuyOrders?: number;
+  cheapestFlipCity?: string;
+  cheapestFlipPrice?: number;
+  flipProfit?: number;
+  isCraftBetter?: boolean;
 }
 
 type SortKey = 'profit' | 'margin' | 'sellPrice' | 'materialCost' | 'name';
@@ -51,7 +57,6 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
     setResults([]);
 
     try {
-      // 1. Collect ALL item IDs + material IDs + artifact IDs
       const allIds = new Set<string>();
       for (const item of ALL_ITEMS) {
         const itemId = resolveItemId(item.baseId, tier, enchantment);
@@ -67,7 +72,6 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         }
       }
 
-      // 2. Fetch prices in batches
       const idArray = [...allIds];
       const allPrices: MarketPrice[] = [];
       const batchSize = 50;
@@ -80,25 +84,21 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         setProgress(Math.round(((i / batchSize + 1) / totalBatches) * 100));
       }
 
-      // 3. Build price maps
+      // Build price maps per city
       const materialPriceByCity = new Map<string, Map<string, number>>();
       const sellPriceByCity = new Map<string, Map<string, number>>();
 
       for (const city of CITIES) {
         const matMap = new Map<string, number>();
         const sellMap = new Map<string, number>();
-
         for (const p of allPrices) {
           if (p.city !== city.id) continue;
           if (p.sell_price_min > 0) {
             const existing = matMap.get(p.item_id);
-            if (!existing || p.sell_price_min < existing) {
-              matMap.set(p.item_id, p.sell_price_min);
-            }
+            if (!existing || p.sell_price_min < existing) matMap.set(p.item_id, p.sell_price_min);
             sellMap.set(p.item_id, p.sell_price_min);
           }
         }
-
         materialPriceByCity.set(city.id, matMap);
         sellPriceByCity.set(city.id, sellMap);
       }
@@ -107,13 +107,31 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
       for (const p of allPrices) {
         if (p.sell_price_min > 0) {
           const existing = cheapestMaterials.get(p.item_id);
-          if (!existing || p.sell_price_min < existing) {
-            cheapestMaterials.set(p.item_id, p.sell_price_min);
+          if (!existing || p.sell_price_min < existing) cheapestMaterials.set(p.item_id, p.sell_price_min);
+        }
+      }
+
+      // For BM: find cheapest city sell price per item (for flip comparison)
+      const cheapestSellByItem = new Map<string, { price: number; city: string }>();
+      for (const cityId of SELL_CITIES) {
+        const cityPrices = sellPriceByCity.get(cityId);
+        if (!cityPrices) continue;
+        for (const [itemId, price] of cityPrices) {
+          const existing = cheapestSellByItem.get(itemId);
+          if (!existing || price < existing.price) {
+            cheapestSellByItem.set(itemId, { price, city: cityId });
           }
         }
       }
 
-      // 4. Calculate profit
+      // Count BM buy orders per item (estimate from price entries with buy_price_max > 0)
+      const bmBuyOrderCount = new Map<string, number>();
+      for (const p of allPrices) {
+        if (p.city === 'Black Market' && p.buy_price_max > 0) {
+          bmBuyOrderCount.set(p.item_id, (bmBuyOrderCount.get(p.item_id) || 0) + 1);
+        }
+      }
+
       const craftCity = settings.craftingCity;
       const craftMaterials = materialPriceByCity.get(craftCity) || new Map();
       const scanResults: ScanResult[] = [];
@@ -122,90 +140,74 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         const itemId = resolveItemId(item.baseId, tier, enchantment);
         const altId = itemId.includes('_2H_')
           ? itemId.replace('_2H_', '_MAIN_')
-          : itemId.includes('_MAIN_')
-            ? itemId.replace('_MAIN_', '_2H_')
-            : null;
+          : itemId.includes('_MAIN_') ? itemId.replace('_MAIN_', '_2H_') : null;
 
         const priceMap = new Map<string, number>();
         for (const req of item.recipe) {
           const matId = resolveMaterialId(req.materialBase, tier, enchantment);
-          const price = craftMaterials.get(matId) || cheapestMaterials.get(matId) || 0;
-          priceMap.set(matId, price);
+          priceMap.set(matId, craftMaterials.get(matId) || cheapestMaterials.get(matId) || 0);
         }
         if (item.artifactId) {
           const artId = resolveArtifactId(item.artifactId, tier);
-          const artPrice = craftMaterials.get(artId) || cheapestMaterials.get(artId) || 0;
-          priceMap.set(artId, artPrice);
+          priceMap.set(artId, craftMaterials.get(artId) || cheapestMaterials.get(artId) || 0);
         }
 
-        // Regular cities (skip if BM only mode)
         if (!blackMarketOnly) {
           for (const sellCityId of SELL_CITIES) {
             const cityPrices = sellPriceByCity.get(sellCityId);
             if (!cityPrices) continue;
-
             const sellPrice = cityPrices.get(itemId) || (altId ? cityPrices.get(altId) : 0) || 0;
             if (sellPrice <= 0) continue;
-
             priceMap.set(itemId, sellPrice);
 
             const rr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
-            const result = calculateCrafting(
-              item, tier, enchantment, 1, rr,
-              settings.hasPremium, settings.usageFeePerHundred, priceMap,
-            );
+            const result = calculateCrafting(item, tier, enchantment, 1, rr, settings.hasPremium, settings.usageFeePerHundred, priceMap);
 
             if (result.profit > 0) {
               scanResults.push({
                 item, craftCity, sellCity: sellCityId,
-                materialCost: result.effectiveMaterialCost,
-                sellPrice, profit: result.profit, margin: result.profitMargin, itemId,
+                materialCost: result.effectiveMaterialCost, sellPrice,
+                profit: result.profit, margin: result.profitMargin, itemId,
               });
             }
           }
         }
 
-        // Black Market (buy orders)
-        const bmPrices = allPrices.filter(p => p.city === 'Black Market' && (p.item_id === itemId || p.item_id === altId));
-        for (const bp of bmPrices) {
+        // Black Market
+        const bmEntries = allPrices.filter(p => p.city === 'Black Market' && (p.item_id === itemId || p.item_id === altId));
+        for (const bp of bmEntries) {
           if (bp.buy_price_max <= 0) continue;
           priceMap.set(itemId, bp.buy_price_max);
 
           const rr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
-          const result = calculateCrafting(
-            item, tier, enchantment, 1, rr,
-            settings.hasPremium, settings.usageFeePerHundred, priceMap,
-          );
+          const result = calculateCrafting(item, tier, enchantment, 1, rr, settings.hasPremium, settings.usageFeePerHundred, priceMap);
+
+          // Flip comparison: cheapest city sell vs BM buy
+          const flipInfo = cheapestSellByItem.get(itemId) || (altId ? cheapestSellByItem.get(altId) : undefined);
+          const flipProfit = flipInfo ? bp.buy_price_max * (1 - (settings.hasPremium ? 0.065 : 0.105)) - flipInfo.price : undefined;
 
           if (result.profit > 0) {
             scanResults.push({
               item, craftCity, sellCity: 'Black Market',
               materialCost: result.effectiveMaterialCost,
-              sellPrice: bp.buy_price_max, profit: result.profit, margin: result.profitMargin, itemId,
+              sellPrice: bp.buy_price_max,
+              profit: result.profit, margin: result.profitMargin, itemId,
+              bmBuyOrders: bmBuyOrderCount.get(bp.item_id) || 1,
+              cheapestFlipCity: flipInfo?.city,
+              cheapestFlipPrice: flipInfo?.price,
+              flipProfit: flipProfit,
+              isCraftBetter: flipInfo ? result.effectiveMaterialCost < flipInfo.price : true,
             });
           }
         }
       }
 
-      // Keep best per item
-      const bestPerItem = new Map<string, ScanResult>();
-      for (const r of scanResults) {
-        const key = r.item.baseId + ':' + r.sellCity;
-        const existing = bestPerItem.get(key);
-        if (!existing || r.profit > existing.profit) {
-          bestPerItem.set(key, r);
-        }
-      }
-
-      // For BM mode: one entry per item (best BM profit)
-      // For normal mode: one entry per item (best city overall)
+      // Best per item
       const final = new Map<string, ScanResult>();
-      for (const r of bestPerItem.values()) {
+      for (const r of scanResults) {
         const key = r.item.baseId;
         const existing = final.get(key);
-        if (!existing || r.profit > existing.profit) {
-          final.set(key, r);
-        }
+        if (!existing || r.profit > existing.profit) final.set(key, r);
       }
 
       setResults([...final.values()]);
@@ -249,36 +251,22 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
   const sortIcon = (key: SortKey) => sortKey === key ? (sortAsc ? ' ↑' : ' ↓') : '';
 
   const title = blackMarketOnly ? 'Black Market Crafts' : 'Suggested Crafts';
-  const emptyIcon = blackMarketOnly ? '&#9876;' : '&#128200;';
   const emptyText = blackMarketOnly
     ? 'Scan to find items profitable to craft and sell on the Black Market.'
     : 'Select tier & enchantment, then click "Scan Market" to find profitable crafts.';
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
-      {/* Controls */}
-      <div className={`rounded-xl border p-4 ${
-        blackMarketOnly ? 'bg-red-950/20 border-red-900/30' : 'bg-surface border-surface-lighter'
-      }`}>
+      <div className={`rounded-xl border p-4 ${blackMarketOnly ? 'bg-red-950/20 border-red-900/30' : 'bg-surface border-surface-lighter'}`}>
         <div className="flex flex-wrap items-end gap-6">
           <TierSelector value={tier} onChange={setLocalTier} />
           <EnchantmentSelector value={enchantment} onChange={setLocalEnchant} />
-
-          <div className="flex items-end gap-3">
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">Craft City</label>
-              <span className="text-sm text-gold">{settings.craftingCity}</span>
-            </div>
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">Premium</label>
-              <span className="text-sm text-slate-300">{settings.hasPremium ? 'Yes' : 'No'}</span>
-            </div>
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">Focus</label>
-              <span className="text-sm text-slate-300">{settings.useFocus ? 'Yes' : 'No'}</span>
-            </div>
+          <div className="flex items-end gap-3 text-sm">
+            <span className="text-slate-500">Craft:</span>
+            <span className="text-gold">{settings.craftingCity}</span>
+            {settings.hasPremium && <span className="text-xs bg-gold/20 text-gold px-1.5 py-0.5 rounded">Premium</span>}
+            {settings.useFocus && <span className="text-xs bg-blue-900/30 text-blue-400 px-1.5 py-0.5 rounded">Focus</span>}
           </div>
-
           <button
             onClick={scan}
             disabled={scanning}
@@ -288,57 +276,40 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                 : 'bg-gold/20 hover:bg-gold/30 text-gold border border-gold/30'
             }`}
           >
-            {scanning ? 'Scanning...' : blackMarketOnly ? '&#9876; Scan Black Market' : '&#9889; Scan Market'}
+            {scanning ? 'Scanning...' : blackMarketOnly ? 'Scan Black Market' : 'Scan Market'}
           </button>
         </div>
-
         {scanning && (
           <div className="mt-3">
             <div className="h-1.5 bg-surface-lighter rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${blackMarketOnly ? 'bg-red-500' : 'bg-gold'}`}
-                style={{ width: `${progress}%` }}
-              />
+              <div className={`h-full rounded-full transition-all duration-300 ${blackMarketOnly ? 'bg-red-500' : 'bg-gold'}`} style={{ width: `${progress}%` }} />
             </div>
             <p className="text-xs text-slate-500 mt-1">Fetching prices... {progress}%</p>
           </div>
         )}
       </div>
 
-      {/* Results */}
       {results.length > 0 && (
         <div className="bg-surface rounded-xl border border-surface-lighter overflow-hidden">
           <div className="px-4 py-3 border-b border-surface-lighter flex justify-between items-center">
             <h3 className={`text-sm font-medium ${blackMarketOnly ? 'text-red-300' : 'text-gold'}`}>
-              {results.length} profitable crafts found
-              {blackMarketOnly && ' on Black Market'}
+              {results.length} profitable crafts{blackMarketOnly ? ' on Black Market' : ''}
             </h3>
-            {scannedAt && (
-              <span className="text-xs text-slate-500">Scanned at {scannedAt}</span>
-            )}
+            {scannedAt && <span className="text-xs text-slate-500">Scanned at {scannedAt}</span>}
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-surface-lighter">
-                  <th className="text-left px-4 py-2 w-8"></th>
-                  <th className="text-left px-4 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('name')}>
-                    Item{sortIcon('name')}
-                  </th>
-                  {!blackMarketOnly && <th className="text-left px-4 py-2">Sell At</th>}
-                  <th className="text-right px-4 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('materialCost')}>
-                    Cost{sortIcon('materialCost')}
-                  </th>
-                  <th className="text-right px-4 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('sellPrice')}>
-                    {blackMarketOnly ? 'BM Buy' : 'Sell'}{sortIcon('sellPrice')}
-                  </th>
-                  <th className="text-right px-4 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('profit')}>
-                    Profit{sortIcon('profit')}
-                  </th>
-                  <th className="text-right px-4 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('margin')}>
-                    Margin{sortIcon('margin')}
-                  </th>
+                  <th className="text-left px-3 py-2 w-8"></th>
+                  <th className="text-left px-3 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('name')}>Item{sortIcon('name')}</th>
+                  {!blackMarketOnly && <th className="text-left px-3 py-2">Sell At</th>}
+                  <th className="text-right px-3 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('materialCost')}>Craft Cost{sortIcon('materialCost')}</th>
+                  <th className="text-right px-3 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('sellPrice')}>{blackMarketOnly ? 'BM Buy' : 'Sell'}{sortIcon('sellPrice')}</th>
+                  <th className="text-right px-3 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('profit')}>Profit{sortIcon('profit')}</th>
+                  <th className="text-right px-3 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('margin')}>Margin{sortIcon('margin')}</th>
+                  {blackMarketOnly && <th className="text-left px-3 py-2">Craft vs Flip</th>}
                 </tr>
               </thead>
               <tbody>
@@ -348,34 +319,48 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                     onClick={() => handleItemClick(r)}
                     className="border-b border-surface-lighter/50 hover:bg-surface-light cursor-pointer transition-colors"
                   >
-                    <td className="px-4 py-2">
+                    <td className="px-3 py-2">
                       <ItemIcon itemId={r.itemId} size={28} className="bg-surface-lighter rounded" />
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-3 py-2">
                       <span className="text-slate-200">{r.item.name}</span>
                       {r.item.artifactId && <span className="text-purple-400 text-xs ml-1">*</span>}
                     </td>
                     {!blackMarketOnly && (
-                      <td className="px-4 py-2">
+                      <td className="px-3 py-2">
                         <span className={`text-xs px-1.5 py-0.5 rounded ${
                           r.sellCity === 'Black Market' ? 'bg-red-900/30 text-red-300' : 'bg-surface-lighter text-slate-300'
-                        }`}>
-                          {r.sellCity}
-                        </span>
+                        }`}>{r.sellCity}</span>
                       </td>
                     )}
-                    <td className="px-4 py-2 text-right text-slate-400">
-                      {formatSilver(r.materialCost)}
-                    </td>
-                    <td className="px-4 py-2 text-right text-slate-200">
-                      {formatSilver(r.sellPrice)}
-                    </td>
-                    <td className="px-4 py-2 text-right font-medium text-profit">
-                      +{formatSilver(r.profit)}
-                    </td>
-                    <td className="px-4 py-2 text-right font-medium text-profit">
-                      +{formatPercent(r.margin)}
-                    </td>
+                    <td className="px-3 py-2 text-right text-slate-400">{formatSilver(r.materialCost)}</td>
+                    <td className="px-3 py-2 text-right text-slate-200">{formatSilver(r.sellPrice)}</td>
+                    <td className="px-3 py-2 text-right font-medium text-profit">+{formatSilver(r.profit)}</td>
+                    <td className="px-3 py-2 text-right font-medium text-profit">+{formatPercent(r.margin)}</td>
+                    {blackMarketOnly && (
+                      <td className="px-3 py-2">
+                        {r.cheapestFlipCity ? (
+                          <div className="flex flex-col gap-0.5">
+                            {r.isCraftBetter ? (
+                              <span className="text-xs text-green-400">
+                                Craft ({formatSilver(r.materialCost)})
+                              </span>
+                            ) : (
+                              <span className="text-xs text-blue-400">
+                                Flip {r.cheapestFlipCity} ({formatSilver(r.cheapestFlipPrice || 0)})
+                              </span>
+                            )}
+                            {r.flipProfit !== undefined && r.flipProfit > 0 && !r.isCraftBetter && (
+                              <span className="text-[10px] text-slate-500">
+                                flip profit: +{formatSilver(r.flipProfit)}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-green-400">Craft only</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -386,12 +371,10 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
 
       {!scanning && results.length === 0 && (
         <div className="bg-surface rounded-xl border border-surface-lighter p-12 text-center">
-          <div className="text-5xl mb-4 opacity-20" dangerouslySetInnerHTML={{ __html: emptyIcon }} />
+          <div className="text-5xl mb-4 opacity-20">{blackMarketOnly ? '&#9876;' : '&#128200;'}</div>
           <h2 className="text-lg text-slate-400 mb-2">{title}</h2>
           <p className="text-sm text-slate-500">{emptyText}</p>
-          <p className="text-xs text-slate-600 mt-2">
-            Uses your Settings (craft city, premium, focus) from Calculator page.
-          </p>
+          <p className="text-xs text-slate-600 mt-2">Settings (craft city, premium, focus) from Calculator page.</p>
         </div>
       )}
     </div>
