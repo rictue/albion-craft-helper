@@ -1,14 +1,21 @@
 export function formatSilver(amount: number): string {
-  if (Math.abs(amount) >= 1_000_000) {
-    return (amount / 1_000_000).toFixed(2) + 'M';
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? '-' : '';
+
+  if (abs >= 1_000_000) {
+    return sign + (abs / 1_000_000).toFixed(2) + 'M';
   }
-  if (Math.abs(amount) >= 1_000) {
-    return amount.toLocaleString('en-US');
+  if (abs >= 1_000) {
+    return sign + Math.round(abs).toLocaleString('en-US');
   }
-  return amount.toFixed(0);
+  return sign + Math.round(abs).toString();
 }
 
 export function formatPercent(value: number): string {
+  // Cap at reasonable range for display
+  if (Math.abs(value) > 999) {
+    return (value > 0 ? '+' : '-') + '999%';
+  }
   return value.toFixed(1) + '%';
 }
 
