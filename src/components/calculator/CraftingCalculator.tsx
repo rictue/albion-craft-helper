@@ -77,26 +77,33 @@ export default function CraftingCalculator() {
     const materialMap = buildPriceMap(prices, settings.craftingCity);
     const sellMap = buildPriceMap(prices, settings.sellingLocation, true);
 
-    // Fallback: all cities
-    const allCitiesMap = new Map<string, number>();
+    // Fallback for MATERIALS: cheapest sell_price_min across all cities (buy low)
+    const allCitiesMaterials = new Map<string, number>();
     for (const price of prices) {
-      const bestPrice = price.sell_price_min > 0
-        ? price.sell_price_min
-        : price.buy_price_max > 0
-          ? price.buy_price_max
-          : 0;
-      if (bestPrice > 0) {
-        const existing = allCitiesMap.get(price.item_id);
-        if (!existing || bestPrice < existing) {
-          allCitiesMap.set(price.item_id, bestPrice);
+      if (price.sell_price_min > 0) {
+        const existing = allCitiesMaterials.get(price.item_id);
+        if (!existing || price.sell_price_min < existing) {
+          allCitiesMaterials.set(price.item_id, price.sell_price_min);
         }
       }
     }
 
-    allCitiesMap.forEach((v, k) => map.set(k, v));
+    // For CRAFTED ITEM sell price: highest sell_price_min across all cities (sell high)
+    const allCitiesSell = new Map<string, number>();
+    for (const price of prices) {
+      if (price.sell_price_min > 0) {
+        const existing = allCitiesSell.get(price.item_id);
+        if (!existing || price.sell_price_min > existing) {
+          allCitiesSell.set(price.item_id, price.sell_price_min);
+        }
+      }
+    }
+
+    // Start with material fallback prices, then override with crafting city
+    allCitiesMaterials.forEach((v, k) => map.set(k, v));
     materialMap.forEach((v, k) => map.set(k, v));
 
-    // Resolve sell price: try both 2H_ and MAIN_ variants
+    // Resolve sell price for crafted item
     if (selectedItem) {
       const itemId = craftedItemId;
       const altId = itemId.includes('_2H_')
@@ -105,16 +112,17 @@ export default function CraftingCalculator() {
           ? itemId.replace('_MAIN_', '_2H_')
           : null;
 
-      // From selling location
+      // From selected selling location (preferred)
+      let found = false;
       sellMap.forEach((v, k) => {
-        if (k === itemId) map.set(itemId, v);
-        if (altId && k === altId && !map.has(itemId)) map.set(itemId, v);
+        if (k === itemId) { map.set(itemId, v); found = true; }
+        if (altId && k === altId && !found) { map.set(itemId, v); found = true; }
       });
 
-      // Fallback: from all cities
-      if (!map.has(itemId) || map.get(itemId) === 0) {
-        const altPrice = altId ? allCitiesMap.get(altId) : undefined;
-        if (altPrice) map.set(itemId, altPrice);
+      // Fallback: best sell price from any city (NOT buy orders)
+      if (!found) {
+        const sellPrice = allCitiesSell.get(itemId) || (altId ? allCitiesSell.get(altId) : 0) || 0;
+        if (sellPrice > 0) map.set(itemId, sellPrice);
       }
     }
 
