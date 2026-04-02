@@ -28,7 +28,11 @@ type SortKey = 'profit' | 'margin' | 'sellPrice' | 'materialCost' | 'name';
 
 const SELL_CITIES = CITIES.filter(c => c.id !== 'Black Market').map(c => c.id);
 
-export default function SuggestedCrafts() {
+interface Props {
+  blackMarketOnly?: boolean;
+}
+
+export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
   const navigate = useNavigate();
   const { settings, setSelectedItem, setTier, setEnchantment } = useAppStore();
 
@@ -52,7 +56,6 @@ export default function SuggestedCrafts() {
       for (const item of ALL_ITEMS) {
         const itemId = resolveItemId(item.baseId, tier, enchantment);
         allIds.add(itemId);
-        // Also add MAIN_/2H_ variant
         if (itemId.includes('_2H_')) allIds.add(itemId.replace('_2H_', '_MAIN_'));
         else if (itemId.includes('_MAIN_')) allIds.add(itemId.replace('_MAIN_', '_2H_'));
 
@@ -77,7 +80,7 @@ export default function SuggestedCrafts() {
         setProgress(Math.round(((i / batchSize + 1) / totalBatches) * 100));
       }
 
-      // 3. Build price maps per city (materials: cheapest sell, items: sell_price_min)
+      // 3. Build price maps
       const materialPriceByCity = new Map<string, Map<string, number>>();
       const sellPriceByCity = new Map<string, Map<string, number>>();
 
@@ -88,12 +91,10 @@ export default function SuggestedCrafts() {
         for (const p of allPrices) {
           if (p.city !== city.id) continue;
           if (p.sell_price_min > 0) {
-            // Materials: cheapest
             const existing = matMap.get(p.item_id);
             if (!existing || p.sell_price_min < existing) {
               matMap.set(p.item_id, p.sell_price_min);
             }
-            // Sell items: same (sell_price_min is the listing price)
             sellMap.set(p.item_id, p.sell_price_min);
           }
         }
@@ -102,7 +103,6 @@ export default function SuggestedCrafts() {
         sellPriceByCity.set(city.id, sellMap);
       }
 
-      // Also build cheapest material map across ALL cities
       const cheapestMaterials = new Map<string, number>();
       for (const p of allPrices) {
         if (p.sell_price_min > 0) {
@@ -113,7 +113,7 @@ export default function SuggestedCrafts() {
         }
       }
 
-      // 4. Calculate profit for each item across all sell cities
+      // 4. Calculate profit
       const craftCity = settings.craftingCity;
       const craftMaterials = materialPriceByCity.get(craftCity) || new Map();
       const scanResults: ScanResult[] = [];
@@ -126,7 +126,6 @@ export default function SuggestedCrafts() {
             ? itemId.replace('_MAIN_', '_2H_')
             : null;
 
-        // Build material price map (craft city, fallback to cheapest)
         const priceMap = new Map<string, number>();
         for (const req of item.recipe) {
           const matId = resolveMaterialId(req.materialBase, tier, enchantment);
@@ -139,38 +138,34 @@ export default function SuggestedCrafts() {
           priceMap.set(artId, artPrice);
         }
 
-        // Try each sell city
-        for (const sellCityId of SELL_CITIES) {
-          const cityPrices = sellPriceByCity.get(sellCityId);
-          if (!cityPrices) continue;
+        // Regular cities (skip if BM only mode)
+        if (!blackMarketOnly) {
+          for (const sellCityId of SELL_CITIES) {
+            const cityPrices = sellPriceByCity.get(sellCityId);
+            if (!cityPrices) continue;
 
-          const sellPrice = cityPrices.get(itemId) || (altId ? cityPrices.get(altId) : 0) || 0;
-          if (sellPrice <= 0) continue;
+            const sellPrice = cityPrices.get(itemId) || (altId ? cityPrices.get(altId) : 0) || 0;
+            if (sellPrice <= 0) continue;
 
-          // Set sell price in map
-          priceMap.set(itemId, sellPrice);
+            priceMap.set(itemId, sellPrice);
 
-          const rr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
-          const result = calculateCrafting(
-            item, tier, enchantment, 1, rr,
-            settings.hasPremium, settings.usageFeePerHundred, priceMap,
-          );
+            const rr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
+            const result = calculateCrafting(
+              item, tier, enchantment, 1, rr,
+              settings.hasPremium, settings.usageFeePerHundred, priceMap,
+            );
 
-          if (result.profit > 0) {
-            scanResults.push({
-              item,
-              craftCity,
-              sellCity: sellCityId,
-              materialCost: result.effectiveMaterialCost,
-              sellPrice,
-              profit: result.profit,
-              margin: result.profitMargin,
-              itemId,
-            });
+            if (result.profit > 0) {
+              scanResults.push({
+                item, craftCity, sellCity: sellCityId,
+                materialCost: result.effectiveMaterialCost,
+                sellPrice, profit: result.profit, margin: result.profitMargin, itemId,
+              });
+            }
           }
         }
 
-        // Also try Black Market (buy orders)
+        // Black Market (buy orders)
         const bmPrices = allPrices.filter(p => p.city === 'Black Market' && (p.item_id === itemId || p.item_id === altId));
         for (const bp of bmPrices) {
           if (bp.buy_price_max <= 0) continue;
@@ -184,30 +179,36 @@ export default function SuggestedCrafts() {
 
           if (result.profit > 0) {
             scanResults.push({
-              item,
-              craftCity,
-              sellCity: 'Black Market',
+              item, craftCity, sellCity: 'Black Market',
               materialCost: result.effectiveMaterialCost,
-              sellPrice: bp.buy_price_max,
-              profit: result.profit,
-              margin: result.profitMargin,
-              itemId,
+              sellPrice: bp.buy_price_max, profit: result.profit, margin: result.profitMargin, itemId,
             });
           }
         }
       }
 
-      // Keep only best sell city per item
+      // Keep best per item
       const bestPerItem = new Map<string, ScanResult>();
       for (const r of scanResults) {
-        const key = r.item.baseId;
+        const key = r.item.baseId + ':' + r.sellCity;
         const existing = bestPerItem.get(key);
         if (!existing || r.profit > existing.profit) {
           bestPerItem.set(key, r);
         }
       }
 
-      setResults([...bestPerItem.values()]);
+      // For BM mode: one entry per item (best BM profit)
+      // For normal mode: one entry per item (best city overall)
+      const final = new Map<string, ScanResult>();
+      for (const r of bestPerItem.values()) {
+        const key = r.item.baseId;
+        const existing = final.get(key);
+        if (!existing || r.profit > existing.profit) {
+          final.set(key, r);
+        }
+      }
+
+      setResults([...final.values()]);
       setScannedAt(new Date().toLocaleTimeString());
     } catch (err) {
       console.error('Scan failed:', err);
@@ -215,7 +216,7 @@ export default function SuggestedCrafts() {
       setScanning(false);
       setProgress(100);
     }
-  }, [tier, enchantment, settings]);
+  }, [tier, enchantment, settings, blackMarketOnly]);
 
   const sorted = useMemo(() => {
     const arr = [...results];
@@ -247,10 +248,18 @@ export default function SuggestedCrafts() {
 
   const sortIcon = (key: SortKey) => sortKey === key ? (sortAsc ? ' ↑' : ' ↓') : '';
 
+  const title = blackMarketOnly ? 'Black Market Crafts' : 'Suggested Crafts';
+  const emptyIcon = blackMarketOnly ? '&#9876;' : '&#128200;';
+  const emptyText = blackMarketOnly
+    ? 'Scan to find items profitable to craft and sell on the Black Market.'
+    : 'Select tier & enchantment, then click "Scan Market" to find profitable crafts.';
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
       {/* Controls */}
-      <div className="bg-surface rounded-xl border border-surface-lighter p-4">
+      <div className={`rounded-xl border p-4 ${
+        blackMarketOnly ? 'bg-red-950/20 border-red-900/30' : 'bg-surface border-surface-lighter'
+      }`}>
         <div className="flex flex-wrap items-end gap-6">
           <TierSelector value={tier} onChange={setLocalTier} />
           <EnchantmentSelector value={enchantment} onChange={setLocalEnchant} />
@@ -273,9 +282,13 @@ export default function SuggestedCrafts() {
           <button
             onClick={scan}
             disabled={scanning}
-            className="ml-auto bg-gold/20 hover:bg-gold/30 text-gold border border-gold/30 rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
+            className={`ml-auto rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
+              blackMarketOnly
+                ? 'bg-red-900/30 hover:bg-red-900/50 text-red-300 border border-red-800/30'
+                : 'bg-gold/20 hover:bg-gold/30 text-gold border border-gold/30'
+            }`}
           >
-            {scanning ? 'Scanning...' : '⚡ Scan Market'}
+            {scanning ? 'Scanning...' : blackMarketOnly ? '&#9876; Scan Black Market' : '&#9889; Scan Market'}
           </button>
         </div>
 
@@ -283,7 +296,7 @@ export default function SuggestedCrafts() {
           <div className="mt-3">
             <div className="h-1.5 bg-surface-lighter rounded-full overflow-hidden">
               <div
-                className="h-full bg-gold rounded-full transition-all duration-300"
+                className={`h-full rounded-full transition-all duration-300 ${blackMarketOnly ? 'bg-red-500' : 'bg-gold'}`}
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -296,8 +309,9 @@ export default function SuggestedCrafts() {
       {results.length > 0 && (
         <div className="bg-surface rounded-xl border border-surface-lighter overflow-hidden">
           <div className="px-4 py-3 border-b border-surface-lighter flex justify-between items-center">
-            <h3 className="text-sm font-medium text-gold">
+            <h3 className={`text-sm font-medium ${blackMarketOnly ? 'text-red-300' : 'text-gold'}`}>
               {results.length} profitable crafts found
+              {blackMarketOnly && ' on Black Market'}
             </h3>
             {scannedAt && (
               <span className="text-xs text-slate-500">Scanned at {scannedAt}</span>
@@ -312,12 +326,12 @@ export default function SuggestedCrafts() {
                   <th className="text-left px-4 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('name')}>
                     Item{sortIcon('name')}
                   </th>
-                  <th className="text-left px-4 py-2">Sell At</th>
+                  {!blackMarketOnly && <th className="text-left px-4 py-2">Sell At</th>}
                   <th className="text-right px-4 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('materialCost')}>
                     Cost{sortIcon('materialCost')}
                   </th>
                   <th className="text-right px-4 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('sellPrice')}>
-                    Sell{sortIcon('sellPrice')}
+                    {blackMarketOnly ? 'BM Buy' : 'Sell'}{sortIcon('sellPrice')}
                   </th>
                   <th className="text-right px-4 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('profit')}>
                     Profit{sortIcon('profit')}
@@ -341,13 +355,15 @@ export default function SuggestedCrafts() {
                       <span className="text-slate-200">{r.item.name}</span>
                       {r.item.artifactId && <span className="text-purple-400 text-xs ml-1">*</span>}
                     </td>
-                    <td className="px-4 py-2">
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${
-                        r.sellCity === 'Black Market' ? 'bg-red-900/30 text-red-300' : 'bg-surface-lighter text-slate-300'
-                      }`}>
-                        {r.sellCity}
-                      </span>
-                    </td>
+                    {!blackMarketOnly && (
+                      <td className="px-4 py-2">
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          r.sellCity === 'Black Market' ? 'bg-red-900/30 text-red-300' : 'bg-surface-lighter text-slate-300'
+                        }`}>
+                          {r.sellCity}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-4 py-2 text-right text-slate-400">
                       {formatSilver(r.materialCost)}
                     </td>
@@ -370,11 +386,9 @@ export default function SuggestedCrafts() {
 
       {!scanning && results.length === 0 && (
         <div className="bg-surface rounded-xl border border-surface-lighter p-12 text-center">
-          <div className="text-5xl mb-4 opacity-20">&#128200;</div>
-          <h2 className="text-lg text-slate-400 mb-2">Market Scanner</h2>
-          <p className="text-sm text-slate-500">
-            Select tier & enchantment, then click "Scan Market" to find profitable crafts.
-          </p>
+          <div className="text-5xl mb-4 opacity-20" dangerouslySetInnerHTML={{ __html: emptyIcon }} />
+          <h2 className="text-lg text-slate-400 mb-2">{title}</h2>
+          <p className="text-sm text-slate-500">{emptyText}</p>
           <p className="text-xs text-slate-600 mt-2">
             Uses your Settings (craft city, premium, focus) from Calculator page.
           </p>

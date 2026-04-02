@@ -13,6 +13,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<CraftingCalculator />} />
           <Route path="/suggested" element={<SuggestedCrafts />} />
+          <Route path="/blackmarket" element={<SuggestedCrafts blackMarketOnly />} />
           <Route path="/planner" element={<CraftingPlanner />} />
           <Route path="/database" element={<CustomDatabase />} />
         </Routes>
