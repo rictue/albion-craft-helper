@@ -26,7 +26,7 @@ export async function fetchPrices(
   const results: MarketPrice[] = [];
   for (let i = 0; i < itemIds.length; i += 50) {
     const batch = itemIds.slice(i, i + 50);
-    const url = `${API_BASE}/${batch.join(',')}.json?locations=${locations.join(',')}`;
+    const url = `${API_BASE}/${batch.join(',')}.json?locations=${locations.join(',')}&qualities=1`;
 
     try {
       const response = await fetch(url);
