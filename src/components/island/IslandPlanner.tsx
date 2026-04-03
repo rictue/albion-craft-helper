@@ -23,9 +23,12 @@ export default function IslandPlanner() {
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
-  const [numPlots, setNumPlots] = useState(5);
+  const [numIslands, setNumIslands] = useState(1);
+  const [plotsPerIsland, setPlotsPerIsland] = useState(5);
   const [hasPremium, setHasPremium] = useState(settings.hasPremium);
   const [islandCity, setIslandCity] = useState(settings.craftingCity);
+
+  const totalPlots = numIslands * plotsPerIsland;
 
   const scan = useCallback(async () => {
     setScanning(true);
@@ -145,8 +148,8 @@ export default function IslandPlanner() {
   const totalDailyProfit = useMemo(() => {
     if (results.length === 0) return 0;
     // Take top N items by profit (user's plot count)
-    return results.slice(0, numPlots).reduce((sum, r) => sum + r.profitPerPlot, 0);
-  }, [results, numPlots]);
+    return results.slice(0, totalPlots).reduce((sum, r) => sum + r.profitPerPlot, 0);
+  }, [results, totalPlots]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
@@ -166,12 +169,24 @@ export default function IslandPlanner() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 block mb-1">Farm Plots</label>
+            <label className="text-xs text-slate-500 block mb-1">Islands</label>
             <input
-              type="number" min={1} max={16} value={numPlots}
-              onChange={(e) => setNumPlots(Math.max(1, Math.min(16, parseInt(e.target.value) || 5)))}
+              type="number" min={1} max={10} value={numIslands}
+              onChange={(e) => setNumIslands(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
               className="w-16 bg-surface-light border border-surface-lighter rounded-lg px-2 py-2 text-sm text-slate-200 text-center"
             />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Plots/Island</label>
+            <input
+              type="number" min={1} max={16} value={plotsPerIsland}
+              onChange={(e) => setPlotsPerIsland(Math.max(1, Math.min(16, parseInt(e.target.value) || 5)))}
+              className="w-16 bg-surface-light border border-surface-lighter rounded-lg px-2 py-2 text-sm text-slate-200 text-center"
+            />
+          </div>
+          <div className="pb-1">
+            <span className="text-xs text-slate-500">Total: </span>
+            <span className="text-sm text-gold font-bold">{totalPlots} plots</span>
           </div>
           <label className="flex items-center gap-2 cursor-pointer pb-1">
             <input type="checkbox" checked={hasPremium} onChange={(e) => setHasPremium(e.target.checked)} className="accent-gold" />
@@ -206,7 +221,7 @@ export default function IslandPlanner() {
         <div className="bg-green-950/20 rounded-xl border border-green-800/30 p-4">
           <div className="flex justify-between items-center">
             <div>
-              <div className="text-xs text-slate-500">Estimated Daily Profit (Top {numPlots} plots)</div>
+              <div className="text-xs text-slate-500">Estimated Daily Profit (Top {totalPlots} plots)</div>
               <div className="text-2xl font-bold text-profit">+{formatSilver(totalDailyProfit)}/day</div>
             </div>
             {scannedAt && <span className="text-xs text-slate-500">Scanned at {scannedAt}</span>}
@@ -239,13 +254,13 @@ export default function IslandPlanner() {
               <tbody>
                 {results.map((r, i) => {
                   const name = 'name' in r.item ? r.item.name : '';
-                  const isTopPick = i < numPlots;
+                  const isTopPick = i < totalPlots;
                   const typeColors = { crop: 'text-yellow-400 bg-yellow-900/20', herb: 'text-green-400 bg-green-900/20', animal: 'text-blue-400 bg-blue-900/20' };
 
                   return (
                     <tr key={name + r.type} className={`border-b border-surface-lighter/50 ${isTopPick ? 'bg-green-950/10' : ''}`}>
                       <td className="px-3 py-2.5">
-                        <span className={`text-xs font-bold ${i === 0 ? 'text-gold' : i < numPlots ? 'text-slate-300' : 'text-slate-600'}`}>
+                        <span className={`text-xs font-bold ${i === 0 ? 'text-gold' : i < totalPlots ? 'text-slate-300' : 'text-slate-600'}`}>
                           {i + 1}
                         </span>
                       </td>
