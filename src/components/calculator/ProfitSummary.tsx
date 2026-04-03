@@ -17,8 +17,30 @@ interface Props {
 export default function ProfitSummary({ result, onAddToPlan, prices, itemId, altItemId }: Props) {
   const [added, setAdded] = useState(false);
   const { settings } = useAppStore();
-  const isProfit = result.profit > 0;
-  const hasData = result.sellPrice > 0;
+  // Use the directly-calculated sell price for the selected city (more accurate than priceMap)
+  const directSellPrice = useMemo(() => {
+    let bestSell = 0;
+    for (const p of prices) {
+      if (p.city !== settings.sellingLocation) continue;
+      if (p.item_id !== itemId && p.item_id !== altItemId) continue;
+
+      if (settings.sellingLocation === 'Black Market') {
+        if (p.buy_price_max > bestSell) bestSell = p.buy_price_max;
+      } else {
+        if (p.sell_price_min > 0 && (bestSell === 0 || p.sell_price_min < bestSell)) {
+          bestSell = p.sell_price_min;
+        }
+      }
+    }
+    return bestSell;
+  }, [prices, itemId, altItemId, settings.sellingLocation]);
+
+  const sellPrice = directSellPrice || result.sellPrice;
+  const taxRate = settings.hasPremium ? 0.065 : 0.105;
+  const tax = sellPrice * taxRate;
+  const profit = sellPrice - tax - result.investment;
+  const isProfit = profit > 0;
+  const hasData = sellPrice > 0;
 
   // Find top 3 most profitable cities to sell
   const topCities = useMemo(() => {
@@ -67,7 +89,7 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
               Sell Price <span className="text-gold normal-case">@ {settings.sellingLocation}</span>
             </div>
             {hasData ? (
-              <div className="text-2xl font-bold text-slate-100">{formatSilver(result.sellPrice)}</div>
+              <div className="text-2xl font-bold text-slate-100">{formatSilver(sellPrice)}</div>
             ) : (
               <div className="text-lg font-bold text-yellow-500">No data</div>
             )}
@@ -81,11 +103,11 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Revenue</span>
-            <span className="text-slate-300">{formatSilver(result.sellPrice)}</span>
+            <span className="text-slate-300">{formatSilver(sellPrice)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">Tax ({(result.taxRate * 100).toFixed(1)}%)</span>
-            <span className="text-red-400">-{formatSilver(result.tax)}</span>
+            <span className="text-slate-500">Tax ({(taxRate * 100).toFixed(1)}%)</span>
+            <span className="text-red-400">-{formatSilver(tax)}</span>
           </div>
           {result.usageFee > 0 && (
             <div className="flex justify-between">
@@ -132,13 +154,13 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
         <div className="flex justify-between items-center mb-1">
           <span className="text-sm font-medium text-slate-300">Net Profit</span>
           <span className={`text-2xl font-bold ${isProfit ? 'text-profit' : 'text-loss'}`}>
-            {isProfit ? '+' : ''}{formatSilver(result.profit)}
+            {isProfit ? '+' : ''}{formatSilver(profit)}
           </span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-xs text-slate-500">Margin</span>
           <span className={`text-sm font-semibold ${isProfit ? 'text-profit' : 'text-loss'}`}>
-            {isProfit ? '+' : ''}{formatPercent(result.profitMargin)}
+            {isProfit ? '+' : ''}{formatPercent(sellPrice > 0 ? (profit / sellPrice) * 100 : 0)}
           </span>
         </div>
       </div>
