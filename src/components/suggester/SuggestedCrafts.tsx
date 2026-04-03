@@ -307,7 +307,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                   <th className="text-left px-3 py-2.5 w-12"></th>
                   <th className="text-left px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('name')}>Item{sortIcon('name')}</th>
                   {!blackMarketOnly && <th className="text-left px-3 py-2.5">Sell At</th>}
-                  {blackMarketOnly && <th className="text-center px-3 py-2.5">Orders</th>}
+                  {blackMarketOnly && <th className="text-center px-3 py-2.5">Demand</th>}
                   <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('materialCost')}>Craft Cost{sortIcon('materialCost')}</th>
                   <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('sellPrice')}>{blackMarketOnly ? 'BM Buy' : 'Sell'}{sortIcon('sellPrice')}</th>
                   <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('profit')}>Profit{sortIcon('profit')}</th>
@@ -343,8 +343,8 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                             r.bmBuyOrders >= 4 ? 'bg-green-900/30 text-green-400' :
                             r.bmBuyOrders >= 2 ? 'bg-yellow-900/30 text-yellow-400' :
                             'bg-slate-800 text-slate-400'
-                          }`}>
-                            {r.bmBuyOrders}/5
+                          }`} title={`Buy orders at ${r.bmBuyOrders} of 5 quality levels`}>
+                            {r.bmBuyOrders >= 4 ? 'High' : r.bmBuyOrders >= 2 ? 'Med' : 'Low'}
                           </span>
                         ) : (
                           <span className="text-xs text-slate-600">-</span>
