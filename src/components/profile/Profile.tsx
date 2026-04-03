@@ -1,40 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import { ITEM_CATEGORIES } from '../../data/items';
 import { Card, CardHeader, Button } from '../ui';
-
-const SPEC_CATEGORIES: { category: string; label: string; items: { baseId: string; label: string }[] }[] = [
-  { category: 'sword', label: 'Swords', items: [
-    { baseId: 'MAIN_SWORD', label: 'Broadsword' }, { baseId: '2H_CLAYMORE', label: 'Claymore' }, { baseId: '2H_DUALSWORD', label: 'Dual Swords' },
-  ]},
-  { category: 'axe', label: 'Axes', items: [
-    { baseId: 'MAIN_AXE', label: 'Battleaxe' }, { baseId: '2H_AXE', label: 'Greataxe' }, { baseId: '2H_HALBERD', label: 'Halberd' },
-    { baseId: '2H_SCYTHE_HELL', label: 'Infernal Scythe' }, { baseId: '2H_DUALAXE_KEEPER', label: 'Bear Paws' }, { baseId: '2H_AXE_AVALON', label: 'Realmbreaker' },
-  ]},
-  { category: 'bow', label: 'Bows', items: [
-    { baseId: 'MAIN_BOW', label: 'Bow' }, { baseId: '2H_BOW', label: 'Longbow' }, { baseId: '2H_WARBOW', label: 'Warbow' },
-  ]},
-  { category: 'firestaff', label: 'Fire Staffs', items: [
-    { baseId: 'MAIN_FIRESTAFF', label: 'Fire Staff' }, { baseId: '2H_FIRESTAFF', label: 'Great Fire Staff' },
-    { baseId: '2H_FIRESTAFF_AVALON', label: 'Brimstone Staff' }, { baseId: '2H_INFERNOSTAFF_MORGANA', label: 'Blazing Staff' },
-    { baseId: 'MAIN_FIRESTAFF_KEEPER', label: 'Dawnsong' },
-  ]},
-  { category: 'spear', label: 'Spears', items: [
-    { baseId: 'MAIN_SPEAR', label: 'Spear' }, { baseId: '2H_GLAIVE', label: 'Glaive' }, { baseId: '2H_SPEAR', label: 'Pike' },
-  ]},
-  { category: 'knuckles', label: 'War Gloves', items: [
-    { baseId: 'MAIN_KNUCKLES', label: 'Brawler Gloves' }, { baseId: '2H_KNUCKLES', label: 'Battle Bracers' },
-  ]},
-  { category: 'plate_armor', label: 'Plate Armor', items: [
-    { baseId: 'ARMOR_PLATE_SET1', label: 'Soldier Armor' }, { baseId: 'ARMOR_PLATE_SET2', label: 'Knight Armor' }, { baseId: 'ARMOR_PLATE_SET3', label: 'Guardian Armor' },
-  ]},
-  { category: 'plate_shoes', label: 'Plate Boots', items: [
-    { baseId: 'SHOES_PLATE_SET1', label: 'Soldier Boots' }, { baseId: 'SHOES_PLATE_SET2', label: 'Knight Boots' }, { baseId: 'SHOES_PLATE_SET3', label: 'Guardian Boots' },
-  ]},
-];
 
 const REFINE_RESOURCES = ['PLANKS', 'METALBAR', 'LEATHER', 'CLOTH', 'STONEBLOCK'];
 const REFINE_LABELS: Record<string, string> = { PLANKS: 'Wood', METALBAR: 'Ore', LEATHER: 'Hide', CLOTH: 'Fiber', STONEBLOCK: 'Rock' };
+
+const CAT_DISPLAY: Record<string, string> = {
+  knuckles: 'War Gloves', cursestaff: 'Cursed Staffs', firestaff: 'Fire Staffs',
+  froststaff: 'Frost Staffs', holystaff: 'Holy Staffs', arcanestaff: 'Arcane Staffs',
+  naturestaff: 'Nature Staffs', plate_helmet: 'Plate Helmets', plate_armor: 'Plate Armor',
+  plate_shoes: 'Plate Boots', leather_helmet: 'Leather Hoods', leather_armor: 'Leather Jackets',
+  leather_shoes: 'Leather Shoes', cloth_helmet: 'Cloth Cowls', cloth_armor: 'Cloth Robes',
+  cloth_shoes: 'Cloth Sandals', shieldtype: 'Shields', booktype: 'Tomes', torchtype: 'Torches',
+};
 
 export default function Profile() {
   const { user, signInWithDiscord, signOut } = useAuth();
@@ -144,28 +124,28 @@ export default function Profile() {
         </div>
       </Card>
 
-      {/* Crafting Specs */}
+      {/* Crafting Specs - auto-generated from all 221 items */}
       <Card>
-        <CardHeader>Crafting Specializations</CardHeader>
+        <CardHeader>Crafting Specializations ({ITEM_CATEGORIES.length} categories, {ITEM_CATEGORIES.reduce((s, c) => s + c.items.length, 0)} items)</CardHeader>
         <div className="space-y-4">
-          {SPEC_CATEGORIES.map(cat => (
-            <div key={cat.category} className="border-b border-zinc-800 pb-3 last:border-0">
+          {ITEM_CATEGORIES.map(cat => (
+            <div key={cat.id} className="border-b border-zinc-800 pb-3 last:border-0">
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-sm font-medium text-gold w-32">{cat.label}</span>
+                <span className="text-sm font-medium text-gold w-36">{CAT_DISPLAY[cat.id] || cat.name}</span>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-zinc-500">Mastery:</span>
                   <input
                     type="number" min={0} max={120}
-                    value={specs[`mastery:${cat.category}`] || 0}
-                    onChange={(e) => updateSpec(`mastery:${cat.category}`, parseInt(e.target.value) || 0)}
+                    value={specs[`mastery:${cat.id}`] || 0}
+                    onChange={(e) => updateSpec(`mastery:${cat.id}`, parseInt(e.target.value) || 0)}
                     className="w-14 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 text-center"
                   />
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2 ml-32">
+              <div className="flex flex-wrap gap-2 ml-36">
                 {cat.items.map(item => (
                   <div key={item.baseId} className="flex items-center gap-1.5 bg-zinc-800/50 rounded-lg px-2 py-1">
-                    <span className="text-xs text-zinc-400">{item.label}:</span>
+                    <span className="text-xs text-zinc-400">{item.name}:</span>
                     <input
                       type="number" min={0} max={120}
                       value={specs[`spec:${item.baseId}`] || 0}
