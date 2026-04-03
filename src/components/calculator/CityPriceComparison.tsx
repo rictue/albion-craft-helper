@@ -49,13 +49,14 @@ export default function CityPriceComparison({ prices, itemId, mainVariantId }: P
     <div className="bg-surface rounded-xl border border-surface-lighter p-4">
       <h3 className="text-xs text-slate-500 uppercase tracking-wider mb-3">City Sell Prices <span className="normal-case text-slate-600">(sell orders / BM buy orders)</span></h3>
       <div className="space-y-1.5">
-        {cityPrices.map((cp) => {
+        {cityPrices.map((cp, i) => {
           const price = cp.sell || cp.buy;
           const barWidth = maxPrice > 0 ? (price / maxPrice) * 100 : 0;
           const isBuy = cp.sell === 0;
 
           return (
             <div key={cp.city} className="flex items-center gap-2">
+              <span className={`text-xs font-bold w-4 text-right shrink-0 ${i === 0 ? 'text-gold' : i < 3 ? 'text-slate-400' : 'text-slate-600'}`}>{i + 1}</span>
               <span className="text-xs text-slate-400 w-24 shrink-0 truncate">{cp.city}</span>
               <div className="flex-1 h-5 bg-surface-light rounded overflow-hidden relative">
                 <div
