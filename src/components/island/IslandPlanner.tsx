@@ -27,6 +27,7 @@ export default function IslandPlanner() {
   const [scannedAt, setScannedAt] = useState<string | null>(null);
   const [islandPlots, setIslandPlots] = useState<number[]>([16]);
   const [hasPremium, setHasPremium] = useState(settings.hasPremium);
+  const [useFocus, setUseFocus] = useState(false);
   const [islandCity, setIslandCity] = useState(settings.craftingCity);
 
   const totalPlots = islandPlots.reduce((s, p) => s + p, 0);
@@ -95,8 +96,9 @@ export default function IslandPlanner() {
         const bonusMult = bonusTypes.includes(item.type) ? 1.1 : 1.0;
         const totalYield = Math.floor(item.seedsPerPlot * yieldPerSeed * bonusMult);
 
-        // Seeds return ~33% as new seeds on average
-        const seedReturn = Math.floor(item.seedsPerPlot * 0.33);
+        // Focus: 100% seed return. No focus: ~33% seed return
+        const seedReturnRate = useFocus ? 1.0 : 0.33;
+        const seedReturn = Math.floor(item.seedsPerPlot * seedReturnRate);
         const netSeedCost = (item.seedsPerPlot - seedReturn) * seedCost;
 
         const revenue = totalYield * outputSell.price;
@@ -162,7 +164,7 @@ export default function IslandPlanner() {
     } finally {
       setScanning(false);
     }
-  }, [hasPremium, islandCity]);
+  }, [hasPremium, useFocus, islandCity]);
 
   // Optimization: best item gets all plots (you CAN plant same thing on every plot)
   // Show top 3 options for comparison
@@ -233,6 +235,10 @@ export default function IslandPlanner() {
           <label className="flex items-center gap-2 cursor-pointer pb-1">
             <input type="checkbox" checked={hasPremium} onChange={(e) => setHasPremium(e.target.checked)} className="accent-gold" />
             <span className="text-sm text-slate-300">Premium</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer pb-1">
+            <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-blue-500" />
+            <span className="text-sm text-slate-300">Focus</span>
           </label>
 
           {CITY_FARM_BONUS[islandCity]?.length > 0 && (
