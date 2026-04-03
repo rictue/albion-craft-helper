@@ -179,8 +179,8 @@ export default function RefiningCalculator() {
                   <th className="text-center px-3 py-2.5">Tier</th>
                   <th className="text-center px-3 py-2.5">Spec</th>
                   <th className="text-center px-3 py-2.5">RR</th>
-                  <th className="text-right px-3 py-2.5">Raw Cost</th>
-                  <th className="text-right px-3 py-2.5">Eff. Cost</th>
+                  <th className="text-right px-3 py-2.5">Input Cost</th>
+                  <th className="text-right px-3 py-2.5">After Return</th>
                   <th className="text-right px-3 py-2.5">Sell</th>
                   <th className="text-right px-3 py-2.5">Profit</th>
                   <th className="text-right px-3 py-2.5">Margin</th>
