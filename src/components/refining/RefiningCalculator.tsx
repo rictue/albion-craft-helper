@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { fetchPrices } from '../../services/api';
 import { RESOURCE_TYPES, CITY_REFINE_BONUS } from '../../data/refining';
-import { getRefineSpec } from '../../data/specs';
+import { getRefineSpec, setRefineSpec as saveRefineSpec } from '../../data/specs';
 import { lpbToReturnRate } from '../../utils/returnRate';
 import { formatSilver, formatPercent } from '../../utils/formatters';
 import { useAppStore } from '../../store/appStore';
@@ -42,10 +42,7 @@ export default function RefiningCalculator() {
   const [scannedAt, setScannedAt] = useState<string | null>(null);
   const [useFocus, setUseFocus] = useState(true);
   const [refineCity, setRefineCity] = useState(settings.craftingCity);
-  const [showAll, setShowAll] = useState(true);
-
-  // Show all resources (no hardcoded filter)
-  const speccedResources: string[] = [];
+  const [filterResource, setFilterResource] = useState<string>('all');
 
   const scan = useCallback(async () => {
     setScanning(true);
@@ -53,7 +50,7 @@ export default function RefiningCalculator() {
 
     try {
       const allIds: string[] = [];
-      const typesToScan = showAll ? RESOURCE_TYPES : RESOURCE_TYPES.filter(rt => speccedResources.includes(rt.refinedPrefix));
+      const typesToScan = filterResource === 'all' ? RESOURCE_TYPES : RESOURCE_TYPES.filter(rt => rt.id === filterResource);
 
       for (const rt of typesToScan) {
         for (const r of rt.recipes) {
@@ -128,7 +125,7 @@ export default function RefiningCalculator() {
     } finally {
       setScanning(false);
     }
-  }, [useFocus, refineCity, showAll, speccedResources]);
+  }, [useFocus, refineCity, filterResource]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
@@ -150,18 +147,22 @@ export default function RefiningCalculator() {
             <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-blue-500" />
             <span className="text-sm text-zinc-300">Focus</span>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer pb-1">
-            <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} className="accent-gold" />
-            <span className="text-sm text-zinc-300">Show All Resources</span>
-          </label>
+          <div>
+            <label className="text-xs text-zinc-500 block mb-1">Resource</label>
+            <select
+              value={filterResource}
+              onChange={(e) => setFilterResource(e.target.value)}
+              className="bg-surface-light border border-surface-lighter rounded-lg px-2 py-2 text-sm text-zinc-200"
+            >
+              <option value="all">All Resources</option>
+              {RESOURCE_TYPES.map(rt => (
+                <option key={rt.id} value={rt.id}>{rt.name}</option>
+              ))}
+            </select>
+          </div>
           {CITY_REFINE_BONUS[refineCity]?.length > 0 && (
             <span className="text-xs px-2 py-1 rounded bg-green-900/30 text-green-400">
               +53% LPB ({CITY_REFINE_BONUS[refineCity].join(', ')})
-            </span>
-          )}
-          {!showAll && (
-            <span className="text-xs text-zinc-500 pb-1">
-              Showing: {speccedResources.length > 0 ? speccedResources.join(', ') : 'none'} (your specs)
             </span>
           )}
           <button
@@ -248,9 +249,7 @@ export default function RefiningCalculator() {
             Compare refining profits with enchanted tiers included.
           </p>
           <p className="text-xs text-zinc-600 mt-2">
-            {speccedResources.length > 0
-              ? `Your specs: ${speccedResources.join(', ')}. Check "Show All" to see all resources.`
-              : 'No refine specs found. Check "Show All" to see all resources.'}
+            Select resource filter and click Scan. Spec levels in table are from your saved specs.
           </p>
         </div>
       )}
