@@ -58,11 +58,15 @@ export default function RefiningCalculator() {
 
       for (const p of allPrices) {
         if (p.sell_price_min > 0) {
+          // Buy materials from cheapest city
           const ex = cheapest.get(p.item_id);
           if (!ex || p.sell_price_min < ex) cheapest.set(p.item_id, p.sell_price_min);
 
-          const exS = bestSell.get(p.item_id);
-          if (!exS || p.sell_price_min > exS.price) bestSell.set(p.item_id, { price: p.sell_price_min, city: p.city });
+          // Sell refined at best price (exclude Caerleon - low prices, transport risk)
+          if (p.city !== 'Caerleon' && p.city !== 'Black Market') {
+            const exS = bestSell.get(p.item_id);
+            if (!exS || p.sell_price_min > exS.price) bestSell.set(p.item_id, { price: p.sell_price_min, city: p.city });
+          }
         }
       }
 
