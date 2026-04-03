@@ -1,24 +1,31 @@
 import { useMemo } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { calculateReturnRate, calculateLPB } from '../../utils/returnRate';
+import { getSpecBonus, DEFAULT_CRAFT_SPECS } from '../../data/specs';
 import { CITIES } from '../../data/cities';
 import { formatPercent } from '../../utils/formatters';
 
 interface Props {
   subcategory: string;
+  baseId: string;
 }
 
-export default function ReturnRateSlider({ subcategory }: Props) {
+export default function ReturnRateSlider({ subcategory, baseId }: Props) {
   const { settings, updateSettings } = useAppStore();
 
+  const spec = useMemo(
+    () => getSpecBonus(DEFAULT_CRAFT_SPECS, subcategory, baseId),
+    [subcategory, baseId],
+  );
+
   const autoRate = useMemo(
-    () => calculateReturnRate(settings.craftingCity, subcategory, settings.useFocus),
-    [settings.craftingCity, subcategory, settings.useFocus],
+    () => calculateReturnRate(settings.craftingCity, subcategory, settings.useFocus, spec.bonusLPB),
+    [settings.craftingCity, subcategory, settings.useFocus, spec.bonusLPB],
   );
 
   const lpb = useMemo(
-    () => calculateLPB(settings.craftingCity, subcategory, settings.useFocus),
-    [settings.craftingCity, subcategory, settings.useFocus],
+    () => calculateLPB(settings.craftingCity, subcategory, settings.useFocus, spec.bonusLPB),
+    [settings.craftingCity, subcategory, settings.useFocus, spec.bonusLPB],
   );
 
   const isOverride = settings.returnRateOverride !== null;
@@ -62,7 +69,7 @@ export default function ReturnRateSlider({ subcategory }: Props) {
         </span>
         {hasBonus && (
           <span className="text-xs px-2 py-0.5 rounded bg-green-900/30 text-green-400">
-            City Bonus +15%
+            City +15%
           </span>
         )}
         {settings.useFocus && (
@@ -70,8 +77,18 @@ export default function ReturnRateSlider({ subcategory }: Props) {
             Focus +59%
           </span>
         )}
+        {spec.specLevel > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded bg-purple-900/30 text-purple-400">
+            Spec {spec.specLevel} (+{spec.bonusLPB.toFixed(1)}%)
+          </span>
+        )}
+        {spec.masteryLevel > 0 && spec.specLevel === 0 && (
+          <span className="text-xs px-2 py-0.5 rounded bg-orange-900/30 text-orange-400">
+            Mastery {spec.masteryLevel}
+          </span>
+        )}
         <span className="text-xs px-2 py-0.5 rounded bg-surface-lighter text-slate-300">
-          LPB: {lpb}%
+          LPB: {lpb.toFixed(1)}%
         </span>
         {!isOverride && (
           <span className="text-xs px-2 py-0.5 rounded bg-gold/10 text-gold">

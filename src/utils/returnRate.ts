@@ -4,7 +4,7 @@ const BASE_LPB = 18;
 const SPECIALIZATION_LPB = 15;
 const FOCUS_LPB = 59;
 
-export function calculateLPB(city: string, subcategory: string, useFocus: boolean): number {
+export function calculateLPB(city: string, subcategory: string, useFocus: boolean, specBonusLPB: number = 0): number {
   let lpb = BASE_LPB;
 
   const cityInfo = CITIES.find(c => c.id === city);
@@ -16,6 +16,9 @@ export function calculateLPB(city: string, subcategory: string, useFocus: boolea
     lpb += FOCUS_LPB;
   }
 
+  // Spec bonus: each spec level adds 0.3 LPB
+  lpb += specBonusLPB;
+
   return lpb;
 }
 
@@ -23,7 +26,7 @@ export function lpbToReturnRate(lpb: number): number {
   return lpb / (100 + lpb);
 }
 
-export function calculateReturnRate(city: string, subcategory: string, useFocus: boolean): number {
-  const lpb = calculateLPB(city, subcategory, useFocus);
+export function calculateReturnRate(city: string, subcategory: string, useFocus: boolean, specBonusLPB: number = 0): number {
+  const lpb = calculateLPB(city, subcategory, useFocus, specBonusLPB);
   return lpbToReturnRate(lpb);
 }

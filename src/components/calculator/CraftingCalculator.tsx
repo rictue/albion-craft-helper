@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/appStore';
 import { fetchPrices, buildPriceMap } from '../../services/api';
 import { calculateCrafting } from '../../utils/profitCalculator';
 import { calculateReturnRate } from '../../utils/returnRate';
+import { getSpecBonus, DEFAULT_CRAFT_SPECS } from '../../data/specs';
 import { resolveItemId, resolveMaterialId, resolveArtifactId } from '../../utils/itemIdParser';
 import ItemSearch from './ItemSearch';
 import CraftingSettings from './CraftingSettings';
@@ -147,7 +148,8 @@ export default function CraftingCalculator() {
   const returnRate = useMemo(() => {
     if (settings.returnRateOverride !== null) return settings.returnRateOverride / 100;
     if (!selectedItem) return 0.152;
-    return calculateReturnRate(settings.craftingCity, selectedItem.subcategory, settings.useFocus);
+    const spec = getSpecBonus(DEFAULT_CRAFT_SPECS, selectedItem.subcategory, selectedItem.baseId);
+    return calculateReturnRate(settings.craftingCity, selectedItem.subcategory, settings.useFocus, spec.bonusLPB);
   }, [settings.craftingCity, settings.useFocus, settings.returnRateOverride, selectedItem]);
 
   const result = useMemo(() => {
@@ -200,7 +202,7 @@ export default function CraftingCalculator() {
                 </div>
               </div>
 
-              <ReturnRateSlider subcategory={selectedItem.subcategory} />
+              <ReturnRateSlider subcategory={selectedItem.subcategory} baseId={selectedItem.baseId} />
 
               {result && <RecipeDisplay result={result} prices={prices} />}
 
