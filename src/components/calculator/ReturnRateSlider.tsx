@@ -1,31 +1,51 @@
-import { useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { calculateReturnRate, calculateLPB } from '../../utils/returnRate';
-import { getSpecBonus, DEFAULT_CRAFT_SPECS } from '../../data/specs';
+import { getMastery, setMastery, getItemSpec, setItemSpec } from '../../data/specs';
 import { CITIES } from '../../data/cities';
 import { formatPercent } from '../../utils/formatters';
 
 interface Props {
   subcategory: string;
   baseId: string;
+  itemName: string;
 }
 
-export default function ReturnRateSlider({ subcategory, baseId }: Props) {
+export default function ReturnRateSlider({ subcategory, baseId, itemName }: Props) {
   const { settings, updateSettings } = useAppStore();
 
-  const spec = useMemo(
-    () => getSpecBonus(DEFAULT_CRAFT_SPECS, subcategory, baseId),
-    [subcategory, baseId],
-  );
+  const [masteryInput, setMasteryInput] = useState(() => getMastery(subcategory));
+  const [specInput, setSpecInput] = useState(() => getItemSpec(baseId));
+
+  // Reset when item changes
+  useEffect(() => {
+    setMasteryInput(getMastery(subcategory));
+    setSpecInput(getItemSpec(baseId));
+  }, [subcategory, baseId]);
+
+  // Save to localStorage on change
+  const handleMastery = (v: number) => {
+    const val = Math.max(0, Math.min(120, v));
+    setMasteryInput(val);
+    setMastery(subcategory, val);
+  };
+
+  const handleSpec = (v: number) => {
+    const val = Math.max(0, Math.min(120, v));
+    setSpecInput(val);
+    setItemSpec(baseId, val);
+  };
+
+  const bonusLPB = specInput * 0.3;
 
   const autoRate = useMemo(
-    () => calculateReturnRate(settings.craftingCity, subcategory, settings.useFocus, spec.bonusLPB),
-    [settings.craftingCity, subcategory, settings.useFocus, spec.bonusLPB],
+    () => calculateReturnRate(settings.craftingCity, subcategory, settings.useFocus, bonusLPB),
+    [settings.craftingCity, subcategory, settings.useFocus, bonusLPB],
   );
 
   const lpb = useMemo(
-    () => calculateLPB(settings.craftingCity, subcategory, settings.useFocus, spec.bonusLPB),
-    [settings.craftingCity, subcategory, settings.useFocus, spec.bonusLPB],
+    () => calculateLPB(settings.craftingCity, subcategory, settings.useFocus, bonusLPB),
+    [settings.craftingCity, subcategory, settings.useFocus, bonusLPB],
   );
 
   const isOverride = settings.returnRateOverride !== null;
@@ -33,6 +53,9 @@ export default function ReturnRateSlider({ subcategory, baseId }: Props) {
 
   const cityInfo = CITIES.find(c => c.id === settings.craftingCity);
   const hasBonus = cityInfo?.specializations.includes(subcategory) || false;
+
+  // Subcategory display name
+  const subName = subcategory.charAt(0).toUpperCase() + subcategory.slice(1).replace(/_/g, ' ');
 
   return (
     <div className="bg-surface rounded-xl border border-surface-lighter p-4">
@@ -46,6 +69,26 @@ export default function ReturnRateSlider({ subcategory, baseId }: Props) {
             Reset to Auto
           </button>
         )}
+      </div>
+
+      {/* Spec inputs */}
+      <div className="flex gap-4 mb-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-slate-400">{subName} Mastery:</label>
+          <input
+            type="number" min={0} max={120} value={masteryInput}
+            onChange={(e) => handleMastery(parseInt(e.target.value) || 0)}
+            className="w-14 bg-surface-light border border-surface-lighter rounded px-1.5 py-1 text-xs text-slate-200 text-center focus:outline-none focus:ring-1 focus:ring-gold/50"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-purple-400">{itemName} Spec:</label>
+          <input
+            type="number" min={0} max={120} value={specInput}
+            onChange={(e) => handleSpec(parseInt(e.target.value) || 0)}
+            className="w-14 bg-surface-light border border-surface-lighter rounded px-1.5 py-1 text-xs text-slate-200 text-center focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
@@ -77,14 +120,9 @@ export default function ReturnRateSlider({ subcategory, baseId }: Props) {
             Focus +59%
           </span>
         )}
-        {spec.specLevel > 0 && (
+        {specInput > 0 && (
           <span className="text-xs px-2 py-0.5 rounded bg-purple-900/30 text-purple-400">
-            Spec {spec.specLevel} (+{spec.bonusLPB.toFixed(1)}%)
-          </span>
-        )}
-        {spec.masteryLevel > 0 && spec.specLevel === 0 && (
-          <span className="text-xs px-2 py-0.5 rounded bg-orange-900/30 text-orange-400">
-            Mastery {spec.masteryLevel}
+            Spec {specInput} (+{bonusLPB.toFixed(1)}%)
           </span>
         )}
         <span className="text-xs px-2 py-0.5 rounded bg-surface-lighter text-slate-300">

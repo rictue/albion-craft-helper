@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { fetchPrices } from '../../services/api';
 import { RESOURCE_TYPES, CITY_REFINE_BONUS } from '../../data/refining';
-import { DEFAULT_REFINE_SPECS, getRefineSpec } from '../../data/specs';
+import { getRefineSpec } from '../../data/specs';
 import { lpbToReturnRate } from '../../utils/returnRate';
 import { formatSilver, formatPercent } from '../../utils/formatters';
 import { useAppStore } from '../../store/appStore';
@@ -42,10 +42,10 @@ export default function RefiningCalculator() {
   const [scannedAt, setScannedAt] = useState<string | null>(null);
   const [useFocus, setUseFocus] = useState(true);
   const [refineCity, setRefineCity] = useState(settings.craftingCity);
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(true);
 
-  // Determine which resources have specs
-  const speccedResources = DEFAULT_REFINE_SPECS.map(s => s.resource);
+  // Show all resources (no hardcoded filter)
+  const speccedResources: string[] = [];
 
   const scan = useCallback(async () => {
     setScanning(true);
@@ -89,7 +89,7 @@ export default function RefiningCalculator() {
           const sell = bestSell.get(recipe.refinedId);
           if (!sell || rawPrice === 0) continue;
 
-          const specLevel = getRefineSpec(DEFAULT_REFINE_SPECS, rt.refinedPrefix, recipe.tier);
+          const specLevel = getRefineSpec(rt.refinedPrefix, recipe.tier);
           const specBonusLPB = specLevel * 0.3;
           let lpb = BASE_REFINE_LPB;
           if (cityBonus.includes(rt.id)) lpb += CITY_REFINE_LPB;
