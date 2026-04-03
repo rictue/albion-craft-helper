@@ -20,6 +20,7 @@ export default function Header() {
           <NavLink to="/" className={linkClass}>Calculator</NavLink>
           <NavLink to="/suggested" className={linkClass}>Suggested</NavLink>
           <NavLink to="/blackmarket" className={linkClass}>Black Market</NavLink>
+          <NavLink to="/island" className={linkClass}>Island</NavLink>
           <NavLink to="/planner" className={linkClass}>Planner</NavLink>
           <NavLink to="/database" className={linkClass}>Database</NavLink>
         </nav>
