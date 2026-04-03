@@ -354,7 +354,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                         {r.bmQualities && r.bmQualities.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {r.bmQualities.map((q) => {
-                              const qNames = ['', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5'];
+                              const qNames = ['', 'Normal', 'Good', 'Outstanding', 'Excellent', 'Masterpiece'];
                               const qColors = ['', 'text-slate-300', 'text-green-400', 'text-blue-400', 'text-purple-400', 'text-yellow-400'];
                               return (
                                 <span key={q.quality} className={`text-[11px] px-1 py-0.5 rounded bg-surface-lighter ${qColors[q.quality] || 'text-slate-400'}`}>
