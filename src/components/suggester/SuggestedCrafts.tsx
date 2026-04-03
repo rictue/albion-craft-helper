@@ -355,7 +355,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                       <td className="px-3 py-2.5">
                         {r.bmQualities && r.bmQualities.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
-                            {r.bmQualities.map((q) => {
+                            {[...r.bmQualities].sort((a, b) => a.quality - b.quality).map((q) => {
                               const qNames = ['', 'Normal', 'Good', 'Outstanding', 'Excellent', 'Masterpiece'];
                               const qColors = ['', 'text-slate-300', 'text-green-400', 'text-blue-400', 'text-purple-400', 'text-yellow-400'];
                               const hasMultiple = q.priceMin > 0 && q.priceMin !== q.price;
