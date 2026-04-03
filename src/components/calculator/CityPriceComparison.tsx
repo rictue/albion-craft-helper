@@ -47,7 +47,7 @@ export default function CityPriceComparison({ prices, itemId, mainVariantId }: P
 
   return (
     <div className="bg-surface rounded-xl border border-surface-lighter p-4">
-      <h3 className="text-xs text-slate-500 uppercase tracking-wider mb-3">City Prices</h3>
+      <h3 className="text-xs text-slate-500 uppercase tracking-wider mb-3">City Sell Prices <span className="normal-case text-slate-600">(sell orders / BM buy orders)</span></h3>
       <div className="space-y-1.5">
         {cityPrices.map((cp) => {
           const price = cp.sell || cp.buy;
