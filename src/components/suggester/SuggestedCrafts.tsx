@@ -16,6 +16,7 @@ import type { Tier, Enchantment, ItemDefinition, MarketPrice } from '../../types
 interface BmQualityOrder {
   quality: number;
   price: number;
+  priceMin: number;
 }
 
 interface ScanResult {
@@ -189,6 +190,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         const bmQualities: BmQualityOrder[] = bmEntries.map(bp => ({
           quality: bp.quality,
           price: bp.buy_price_max,
+          priceMin: bp.buy_price_min,
         })).sort((a, b) => b.price - a.price);
 
         // Use best (highest) buy price for profit calc
@@ -356,9 +358,11 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                             {r.bmQualities.map((q) => {
                               const qNames = ['', 'Normal', 'Good', 'Outstanding', 'Excellent', 'Masterpiece'];
                               const qColors = ['', 'text-slate-300', 'text-green-400', 'text-blue-400', 'text-purple-400', 'text-yellow-400'];
+                              const hasMultiple = q.priceMin > 0 && q.priceMin !== q.price;
                               return (
-                                <span key={q.quality} className={`text-[11px] px-1 py-0.5 rounded bg-surface-lighter ${qColors[q.quality] || 'text-slate-400'}`}>
+                                <span key={q.quality} className={`text-[11px] px-1.5 py-0.5 rounded bg-surface-lighter ${qColors[q.quality] || 'text-slate-400'}`}>
                                   {qNames[q.quality]}: {formatSilver(q.price)}
+                                  {hasMultiple && <span className="text-slate-500 ml-0.5">(2+)</span>}
                                 </span>
                               );
                             })}
