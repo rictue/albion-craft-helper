@@ -152,14 +152,23 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
           : itemId.includes('_MAIN_') ? itemId.replace('_MAIN_', '_2H_') : null;
 
         const priceMap = new Map<string, number>();
+        let hasMissingPrices = false;
+
         for (const req of item.recipe) {
           const matId = resolveMaterialId(req.materialBase, tier, enchantment);
-          priceMap.set(matId, craftMaterials.get(matId) || cheapestMaterials.get(matId) || 0);
+          const matPrice = craftMaterials.get(matId) || cheapestMaterials.get(matId) || 0;
+          if (matPrice === 0) hasMissingPrices = true;
+          priceMap.set(matId, matPrice);
         }
         if (item.artifactId) {
           const artId = resolveArtifactId(item.artifactId, tier);
-          priceMap.set(artId, craftMaterials.get(artId) || cheapestMaterials.get(artId) || 0);
+          const artPrice = craftMaterials.get(artId) || cheapestMaterials.get(artId) || 0;
+          if (artPrice === 0) hasMissingPrices = true;
+          priceMap.set(artId, artPrice);
         }
+
+        // Skip items with missing material/artifact prices - profit would be fake
+        if (hasMissingPrices) continue;
 
         if (!blackMarketOnly) {
           for (const sellCityId of SELL_CITIES) {
