@@ -164,23 +164,31 @@ export default function IslandPlanner() {
     }
   }, [hasPremium, islandCity]);
 
-  // Optimization: assign top N items to plots
+  // Optimization: best item gets all plots (you CAN plant same thing on every plot)
+  // Show top 3 options for comparison
   const optimization = useMemo(() => {
-    if (results.length === 0) return { totalProfit: 0, assignments: [] as { name: string; plots: number; profit: number; type: string }[] };
+    if (results.length === 0) return { totalProfit: 0, bestItem: '', assignments: [] as { name: string; plots: number; profitTotal: number; profitPerPlot: number; type: string }[] };
 
-    let remaining = totalPlots;
-    const assignments: { name: string; plots: number; profit: number; type: string }[] = [];
-    let totalProfit = 0;
+    // Only profitable items
+    const profitable = results.filter(r => r.profitPerPlot > 0);
+    if (profitable.length === 0) return { totalProfit: 0, bestItem: '', assignments: [] };
 
-    for (const r of results) {
-      if (remaining <= 0) break;
+    const assignments = profitable.slice(0, 5).map(r => {
       const name = 'name' in r.item ? r.item.name : '';
-      assignments.push({ name, plots: 1, profit: r.profitPerPlot, type: r.type });
-      totalProfit += r.profitPerPlot;
-      remaining--;
-    }
+      return {
+        name,
+        plots: totalPlots,
+        profitTotal: r.profitPerPlot * totalPlots,
+        profitPerPlot: r.profitPerPlot,
+        type: r.type,
+      };
+    });
 
-    return { totalProfit, assignments };
+    return {
+      totalProfit: assignments[0]?.profitTotal || 0,
+      bestItem: assignments[0]?.name || '',
+      assignments,
+    };
   }, [results, totalPlots]);
 
   return (
@@ -251,23 +259,30 @@ export default function IslandPlanner() {
       </div>
 
       {/* Summary + Optimization */}
-      {results.length > 0 && (
+      {results.length > 0 && optimization.assignments.length > 0 && (
         <div className="bg-green-950/20 rounded-xl border border-green-800/30 p-4">
           <div className="flex justify-between items-center mb-3">
             <div>
-              <div className="text-xs text-slate-500">Optimal Daily Profit ({totalPlots} plots across {islandPlots.length} island{islandPlots.length > 1 ? 's' : ''})</div>
+              <div className="text-xs text-slate-500">Best Option: All {totalPlots} plots = {optimization.bestItem}</div>
               <div className="text-2xl font-bold text-profit">+{formatSilver(optimization.totalProfit)}/day</div>
             </div>
             {scannedAt && <span className="text-xs text-slate-500">Scanned at {scannedAt}</span>}
           </div>
-          <div className="text-xs text-slate-500 mb-1">Recommended plot allocation:</div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="text-xs text-slate-500 mb-2">Top 5 options (if all {totalPlots} plots same item):</div>
+          <div className="space-y-1">
             {optimization.assignments.map((a, i) => {
-              const typeColors: Record<string, string> = { crop: 'bg-yellow-900/20 text-yellow-400', herb: 'bg-green-900/20 text-green-400', animal: 'bg-blue-900/20 text-blue-400' };
+              const typeColors: Record<string, string> = { crop: 'text-yellow-400', herb: 'text-green-400', animal: 'text-blue-400' };
               return (
-                <span key={i} className={`text-xs px-2 py-1 rounded ${typeColors[a.type] || 'bg-surface-lighter text-slate-300'}`}>
-                  {a.name} (+{formatSilver(a.profit)})
-                </span>
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-bold w-5 ${i === 0 ? 'text-gold' : 'text-slate-500'}`}>#{i + 1}</span>
+                    <span className={typeColors[a.type] || 'text-slate-300'}>{a.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-slate-500 mr-2">{formatSilver(a.profitPerPlot)}/plot</span>
+                    <span className="text-profit font-medium">+{formatSilver(a.profitTotal)}/day</span>
+                  </div>
+                </div>
               );
             })}
           </div>
