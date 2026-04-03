@@ -6,6 +6,7 @@ import CustomDatabase from './components/database/CustomDatabase';
 import SuggestedCrafts from './components/suggester/SuggestedCrafts';
 import IslandPlanner from './components/island/IslandPlanner';
 import RefiningCalculator from './components/refining/RefiningCalculator';
+import Profile from './components/profile/Profile';
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/refining" element={<RefiningCalculator />} />
           <Route path="/island" element={<IslandPlanner />} />
           <Route path="/planner" element={<CraftingPlanner />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/database" element={<CustomDatabase />} />
         </Routes>
       </div>

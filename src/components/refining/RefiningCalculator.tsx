@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { fetchPrices } from '../../services/api';
 import { RESOURCE_TYPES, CITY_REFINE_BONUS } from '../../data/refining';
-import { getRefineSpec, setRefineSpec as saveRefineSpec } from '../../data/specs';
+import { getRefineSpec } from '../../data/specs';
 import { lpbToReturnRate } from '../../utils/returnRate';
 import { formatSilver, formatPercent } from '../../utils/formatters';
 import { useAppStore } from '../../store/appStore';
