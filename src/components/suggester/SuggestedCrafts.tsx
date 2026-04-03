@@ -13,6 +13,11 @@ import TierSelector from '../common/TierSelector';
 import EnchantmentSelector from '../common/EnchantmentSelector';
 import type { Tier, Enchantment, ItemDefinition, MarketPrice } from '../../types';
 
+interface BmQualityOrder {
+  quality: number;
+  price: number;
+}
+
 interface ScanResult {
   item: ItemDefinition;
   craftCity: string;
@@ -24,6 +29,7 @@ interface ScanResult {
   itemId: string;
   // BM specific
   bmBuyOrders?: number;
+  bmQualities?: BmQualityOrder[];
   cheapestFlipCity?: string;
   cheapestFlipPrice?: number;
   flipProfit?: number;
@@ -175,32 +181,39 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
           }
         }
 
-        // Black Market
-        const bmEntries = allPrices.filter(p => p.city === 'Black Market' && (p.item_id === itemId || p.item_id === altId));
-        for (const bp of bmEntries) {
-          if (bp.buy_price_max <= 0) continue;
-          priceMap.set(itemId, bp.buy_price_max);
+        // Black Market - collect all quality buy orders
+        const bmEntries = allPrices.filter(p => p.city === 'Black Market' && (p.item_id === itemId || p.item_id === altId) && p.buy_price_max > 0);
+        if (bmEntries.length === 0) continue;
 
-          const rr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
-          const result = calculateCrafting(item, tier, enchantment, 1, rr, settings.hasPremium, settings.usageFeePerHundred, priceMap);
+        // Collect quality breakdown
+        const bmQualities: BmQualityOrder[] = bmEntries.map(bp => ({
+          quality: bp.quality,
+          price: bp.buy_price_max,
+        })).sort((a, b) => b.price - a.price);
 
-          // Flip comparison: cheapest city sell vs BM buy
-          const flipInfo = cheapestSellByItem.get(itemId) || (altId ? cheapestSellByItem.get(altId) : undefined);
-          const flipProfit = flipInfo ? bp.buy_price_max * (1 - (settings.hasPremium ? 0.065 : 0.105)) - flipInfo.price : undefined;
+        // Use best (highest) buy price for profit calc
+        const bestBmPrice = bmQualities[0].price;
+        priceMap.set(itemId, bestBmPrice);
 
-          if (result.profit > 0) {
-            scanResults.push({
-              item, craftCity, sellCity: 'Black Market',
-              materialCost: result.effectiveMaterialCost,
-              sellPrice: bp.buy_price_max,
-              profit: result.profit, margin: result.profitMargin, itemId,
-              bmBuyOrders: bmBuyOrderCount.get(bp.item_id) || 1,
-              cheapestFlipCity: flipInfo?.city,
-              cheapestFlipPrice: flipInfo?.price,
-              flipProfit: flipProfit,
-              isCraftBetter: flipInfo ? result.effectiveMaterialCost < flipInfo.price : true,
-            });
-          }
+        const rr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
+        const result = calculateCrafting(item, tier, enchantment, 1, rr, settings.hasPremium, settings.usageFeePerHundred, priceMap);
+
+        const flipInfo = cheapestSellByItem.get(itemId) || (altId ? cheapestSellByItem.get(altId) : undefined);
+        const flipProfit = flipInfo ? bestBmPrice * (1 - (settings.hasPremium ? 0.065 : 0.105)) - flipInfo.price : undefined;
+
+        if (result.profit > 0) {
+          scanResults.push({
+            item, craftCity, sellCity: 'Black Market',
+            materialCost: result.effectiveMaterialCost,
+            sellPrice: bestBmPrice,
+            profit: result.profit, margin: result.profitMargin, itemId,
+            bmBuyOrders: bmEntries.length,
+            bmQualities,
+            cheapestFlipCity: flipInfo?.city,
+            cheapestFlipPrice: flipInfo?.price,
+            flipProfit,
+            isCraftBetter: flipInfo ? result.effectiveMaterialCost < flipInfo.price : true,
+          });
         }
       }
 
@@ -307,9 +320,9 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                   <th className="text-left px-3 py-2.5 w-12"></th>
                   <th className="text-left px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('name')}>Item{sortIcon('name')}</th>
                   {!blackMarketOnly && <th className="text-left px-3 py-2.5">Sell At</th>}
-                  {blackMarketOnly && <th className="text-center px-3 py-2.5">Demand</th>}
+                  {blackMarketOnly && <th className="text-left px-3 py-2.5">BM Qualities</th>}
                   <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('materialCost')}>Craft Cost{sortIcon('materialCost')}</th>
-                  <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('sellPrice')}>{blackMarketOnly ? 'BM Buy' : 'Sell'}{sortIcon('sellPrice')}</th>
+                  <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('sellPrice')}>{blackMarketOnly ? 'Best Buy' : 'Sell'}{sortIcon('sellPrice')}</th>
                   <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('profit')}>Profit{sortIcon('profit')}</th>
                   <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('margin')}>Margin{sortIcon('margin')}</th>
                   {blackMarketOnly && <th className="text-left px-3 py-2.5">Craft vs Flip</th>}
@@ -337,15 +350,19 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                       </td>
                     )}
                     {blackMarketOnly && (
-                      <td className="px-3 py-2.5 text-center">
-                        {r.bmBuyOrders && r.bmBuyOrders > 0 ? (
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                            r.bmBuyOrders >= 4 ? 'bg-green-900/30 text-green-400' :
-                            r.bmBuyOrders >= 2 ? 'bg-yellow-900/30 text-yellow-400' :
-                            'bg-slate-800 text-slate-400'
-                          }`} title={`Buy orders at ${r.bmBuyOrders} of 5 quality levels`}>
-                            {r.bmBuyOrders >= 4 ? 'High' : r.bmBuyOrders >= 2 ? 'Med' : 'Low'}
-                          </span>
+                      <td className="px-3 py-2.5">
+                        {r.bmQualities && r.bmQualities.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {r.bmQualities.map((q) => {
+                              const qNames = ['', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5'];
+                              const qColors = ['', 'text-slate-300', 'text-green-400', 'text-blue-400', 'text-purple-400', 'text-yellow-400'];
+                              return (
+                                <span key={q.quality} className={`text-[11px] px-1 py-0.5 rounded bg-surface-lighter ${qColors[q.quality] || 'text-slate-400'}`}>
+                                  {qNames[q.quality]}: {formatSilver(q.price)}
+                                </span>
+                              );
+                            })}
+                          </div>
                         ) : (
                           <span className="text-xs text-slate-600">-</span>
                         )}
