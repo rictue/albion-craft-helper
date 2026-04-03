@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CraftingResult } from '../../utils/profitCalculator';
 import { formatSilver, formatPercent } from '../../utils/formatters';
+import { useAppStore } from '../../store/appStore';
 import ItemIcon from '../common/ItemIcon';
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 
 export default function ProfitSummary({ result, onAddToPlan }: Props) {
   const [added, setAdded] = useState(false);
+  const { settings } = useAppStore();
   const isProfit = result.profit > 0;
   const hasData = result.sellPrice > 0;
 
@@ -26,7 +28,9 @@ export default function ProfitSummary({ result, onAddToPlan }: Props) {
         <div className="flex items-center gap-3 mb-3">
           <ItemIcon itemId={result.itemId} size={56} quality={1} className="rounded-lg" />
           <div>
-            <div className="text-xs text-slate-500 uppercase tracking-wider">Sell Price</div>
+            <div className="text-xs text-slate-500 uppercase tracking-wider">
+              Sell Price <span className="text-gold normal-case">@ {settings.sellingLocation}</span>
+            </div>
             {hasData ? (
               <div className="text-2xl font-bold text-slate-100">{formatSilver(result.sellPrice)}</div>
             ) : (
