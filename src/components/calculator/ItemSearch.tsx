@@ -5,6 +5,15 @@ import { resolveItemId } from '../../utils/itemIdParser';
 import ItemIcon from '../common/ItemIcon';
 import type { ItemDefinition } from '../../types';
 
+const SUB_DISPLAY: Record<string, string> = {
+  knuckles: 'War Gloves', cursestaff: 'Cursed Staff', firestaff: 'Fire Staff',
+  froststaff: 'Frost Staff', holystaff: 'Holy Staff', arcanestaff: 'Arcane Staff',
+  naturestaff: 'Nature Staff', plate_helmet: 'Plate Helmet', plate_armor: 'Plate Armor',
+  plate_shoes: 'Plate Boots', leather_helmet: 'Leather Hood', leather_armor: 'Leather Jacket',
+  leather_shoes: 'Leather Shoes', cloth_helmet: 'Cloth Cowl', cloth_armor: 'Cloth Robe',
+  cloth_shoes: 'Cloth Sandals', shieldtype: 'Shield', booktype: 'Tome', torchtype: 'Torch',
+};
+
 interface Props {
   onSelect: (item: ItemDefinition) => void;
   selectedItem: ItemDefinition | null;
@@ -77,7 +86,7 @@ export default function ItemSearch({ onSelect, selectedItem }: Props) {
             >
               <ItemIcon itemId={resolveItemId(item.baseId, 4, 0)} size={28} className="shrink-0 bg-surface-lighter rounded" />
               <span>{item.name}</span>
-              <span className="text-xs text-slate-500 ml-auto">{item.subcategory}</span>
+              <span className="text-xs text-slate-500 ml-auto">{SUB_DISPLAY[item.subcategory] || item.subcategory}</span>
             </button>
           ))}
         </div>
