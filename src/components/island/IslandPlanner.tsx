@@ -15,6 +15,8 @@ interface FarmResult {
   profitPerDay: number;
   bestSellCity: string;
   bestSellPrice: number;
+  seedSource: 'NPC' | 'Market';
+  seedCostEach: number;
 }
 
 export default function IslandPlanner() {
@@ -23,12 +25,19 @@ export default function IslandPlanner() {
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
-  const [numIslands, setNumIslands] = useState(1);
-  const [plotsPerIsland, setPlotsPerIsland] = useState(5);
+  const [islandPlots, setIslandPlots] = useState<number[]>([16]);
   const [hasPremium, setHasPremium] = useState(settings.hasPremium);
   const [islandCity, setIslandCity] = useState(settings.craftingCity);
 
-  const totalPlots = numIslands * plotsPerIsland;
+  const totalPlots = islandPlots.reduce((s, p) => s + p, 0);
+
+  const addIsland = () => setIslandPlots([...islandPlots, 16]);
+  const removeIsland = (i: number) => setIslandPlots(islandPlots.filter((_, idx) => idx !== i));
+  const updatePlots = (i: number, v: number) => {
+    const next = [...islandPlots];
+    next[i] = Math.max(1, Math.min(16, v));
+    setIslandPlots(next);
+  };
 
   const scan = useCallback(async () => {
     setScanning(true);
@@ -74,7 +83,11 @@ export default function IslandPlanner() {
 
       // Calculate crop/herb profits
       for (const item of [...CROPS, ...HERBS]) {
-        const seedCost = cheapestBuy.get(item.seedId) || 0;
+        const marketSeedCost = cheapestBuy.get(item.seedId) || Infinity;
+        const npcSeedCost = item.npcPrice;
+        const seedCost = Math.min(marketSeedCost === Infinity ? npcSeedCost : marketSeedCost, npcSeedCost);
+        const seedSource = seedCost === npcSeedCost ? 'NPC' as const : 'Market' as const;
+
         const outputSell = bestSell.get(item.outputId);
         if (!outputSell) continue;
 
@@ -95,22 +108,27 @@ export default function IslandPlanner() {
           costPerPlot: netSeedCost,
           revenuePerPlot: revenue,
           profitPerPlot: profit,
-          profitPerDay: profit, // 1 harvest per day
+          profitPerDay: profit,
           bestSellCity: outputSell.city,
           bestSellPrice: outputSell.price,
+          seedSource,
+          seedCostEach: seedCost,
         });
       }
 
       // Calculate animal profits
       for (const animal of ANIMALS) {
-        const babyCost = cheapestBuy.get(animal.babyId) || 0;
+        const marketBabyCost = cheapestBuy.get(animal.babyId) || Infinity;
+        const npcBabyCost = animal.npcPrice;
+        const babyCost = Math.min(marketBabyCost === Infinity ? npcBabyCost : marketBabyCost, npcBabyCost);
+        const babySource = babyCost === npcBabyCost ? 'NPC' as const : 'Market' as const;
+
         const mountSell = animal.mountId ? bestSell.get(animal.mountId) : undefined;
         const grownSell = bestSell.get(animal.grownId);
         if (!mountSell && !grownSell) continue;
 
-        // Feed cost: each animal needs crops
         const feedCrop = CROPS.find(c => c.tier === animal.feedCropTier);
-        const feedCropPrice = feedCrop ? (cheapestBuy.get(feedCrop.outputId) || 0) : 0;
+        const feedCropPrice = feedCrop ? Math.min(cheapestBuy.get(feedCrop.outputId) || feedCrop.npcPrice, feedCrop.npcPrice) : 0;
         const feedCostPerAnimal = feedCropPrice * animal.feedAmount;
 
         const totalAnimals = animal.perPlot;
@@ -118,7 +136,6 @@ export default function IslandPlanner() {
         const totalFeedCost = feedCostPerAnimal * totalAnimals;
         const totalCost = totalBabyCost + totalFeedCost;
 
-        // Revenue: sell mounts (preferred) or grown animals
         const sellInfo = mountSell || grownSell!;
         const totalRevenue = sellInfo.price * totalAnimals;
         const profit = totalRevenue - totalCost;
@@ -129,9 +146,11 @@ export default function IslandPlanner() {
           costPerPlot: totalCost,
           revenuePerPlot: totalRevenue,
           profitPerPlot: profit,
-          profitPerDay: profit, // ~1 cycle per day
+          profitPerDay: profit,
           bestSellCity: sellInfo.city,
           bestSellPrice: sellInfo.price,
+          seedSource: babySource,
+          seedCostEach: babyCost,
         });
       }
 
@@ -145,10 +164,23 @@ export default function IslandPlanner() {
     }
   }, [hasPremium, islandCity]);
 
-  const totalDailyProfit = useMemo(() => {
-    if (results.length === 0) return 0;
-    // Take top N items by profit (user's plot count)
-    return results.slice(0, totalPlots).reduce((sum, r) => sum + r.profitPerPlot, 0);
+  // Optimization: assign top N items to plots
+  const optimization = useMemo(() => {
+    if (results.length === 0) return { totalProfit: 0, assignments: [] as { name: string; plots: number; profit: number; type: string }[] };
+
+    let remaining = totalPlots;
+    const assignments: { name: string; plots: number; profit: number; type: string }[] = [];
+    let totalProfit = 0;
+
+    for (const r of results) {
+      if (remaining <= 0) break;
+      const name = 'name' in r.item ? r.item.name : '';
+      assignments.push({ name, plots: 1, profit: r.profitPerPlot, type: r.type });
+      totalProfit += r.profitPerPlot;
+      remaining--;
+    }
+
+    return { totalProfit, assignments };
   }, [results, totalPlots]);
 
   return (
@@ -169,20 +201,22 @@ export default function IslandPlanner() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 block mb-1">Islands</label>
-            <input
-              type="number" min={1} max={10} value={numIslands}
-              onChange={(e) => setNumIslands(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
-              className="w-16 bg-surface-light border border-surface-lighter rounded-lg px-2 py-2 text-sm text-slate-200 text-center"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-slate-500 block mb-1">Plots/Island</label>
-            <input
-              type="number" min={1} max={16} value={plotsPerIsland}
-              onChange={(e) => setPlotsPerIsland(Math.max(1, Math.min(16, parseInt(e.target.value) || 5)))}
-              className="w-16 bg-surface-light border border-surface-lighter rounded-lg px-2 py-2 text-sm text-slate-200 text-center"
-            />
+            <label className="text-xs text-slate-500 block mb-1">Islands ({islandPlots.length})</label>
+            <div className="flex items-center gap-1 flex-wrap">
+              {islandPlots.map((p, i) => (
+                <div key={i} className="flex items-center gap-0.5">
+                  <input
+                    type="number" min={1} max={16} value={p}
+                    onChange={(e) => updatePlots(i, parseInt(e.target.value) || 1)}
+                    className="w-12 bg-surface-light border border-surface-lighter rounded px-1 py-1 text-xs text-slate-200 text-center"
+                  />
+                  {islandPlots.length > 1 && (
+                    <button onClick={() => removeIsland(i)} className="text-red-400 text-xs hover:text-red-300">x</button>
+                  )}
+                </div>
+              ))}
+              <button onClick={addIsland} className="text-xs text-gold hover:text-gold-light px-1.5 py-1 rounded bg-surface-light">+</button>
+            </div>
           </div>
           <div className="pb-1">
             <span className="text-xs text-slate-500">Total: </span>
@@ -216,15 +250,26 @@ export default function IslandPlanner() {
         )}
       </div>
 
-      {/* Summary */}
+      {/* Summary + Optimization */}
       {results.length > 0 && (
         <div className="bg-green-950/20 rounded-xl border border-green-800/30 p-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center mb-3">
             <div>
-              <div className="text-xs text-slate-500">Estimated Daily Profit (Top {totalPlots} plots)</div>
-              <div className="text-2xl font-bold text-profit">+{formatSilver(totalDailyProfit)}/day</div>
+              <div className="text-xs text-slate-500">Optimal Daily Profit ({totalPlots} plots across {islandPlots.length} island{islandPlots.length > 1 ? 's' : ''})</div>
+              <div className="text-2xl font-bold text-profit">+{formatSilver(optimization.totalProfit)}/day</div>
             </div>
             {scannedAt && <span className="text-xs text-slate-500">Scanned at {scannedAt}</span>}
+          </div>
+          <div className="text-xs text-slate-500 mb-1">Recommended plot allocation:</div>
+          <div className="flex flex-wrap gap-1.5">
+            {optimization.assignments.map((a, i) => {
+              const typeColors: Record<string, string> = { crop: 'bg-yellow-900/20 text-yellow-400', herb: 'bg-green-900/20 text-green-400', animal: 'bg-blue-900/20 text-blue-400' };
+              return (
+                <span key={i} className={`text-xs px-2 py-1 rounded ${typeColors[a.type] || 'bg-surface-lighter text-slate-300'}`}>
+                  {a.name} (+{formatSilver(a.profit)})
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
@@ -245,10 +290,11 @@ export default function IslandPlanner() {
                   <th className="text-left px-3 py-2.5 w-8">#</th>
                   <th className="text-left px-3 py-2.5">Item</th>
                   <th className="text-left px-3 py-2.5">Type</th>
+                  <th className="text-left px-3 py-2.5">Buy From</th>
                   <th className="text-right px-3 py-2.5">Cost/Plot</th>
                   <th className="text-right px-3 py-2.5">Revenue/Plot</th>
                   <th className="text-right px-3 py-2.5">Profit/Plot</th>
-                  <th className="text-left px-3 py-2.5">Best Sell</th>
+                  <th className="text-left px-3 py-2.5">Sell At</th>
                 </tr>
               </thead>
               <tbody>
@@ -273,6 +319,12 @@ export default function IslandPlanner() {
                         <span className={`text-xs px-1.5 py-0.5 rounded ${typeColors[r.type]}`}>
                           {r.type}
                         </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${r.seedSource === 'NPC' ? 'bg-purple-900/20 text-purple-400' : 'bg-surface-lighter text-slate-300'}`}>
+                          {r.seedSource}
+                        </span>
+                        <span className="text-xs text-slate-500 ml-1">{formatSilver(r.seedCostEach)} ea</span>
                       </td>
                       <td className="px-3 py-2.5 text-right text-slate-400">{formatSilver(r.costPerPlot)}</td>
                       <td className="px-3 py-2.5 text-right text-slate-300">{formatSilver(r.revenuePerPlot)}</td>
