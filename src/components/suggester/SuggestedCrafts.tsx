@@ -171,20 +171,34 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         if (hasMissingPrices) continue;
 
         if (!blackMarketOnly) {
+          // Collect all city prices for this item, filter outliers using median
+          const allCityPrices: { city: string; price: number }[] = [];
           for (const sellCityId of SELL_CITIES) {
             const cityPrices = sellPriceByCity.get(sellCityId);
             if (!cityPrices) continue;
             const sellPrice = cityPrices.get(itemId) || (altId ? cityPrices.get(altId) : 0) || 0;
-            if (sellPrice <= 0) continue;
-            priceMap.set(itemId, sellPrice);
+            if (sellPrice > 0) allCityPrices.push({ city: sellCityId, price: sellPrice });
+          }
+
+          // Filter outliers: remove prices > 5x median
+          if (allCityPrices.length >= 2) {
+            const sorted = [...allCityPrices].sort((a, b) => a.price - b.price);
+            const median = sorted[Math.floor(sorted.length / 2)].price;
+            const filtered = allCityPrices.filter(cp => cp.price <= median * 5);
+            allCityPrices.length = 0;
+            allCityPrices.push(...filtered);
+          }
+
+          for (const cp of allCityPrices) {
+            priceMap.set(itemId, cp.price);
 
             const rr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
             const result = calculateCrafting(item, tier, enchantment, 1, rr, settings.hasPremium, settings.usageFeePerHundred, priceMap);
 
             if (result.profit > 0) {
               scanResults.push({
-                item, craftCity, sellCity: sellCityId,
-                materialCost: result.effectiveMaterialCost, sellPrice,
+                item, craftCity, sellCity: cp.city,
+                materialCost: result.effectiveMaterialCost, sellPrice: cp.price,
                 profit: result.profit, margin: result.profitMargin, itemId,
               });
             }

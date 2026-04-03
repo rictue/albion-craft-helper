@@ -69,6 +69,16 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
       results.push({ city: city.name, price: bestSell, profit });
     }
 
+    // Filter outliers: remove prices > 5x median
+    if (results.length >= 2) {
+      const sortedPrices = [...results].sort((a, b) => a.price - b.price);
+      const median = sortedPrices[Math.floor(sortedPrices.length / 2)].price;
+      return results
+        .filter(r => r.price <= median * 5)
+        .sort((a, b) => b.profit - a.profit)
+        .slice(0, 3);
+    }
+
     return results.sort((a, b) => b.profit - a.profit).slice(0, 3);
   }, [prices, itemId, altItemId, result.investment, settings.hasPremium]);
 
