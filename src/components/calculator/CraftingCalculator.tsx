@@ -202,7 +202,7 @@ export default function CraftingCalculator() {
 
               <ReturnRateSlider subcategory={selectedItem.subcategory} />
 
-              {result && <RecipeDisplay result={result} />}
+              {result && <RecipeDisplay result={result} prices={prices} />}
 
               {prices.length > 0 && (
                 <CityPriceComparison
@@ -226,7 +226,7 @@ export default function CraftingCalculator() {
         {/* Right sidebar - Profit summary */}
         <div className="lg:col-span-3 lg:sticky lg:top-20">
           {result ? (
-            <ProfitSummary result={result} onAddToPlan={handleAddToPlan} />
+            <ProfitSummary result={result} onAddToPlan={handleAddToPlan} prices={prices} itemId={craftedItemId} altItemId={altVariantId} />
           ) : (
             <div className="bg-surface rounded-xl border border-surface-lighter p-6 text-center">
               <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Profit</div>

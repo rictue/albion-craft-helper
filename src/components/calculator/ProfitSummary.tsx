@@ -1,19 +1,54 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { CraftingResult } from '../../utils/profitCalculator';
+import type { MarketPrice } from '../../types';
 import { formatSilver, formatPercent } from '../../utils/formatters';
 import { useAppStore } from '../../store/appStore';
+import { CITIES } from '../../data/cities';
 import ItemIcon from '../common/ItemIcon';
 
 interface Props {
   result: CraftingResult;
   onAddToPlan: () => void;
+  prices: MarketPrice[];
+  itemId: string;
+  altItemId?: string;
 }
 
-export default function ProfitSummary({ result, onAddToPlan }: Props) {
+export default function ProfitSummary({ result, onAddToPlan, prices, itemId, altItemId }: Props) {
   const [added, setAdded] = useState(false);
   const { settings } = useAppStore();
   const isProfit = result.profit > 0;
   const hasData = result.sellPrice > 0;
+
+  // Find top 3 most profitable cities to sell
+  const topCities = useMemo(() => {
+    const taxRate = settings.hasPremium ? 0.065 : 0.105;
+    const results: { city: string; price: number; profit: number }[] = [];
+
+    for (const city of CITIES) {
+      // Find sell_price_min for this item in this city
+      let bestSell = 0;
+      for (const p of prices) {
+        if (p.city !== city.id) continue;
+        if (p.item_id !== itemId && p.item_id !== altItemId) continue;
+
+        if (city.id === 'Black Market') {
+          if (p.buy_price_max > bestSell) bestSell = p.buy_price_max;
+        } else {
+          if (p.sell_price_min > 0 && (bestSell === 0 || p.sell_price_min < bestSell)) {
+            bestSell = p.sell_price_min;
+          }
+        }
+      }
+
+      if (bestSell <= 0) continue;
+
+      const profit = bestSell * (1 - taxRate) - result.investment;
+      results.push({ city: city.name, price: bestSell, profit });
+    }
+
+    return results.sort((a, b) => b.profit - a.profit).slice(0, 3);
+  }, [prices, itemId, altItemId, result.investment, settings.hasPremium]);
 
   const handleAdd = () => {
     onAddToPlan();
@@ -60,6 +95,33 @@ export default function ProfitSummary({ result, onAddToPlan }: Props) {
           )}
         </div>
       </div>
+
+      {/* Top cities */}
+      {topCities.length > 0 && (
+        <div className="bg-surface rounded-xl border border-surface-lighter p-3">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Best Cities to Sell</div>
+          <div className="space-y-1.5">
+            {topCities.map((c, i) => (
+              <div key={c.city} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold w-5 ${i === 0 ? 'text-gold' : 'text-slate-500'}`}>
+                    #{i + 1}
+                  </span>
+                  <span className={i === 0 ? 'text-slate-200 font-medium' : 'text-slate-400'}>
+                    {c.city}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-300 mr-3">{formatSilver(c.price)}</span>
+                  <span className={`font-medium ${c.profit > 0 ? 'text-profit' : 'text-loss'}`}>
+                    {c.profit > 0 ? '+' : ''}{formatSilver(c.profit)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Profit card */}
       <div className={`rounded-xl border p-4 ${
