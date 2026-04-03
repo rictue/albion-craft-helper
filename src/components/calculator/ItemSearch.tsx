@@ -55,12 +55,12 @@ export default function ItemSearch({ onSelect, selectedItem }: Props) {
               setShowSearch(true);
             }}
             onFocus={() => setShowSearch(true)}
-            className="w-full bg-surface-light border border-surface-lighter rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gold/50"
+            className="w-full bg-surface-light border border-surface-lighter rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gold/50"
           />
           {search && (
             <button
               onClick={() => { setSearch(''); setShowSearch(false); }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
             >
               x
             </button>
@@ -81,12 +81,12 @@ export default function ItemSearch({ onSelect, selectedItem }: Props) {
               className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ${
                 selectedItem?.baseId === item.baseId
                   ? 'bg-gold/20 text-gold'
-                  : 'text-slate-300 hover:bg-surface-light'
+                  : 'text-zinc-300 hover:bg-surface-light'
               }`}
             >
               <ItemIcon itemId={resolveItemId(item.baseId, 4, 0)} size={28} className="shrink-0 bg-surface-lighter rounded" />
               <span>{item.name}</span>
-              <span className="text-xs text-slate-500 ml-auto">{SUB_DISPLAY[item.subcategory] || item.subcategory}</span>
+              <span className="text-xs text-zinc-500 ml-auto">{SUB_DISPLAY[item.subcategory] || item.subcategory}</span>
             </button>
           ))}
         </div>
@@ -98,10 +98,10 @@ export default function ItemSearch({ onSelect, selectedItem }: Props) {
                 onClick={() =>
                   setExpandedCategory(expandedCategory === cat.id ? null : cat.id)
                 }
-                className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-surface-light flex justify-between items-center"
+                className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-zinc-300 hover:bg-surface-light flex justify-between items-center"
               >
                 <span>{cat.name}</span>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-zinc-500">
                   {expandedCategory === cat.id ? '-' : '+'}
                 </span>
               </button>
@@ -117,7 +117,7 @@ export default function ItemSearch({ onSelect, selectedItem }: Props) {
                       className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-2 ${
                         selectedItem?.baseId === item.baseId
                           ? 'bg-gold/20 text-gold'
-                          : 'text-slate-400 hover:bg-surface-light hover:text-slate-200'
+                          : 'text-zinc-400 hover:bg-surface-light hover:text-zinc-200'
                       }`}
                     >
                       <ItemIcon itemId={resolveItemId(item.baseId, 4, 0)} size={28} className="shrink-0 bg-surface-lighter rounded" />

@@ -68,11 +68,11 @@ export default function CustomDatabase() {
         <div className="flex gap-2">
           <button
             onClick={handleExport}
-            className="text-xs text-slate-400 hover:text-gold px-3 py-1.5 rounded-lg bg-surface border border-surface-lighter transition-colors"
+            className="text-xs text-zinc-400 hover:text-gold px-3 py-1.5 rounded-lg bg-surface border border-surface-lighter transition-colors"
           >
             Export
           </button>
-          <label className="text-xs text-slate-400 hover:text-gold px-3 py-1.5 rounded-lg bg-surface border border-surface-lighter transition-colors cursor-pointer">
+          <label className="text-xs text-zinc-400 hover:text-gold px-3 py-1.5 rounded-lg bg-surface border border-surface-lighter transition-colors cursor-pointer">
             Import
             <input type="file" accept=".json" onChange={handleImport} className="hidden" />
           </label>
@@ -89,24 +89,24 @@ export default function CustomDatabase() {
 
       {/* Add custom price */}
       <div className="bg-surface rounded-xl border border-surface-lighter p-4">
-        <h3 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Add Custom Price</h3>
+        <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-3">Add Custom Price</h3>
         <div className="flex gap-3 items-end flex-wrap">
           <div className="flex-1 min-w-48">
-            <label className="text-xs text-slate-500 block mb-1">Item ID</label>
+            <label className="text-xs text-zinc-500 block mb-1">Item ID</label>
             <input
               type="text"
               placeholder="e.g. T4_METALBAR"
               value={newItemId}
               onChange={(e) => setNewItemId(e.target.value)}
-              className="w-full bg-surface-light border border-surface-lighter rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gold/50"
+              className="w-full bg-surface-light border border-surface-lighter rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gold/50"
             />
           </div>
           <div>
-            <label className="text-xs text-slate-500 block mb-1">City</label>
+            <label className="text-xs text-zinc-500 block mb-1">City</label>
             <select
               value={newCity}
               onChange={(e) => setNewCity(e.target.value)}
-              className="bg-surface-light border border-surface-lighter rounded-lg px-2 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-gold/50"
+              className="bg-surface-light border border-surface-lighter rounded-lg px-2 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-gold/50"
             >
               {CITIES.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -114,13 +114,13 @@ export default function CustomDatabase() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 block mb-1">Price</label>
+            <label className="text-xs text-zinc-500 block mb-1">Price</label>
             <input
               type="number"
               placeholder="Silver"
               value={newPrice}
               onChange={(e) => setNewPrice(e.target.value)}
-              className="w-28 bg-surface-light border border-surface-lighter rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gold/50"
+              className="w-28 bg-surface-light border border-surface-lighter rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gold/50"
             />
           </div>
           <button
@@ -135,7 +135,7 @@ export default function CustomDatabase() {
       {/* Saved prices list */}
       <div className="bg-surface rounded-xl border border-surface-lighter p-4">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-xs text-slate-500 uppercase tracking-wider">
+          <h3 className="text-xs text-zinc-500 uppercase tracking-wider">
             Saved Prices ({customEntries.length})
           </h3>
           {customEntries.length > 0 && (
@@ -144,13 +144,13 @@ export default function CustomDatabase() {
               placeholder="Filter..."
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              className="bg-surface-light border border-surface-lighter rounded-lg px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gold/50"
+              className="bg-surface-light border border-surface-lighter rounded-lg px-2 py-1 text-xs text-zinc-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gold/50"
             />
           )}
         </div>
 
         {filteredEntries.length === 0 ? (
-          <p className="text-sm text-slate-500 text-center py-6">
+          <p className="text-sm text-zinc-500 text-center py-6">
             No custom prices saved yet. Custom prices override API prices in calculations.
           </p>
         ) : (
@@ -158,14 +158,14 @@ export default function CustomDatabase() {
             {filteredEntries.map((entry) => (
               <div key={entry.key} className="flex items-center justify-between bg-surface-light rounded-lg px-3 py-2">
                 <div>
-                  <span className="text-sm text-slate-200 font-mono">{entry.itemId}</span>
-                  <span className="text-xs text-slate-500 ml-2">{entry.city}</span>
+                  <span className="text-sm text-zinc-200 font-mono">{entry.itemId}</span>
+                  <span className="text-xs text-zinc-500 ml-2">{entry.city}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-gold font-medium">{formatSilver(entry.price)}</span>
                   <button
                     onClick={() => removeCustomPrice(entry.key)}
-                    className="text-slate-500 hover:text-red-400 transition-colors text-xs"
+                    className="text-zinc-500 hover:text-red-400 transition-colors text-xs"
                   >
                     &#10005;
                   </button>
@@ -178,14 +178,14 @@ export default function CustomDatabase() {
 
       {/* Settings */}
       <div className="bg-surface rounded-xl border border-surface-lighter p-4">
-        <h3 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Default Settings</h3>
+        <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-3">Default Settings</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <div>
-            <label className="text-xs text-slate-500 block mb-1">Default Crafting City</label>
+            <label className="text-xs text-zinc-500 block mb-1">Default Crafting City</label>
             <select
               value={settings.craftingCity}
               onChange={(e) => updateSettings({ craftingCity: e.target.value })}
-              className="w-full bg-surface-light border border-surface-lighter rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-gold/50"
+              className="w-full bg-surface-light border border-surface-lighter rounded-lg px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-gold/50"
             >
               {CITIES.filter(c => c.id !== 'Black Market').map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -193,11 +193,11 @@ export default function CustomDatabase() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 block mb-1">Default Selling Location</label>
+            <label className="text-xs text-zinc-500 block mb-1">Default Selling Location</label>
             <select
               value={settings.sellingLocation}
               onChange={(e) => updateSettings({ sellingLocation: e.target.value })}
-              className="w-full bg-surface-light border border-surface-lighter rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-gold/50"
+              className="w-full bg-surface-light border border-surface-lighter rounded-lg px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-gold/50"
             >
               {CITIES.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -205,13 +205,13 @@ export default function CustomDatabase() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 block mb-1">Usage Fee / 100 Nutrition</label>
+            <label className="text-xs text-zinc-500 block mb-1">Usage Fee / 100 Nutrition</label>
             <input
               type="number"
               min={0}
               value={settings.usageFeePerHundred}
               onChange={(e) => updateSettings({ usageFeePerHundred: parseFloat(e.target.value) || 0 })}
-              className="w-full bg-surface-light border border-surface-lighter rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-gold/50"
+              className="w-full bg-surface-light border border-surface-lighter rounded-lg px-2 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-gold/50"
             />
           </div>
         </div>

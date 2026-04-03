@@ -199,11 +199,11 @@ export default function IslandPlanner() {
       <div className="bg-surface rounded-xl border border-surface-lighter p-4">
         <div className="flex flex-wrap items-end gap-6">
           <div>
-            <label className="text-xs text-slate-500 block mb-1">Island City</label>
+            <label className="text-xs text-zinc-500 block mb-1">Island City</label>
             <select
               value={islandCity}
               onChange={(e) => setIslandCity(e.target.value)}
-              className="bg-surface-light border border-surface-lighter rounded-lg px-2 py-2 text-sm text-slate-200"
+              className="bg-surface-light border border-surface-lighter rounded-lg px-2 py-2 text-sm text-zinc-200"
             >
               {CITIES.filter(c => c.id !== 'Black Market').map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -211,14 +211,14 @@ export default function IslandPlanner() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 block mb-1">Islands ({islandPlots.length})</label>
+            <label className="text-xs text-zinc-500 block mb-1">Islands ({islandPlots.length})</label>
             <div className="flex items-center gap-1 flex-wrap">
               {islandPlots.map((p, i) => (
                 <div key={i} className="flex items-center gap-0.5">
                   <input
                     type="number" min={1} max={16} value={p}
                     onChange={(e) => updatePlots(i, parseInt(e.target.value) || 1)}
-                    className="w-12 bg-surface-light border border-surface-lighter rounded px-1 py-1 text-xs text-slate-200 text-center"
+                    className="w-12 bg-surface-light border border-surface-lighter rounded px-1 py-1 text-xs text-zinc-200 text-center"
                   />
                   {islandPlots.length > 1 && (
                     <button onClick={() => removeIsland(i)} className="text-red-400 text-xs hover:text-red-300">x</button>
@@ -229,16 +229,16 @@ export default function IslandPlanner() {
             </div>
           </div>
           <div className="pb-1">
-            <span className="text-xs text-slate-500">Total: </span>
+            <span className="text-xs text-zinc-500">Total: </span>
             <span className="text-sm text-gold font-bold">{totalPlots} plots</span>
           </div>
           <label className="flex items-center gap-2 cursor-pointer pb-1">
             <input type="checkbox" checked={hasPremium} onChange={(e) => setHasPremium(e.target.checked)} className="accent-gold" />
-            <span className="text-sm text-slate-300">Premium</span>
+            <span className="text-sm text-zinc-300">Premium</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer pb-1">
             <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-blue-500" />
-            <span className="text-sm text-slate-300">Focus</span>
+            <span className="text-sm text-zinc-300">Focus</span>
           </label>
 
           {CITY_FARM_BONUS[islandCity]?.length > 0 && (
@@ -269,23 +269,23 @@ export default function IslandPlanner() {
         <div className="bg-green-950/20 rounded-xl border border-green-800/30 p-4">
           <div className="flex justify-between items-center mb-3">
             <div>
-              <div className="text-xs text-slate-500">Best Option: All {totalPlots} plots = {optimization.bestItem}</div>
+              <div className="text-xs text-zinc-500">Best Option: All {totalPlots} plots = {optimization.bestItem}</div>
               <div className="text-2xl font-bold text-profit">+{formatSilver(optimization.totalProfit)}/day</div>
             </div>
-            {scannedAt && <span className="text-xs text-slate-500">Scanned at {scannedAt}</span>}
+            {scannedAt && <span className="text-xs text-zinc-500">Scanned at {scannedAt}</span>}
           </div>
-          <div className="text-xs text-slate-500 mb-2">Top 5 options (if all {totalPlots} plots same item):</div>
+          <div className="text-xs text-zinc-500 mb-2">Top 5 options (if all {totalPlots} plots same item):</div>
           <div className="space-y-1">
             {optimization.assignments.map((a, i) => {
               const typeColors: Record<string, string> = { crop: 'text-yellow-400', herb: 'text-green-400', animal: 'text-blue-400' };
               return (
                 <div key={i} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs font-bold w-5 ${i === 0 ? 'text-gold' : 'text-slate-500'}`}>#{i + 1}</span>
-                    <span className={typeColors[a.type] || 'text-slate-300'}>{a.name}</span>
+                    <span className={`text-xs font-bold w-5 ${i === 0 ? 'text-gold' : 'text-zinc-500'}`}>#{i + 1}</span>
+                    <span className={typeColors[a.type] || 'text-zinc-300'}>{a.name}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-xs text-slate-500 mr-2">{formatSilver(a.profitPerPlot)}/plot</span>
+                    <span className="text-xs text-zinc-500 mr-2">{formatSilver(a.profitPerPlot)}/plot</span>
                     <span className="text-profit font-medium">+{formatSilver(a.profitTotal)}/day</span>
                   </div>
                 </div>
@@ -307,7 +307,7 @@ export default function IslandPlanner() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-surface-lighter">
+                <tr className="text-xs text-zinc-500 uppercase tracking-wider border-b border-surface-lighter">
                   <th className="text-left px-3 py-2.5 w-8">#</th>
                   <th className="text-left px-3 py-2.5">Item</th>
                   <th className="text-left px-3 py-2.5">Type</th>
@@ -327,12 +327,12 @@ export default function IslandPlanner() {
                   return (
                     <tr key={name + r.type} className={`border-b border-surface-lighter/50 ${isTopPick ? 'bg-green-950/10' : ''}`}>
                       <td className="px-3 py-2.5">
-                        <span className={`text-xs font-bold ${i === 0 ? 'text-gold' : i < totalPlots ? 'text-slate-300' : 'text-slate-600'}`}>
+                        <span className={`text-xs font-bold ${i === 0 ? 'text-gold' : i < totalPlots ? 'text-zinc-300' : 'text-zinc-600'}`}>
                           {i + 1}
                         </span>
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className={isTopPick ? 'text-slate-200 font-medium' : 'text-slate-400'}>
+                        <span className={isTopPick ? 'text-zinc-200 font-medium' : 'text-zinc-400'}>
                           {name}
                         </span>
                       </td>
@@ -342,19 +342,19 @@ export default function IslandPlanner() {
                         </span>
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${r.seedSource === 'NPC' ? 'bg-purple-900/20 text-purple-400' : 'bg-surface-lighter text-slate-300'}`}>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${r.seedSource === 'NPC' ? 'bg-purple-900/20 text-purple-400' : 'bg-surface-lighter text-zinc-300'}`}>
                           {r.seedSource}
                         </span>
-                        <span className="text-xs text-slate-500 ml-1">{formatSilver(r.seedCostEach)} ea</span>
+                        <span className="text-xs text-zinc-500 ml-1">{formatSilver(r.seedCostEach)} ea</span>
                       </td>
-                      <td className="px-3 py-2.5 text-right text-slate-400">{formatSilver(r.costPerPlot)}</td>
-                      <td className="px-3 py-2.5 text-right text-slate-300">{formatSilver(r.revenuePerPlot)}</td>
+                      <td className="px-3 py-2.5 text-right text-zinc-400">{formatSilver(r.costPerPlot)}</td>
+                      <td className="px-3 py-2.5 text-right text-zinc-300">{formatSilver(r.revenuePerPlot)}</td>
                       <td className={`px-3 py-2.5 text-right font-medium ${r.profitPerPlot > 0 ? 'text-profit' : 'text-loss'}`}>
                         {r.profitPerPlot > 0 ? '+' : ''}{formatSilver(r.profitPerPlot)}
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className="text-xs text-slate-400">{r.bestSellCity}</span>
-                        <span className="text-xs text-slate-500 ml-1">({formatSilver(r.bestSellPrice)} ea)</span>
+                        <span className="text-xs text-zinc-400">{r.bestSellCity}</span>
+                        <span className="text-xs text-zinc-500 ml-1">({formatSilver(r.bestSellPrice)} ea)</span>
                       </td>
                     </tr>
                   );
@@ -368,11 +368,11 @@ export default function IslandPlanner() {
       {!scanning && results.length === 0 && (
         <div className="bg-surface rounded-xl border border-surface-lighter p-12 text-center">
           <div className="text-5xl mb-4 opacity-20">&#127793;</div>
-          <h2 className="text-lg text-slate-400 mb-2">Island Planner</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="text-lg text-zinc-400 mb-2">Island Planner</h2>
+          <p className="text-sm text-zinc-500">
             Find the most profitable crops, herbs, and animals for your island.
           </p>
-          <p className="text-xs text-slate-600 mt-2">
+          <p className="text-xs text-zinc-600 mt-2">
             Compares seed cost vs harvest revenue across all cities.
           </p>
         </div>

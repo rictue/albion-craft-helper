@@ -302,7 +302,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
           <TierSelector value={tier} onChange={setLocalTier} />
           <EnchantmentSelector value={enchantment} onChange={setLocalEnchant} />
           <div className="flex items-end gap-3 text-sm">
-            <span className="text-slate-500">Craft:</span>
+            <span className="text-zinc-500">Craft:</span>
             <span className="text-gold">{settings.craftingCity}</span>
             {settings.hasPremium && <span className="text-xs bg-gold/20 text-gold px-1.5 py-0.5 rounded">Premium</span>}
             {settings.useFocus && <span className="text-xs bg-blue-900/30 text-blue-400 px-1.5 py-0.5 rounded">Focus</span>}
@@ -324,7 +324,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
             <div className="h-1.5 bg-surface-lighter rounded-full overflow-hidden">
               <div className={`h-full rounded-full transition-all duration-300 ${blackMarketOnly ? 'bg-red-500' : 'bg-gold'}`} style={{ width: `${progress}%` }} />
             </div>
-            <p className="text-xs text-slate-500 mt-1">Fetching prices... {progress}%</p>
+            <p className="text-xs text-zinc-500 mt-1">Fetching prices... {progress}%</p>
           </div>
         )}
       </div>
@@ -335,13 +335,13 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
             <h3 className={`text-sm font-medium ${blackMarketOnly ? 'text-red-300' : 'text-gold'}`}>
               {results.length} profitable crafts{blackMarketOnly ? ' on Black Market' : ''}
             </h3>
-            {scannedAt && <span className="text-xs text-slate-500">Scanned at {scannedAt}</span>}
+            {scannedAt && <span className="text-xs text-zinc-500">Scanned at {scannedAt}</span>}
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-surface-lighter">
+                <tr className="text-xs text-zinc-500 uppercase tracking-wider border-b border-surface-lighter">
                   <th className="text-left px-3 py-2.5 w-12"></th>
                   <th className="text-left px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('name')}>Item{sortIcon('name')}</th>
                   {!blackMarketOnly && <th className="text-left px-3 py-2.5">Sell At</th>}
@@ -364,13 +364,13 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                       <ItemIcon itemId={r.itemId} size={32} className="bg-surface-lighter rounded" />
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className="text-slate-200">{r.item.name}</span>
+                      <span className="text-zinc-200">{r.item.name}</span>
                       {r.item.artifactId && <span className="text-purple-400 text-xs ml-1">*</span>}
                     </td>
                     {!blackMarketOnly && (
                       <td className="px-3 py-2.5">
                         <span className={`text-xs px-1.5 py-0.5 rounded ${
-                          r.sellCity === 'Black Market' ? 'bg-red-900/30 text-red-300' : 'bg-surface-lighter text-slate-300'
+                          r.sellCity === 'Black Market' ? 'bg-red-900/30 text-red-300' : 'bg-surface-lighter text-zinc-300'
                         }`}>{r.sellCity}</span>
                       </td>
                     )}
@@ -380,23 +380,23 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                           <div className="flex flex-wrap gap-1">
                             {[...r.bmQualities].sort((a, b) => a.quality - b.quality).map((q) => {
                               const qNames = ['', 'Normal', 'Good', 'Outstanding', 'Excellent', 'Masterpiece'];
-                              const qColors = ['', 'text-slate-300', 'text-green-400', 'text-blue-400', 'text-purple-400', 'text-yellow-400'];
+                              const qColors = ['', 'text-zinc-300', 'text-green-400', 'text-blue-400', 'text-purple-400', 'text-yellow-400'];
                               const hasMultiple = q.priceMin > 0 && q.priceMin !== q.price;
                               return (
-                                <span key={q.quality} className={`text-[11px] px-1.5 py-0.5 rounded bg-surface-lighter ${qColors[q.quality] || 'text-slate-400'}`}>
+                                <span key={q.quality} className={`text-[11px] px-1.5 py-0.5 rounded bg-surface-lighter ${qColors[q.quality] || 'text-zinc-400'}`}>
                                   {qNames[q.quality]}: {formatSilver(q.price)}
-                                  {hasMultiple && <span className="text-slate-500 ml-0.5">(2+)</span>}
+                                  {hasMultiple && <span className="text-zinc-500 ml-0.5">(2+)</span>}
                                 </span>
                               );
                             })}
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-600">-</span>
+                          <span className="text-xs text-zinc-600">-</span>
                         )}
                       </td>
                     )}
-                    <td className="px-3 py-2.5 text-right text-slate-400">{formatSilver(r.materialCost)}</td>
-                    <td className="px-3 py-2.5 text-right text-slate-200">{formatSilver(r.sellPrice)}</td>
+                    <td className="px-3 py-2.5 text-right text-zinc-400">{formatSilver(r.materialCost)}</td>
+                    <td className="px-3 py-2.5 text-right text-zinc-200">{formatSilver(r.sellPrice)}</td>
                     <td className="px-3 py-2.5 text-right font-medium text-profit">+{formatSilver(r.profit)}</td>
                     <td className="px-3 py-2.5 text-right font-medium text-profit">+{formatPercent(r.margin)}</td>
                     {blackMarketOnly && (
@@ -413,7 +413,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                               </span>
                             )}
                             {r.flipProfit !== undefined && r.flipProfit > 0 && !r.isCraftBetter && (
-                              <span className="text-[10px] text-slate-500">
+                              <span className="text-[10px] text-zinc-500">
                                 flip profit: +{formatSilver(r.flipProfit)}
                               </span>
                             )}
@@ -434,9 +434,9 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
       {!scanning && results.length === 0 && (
         <div className="bg-surface rounded-xl border border-surface-lighter p-12 text-center">
           <div className="text-5xl mb-4 opacity-20">{blackMarketOnly ? '&#9876;' : '&#128200;'}</div>
-          <h2 className="text-lg text-slate-400 mb-2">{title}</h2>
-          <p className="text-sm text-slate-500">{emptyText}</p>
-          <p className="text-xs text-slate-600 mt-2">Settings (craft city, premium, focus) from Calculator page.</p>
+          <h2 className="text-lg text-zinc-400 mb-2">{title}</h2>
+          <p className="text-sm text-zinc-500">{emptyText}</p>
+          <p className="text-xs text-zinc-600 mt-2">Settings (craft city, premium, focus) from Calculator page.</p>
         </div>
       )}
     </div>

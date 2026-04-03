@@ -55,7 +55,7 @@ export default function ItemIcon({ itemId, size = 64, quality = 1, className = '
   if (error) {
     return (
       <div
-        className={`bg-surface-lighter rounded flex items-center justify-center text-slate-600 text-xs ${className}`}
+        className={`bg-surface-lighter rounded flex items-center justify-center text-zinc-600 text-xs ${className}`}
         style={{ width: size, height: size }}
       >
         ?

@@ -185,12 +185,12 @@ export default function CraftingCalculator() {
                   {pricesLoading && (
                     <div className="flex items-center gap-1">
                       <div className="w-1.5 h-1.5 rounded-full bg-gold animate-pulse" />
-                      <span className="text-xs text-slate-500">Loading...</span>
+                      <span className="text-xs text-zinc-500">Loading...</span>
                     </div>
                   )}
                   <button
                     onClick={loadPrices}
-                    className="ml-auto text-xs text-slate-500 hover:text-gold transition-colors px-2 py-1 rounded hover:bg-surface-light"
+                    className="ml-auto text-xs text-zinc-500 hover:text-gold transition-colors px-2 py-1 rounded hover:bg-surface-light"
                     title="Refresh prices"
                   >
                     &#8635; Refresh
@@ -217,8 +217,8 @@ export default function CraftingCalculator() {
           ) : (
             <div className="bg-surface rounded-xl border border-surface-lighter p-12 text-center">
               <div className="text-6xl mb-4 opacity-20">&#9876;</div>
-              <h2 className="text-lg text-slate-400 mb-2">Select an Item</h2>
-              <p className="text-sm text-slate-500">
+              <h2 className="text-lg text-zinc-400 mb-2">Select an Item</h2>
+              <p className="text-sm text-zinc-500">
                 Choose an item from the list to calculate crafting costs and profit.
               </p>
             </div>
@@ -231,8 +231,8 @@ export default function CraftingCalculator() {
             <ProfitSummary result={result} onAddToPlan={handleAddToPlan} prices={prices} itemId={craftedItemId} altItemId={altVariantId} />
           ) : (
             <div className="bg-surface rounded-xl border border-surface-lighter p-6 text-center">
-              <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Profit</div>
-              <div className="text-2xl text-slate-600">---</div>
+              <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Profit</div>
+              <div className="text-2xl text-zinc-600">---</div>
             </div>
           )}
         </div>

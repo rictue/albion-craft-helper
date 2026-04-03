@@ -128,8 +128,8 @@ export default function CraftingPlanner() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="bg-surface rounded-xl border border-surface-lighter p-12 text-center">
           <div className="text-6xl mb-4 opacity-20">&#128221;</div>
-          <h2 className="text-lg text-slate-400 mb-2">Planner is Empty</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="text-lg text-zinc-400 mb-2">Planner is Empty</h2>
+          <p className="text-sm text-zinc-500">
             Add items from the Calculator using the "Add to Planner" button.
           </p>
         </div>
@@ -144,7 +144,7 @@ export default function CraftingPlanner() {
         <div className="flex gap-2">
           <button
             onClick={loadAllPrices}
-            className="text-xs text-slate-400 hover:text-gold px-3 py-1.5 rounded-lg bg-surface border border-surface-lighter transition-colors"
+            className="text-xs text-zinc-400 hover:text-gold px-3 py-1.5 rounded-lg bg-surface border border-surface-lighter transition-colors"
           >
             Refresh Prices
           </button>
@@ -163,34 +163,34 @@ export default function CraftingPlanner() {
           <div key={entry.id} className="bg-surface rounded-xl border border-surface-lighter p-4 flex items-center gap-4">
             <ItemIcon itemId={result.itemId} size={48} />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-slate-200">{entry.item.name}</div>
-              <div className="text-xs text-slate-500">
+              <div className="text-sm font-medium text-zinc-200">{entry.item.name}</div>
+              <div className="text-xs text-zinc-500">
                 T{entry.tier}.{entry.enchantment}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-500">Qty:</label>
+              <label className="text-xs text-zinc-500">Qty:</label>
               <input
                 type="number"
                 min={1}
                 value={entry.quantity}
                 onChange={(e) => updatePlanQuantity(entry.id, Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-16 bg-surface-light border border-surface-lighter rounded px-2 py-1 text-sm text-slate-200 text-center focus:outline-none focus:ring-1 focus:ring-gold/50"
+                className="w-16 bg-surface-light border border-surface-lighter rounded px-2 py-1 text-sm text-zinc-200 text-center focus:outline-none focus:ring-1 focus:ring-gold/50"
               />
             </div>
             <div className="text-right w-28">
-              <div className="text-xs text-slate-500">Cost</div>
-              <div className="text-sm text-slate-200">{formatSilver(result.investment)}</div>
+              <div className="text-xs text-zinc-500">Cost</div>
+              <div className="text-sm text-zinc-200">{formatSilver(result.investment)}</div>
             </div>
             <div className="text-right w-28">
-              <div className="text-xs text-slate-500">Profit</div>
+              <div className="text-xs text-zinc-500">Profit</div>
               <div className={`text-sm font-medium ${result.profit >= 0 ? 'text-profit' : 'text-loss'}`}>
                 {result.profit >= 0 ? '+' : ''}{formatSilver(result.profit)}
               </div>
             </div>
             <button
               onClick={() => removeFromPlan(entry.id)}
-              className="text-slate-500 hover:text-red-400 transition-colors p-1"
+              className="text-zinc-500 hover:text-red-400 transition-colors p-1"
             >
               &#10005;
             </button>
@@ -200,13 +200,13 @@ export default function CraftingPlanner() {
 
       {/* Material aggregation */}
       <div className="bg-surface rounded-xl border border-surface-lighter p-4">
-        <h3 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Total Materials Needed</h3>
+        <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-3">Total Materials Needed</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[...totals.materialTotals.entries()].map(([key, mat]) => (
             <div key={key} className="bg-surface-light rounded-lg p-3">
-              <div className="text-sm text-slate-200">{mat.name}</div>
+              <div className="text-sm text-zinc-200">{mat.name}</div>
               <div className="text-lg font-bold text-gold">{mat.count.toLocaleString()}</div>
-              <div className="text-xs text-slate-500">{formatSilver(mat.cost)}</div>
+              <div className="text-xs text-zinc-500">{formatSilver(mat.cost)}</div>
             </div>
           ))}
         </div>
@@ -218,18 +218,18 @@ export default function CraftingPlanner() {
           ? 'bg-green-950/20 border-green-800/30'
           : 'bg-red-950/20 border-red-800/30'
       }`}>
-        <h3 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Summary</h3>
+        <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-3">Summary</h3>
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
-            <div className="text-xs text-slate-500">Total Investment</div>
-            <div className="text-xl font-bold text-slate-200">{formatSilver(totals.totalInvestment)}</div>
+            <div className="text-xs text-zinc-500">Total Investment</div>
+            <div className="text-xl font-bold text-zinc-200">{formatSilver(totals.totalInvestment)}</div>
           </div>
           <div className="text-center">
-            <div className="text-xs text-slate-500">Total Revenue</div>
-            <div className="text-xl font-bold text-slate-200">{formatSilver(totals.totalSell)}</div>
+            <div className="text-xs text-zinc-500">Total Revenue</div>
+            <div className="text-xl font-bold text-zinc-200">{formatSilver(totals.totalSell)}</div>
           </div>
           <div className="text-center">
-            <div className="text-xs text-slate-500">Total Profit</div>
+            <div className="text-xs text-zinc-500">Total Profit</div>
             <div className={`text-2xl font-bold ${totals.totalProfit >= 0 ? 'text-profit' : 'text-loss'}`}>
               {totals.totalProfit >= 0 ? '+' : ''}{formatSilver(totals.totalProfit)}
             </div>

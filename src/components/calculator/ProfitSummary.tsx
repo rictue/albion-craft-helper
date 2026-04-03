@@ -101,11 +101,11 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
         <div className="flex items-center gap-3 mb-3">
           <ItemIcon itemId={result.itemId} size={56} quality={1} className="rounded-lg" />
           <div>
-            <div className="text-xs text-slate-500 uppercase tracking-wider">
+            <div className="text-xs text-zinc-500 uppercase tracking-wider">
               Sell Price <span className="text-gold normal-case">@ {settings.sellingLocation}</span>
             </div>
             {hasData ? (
-              <div className="text-2xl font-bold text-slate-100">{formatSilver(sellPrice)}</div>
+              <div className="text-2xl font-bold text-zinc-100">{formatSilver(sellPrice)}</div>
             ) : (
               <div className="text-lg font-bold text-yellow-500">No data</div>
             )}
@@ -114,20 +114,20 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
 
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between">
-            <span className="text-slate-500">Investment</span>
-            <span className="text-slate-300">{formatSilver(result.investment)}</span>
+            <span className="text-zinc-500">Investment</span>
+            <span className="text-zinc-300">{formatSilver(result.investment)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">Revenue</span>
-            <span className="text-slate-300">{formatSilver(sellPrice)}</span>
+            <span className="text-zinc-500">Revenue</span>
+            <span className="text-zinc-300">{formatSilver(sellPrice)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">Tax ({(taxRate * 100).toFixed(1)}%)</span>
+            <span className="text-zinc-500">Tax ({(taxRate * 100).toFixed(1)}%)</span>
             <span className="text-red-400">-{formatSilver(tax)}</span>
           </div>
           {result.usageFee > 0 && (
             <div className="flex justify-between">
-              <span className="text-slate-500">Usage Fee</span>
+              <span className="text-zinc-500">Usage Fee</span>
               <span className="text-red-400">-{formatSilver(result.usageFee)}</span>
             </div>
           )}
@@ -137,20 +137,20 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
       {/* Top cities */}
       {topCities.length > 0 && (
         <div className="bg-surface rounded-xl border border-surface-lighter p-3">
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Best Cities to Sell</div>
+          <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Best Cities to Sell</div>
           <div className="space-y-1.5">
             {topCities.map((c, i) => (
               <div key={c.city} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs font-bold w-5 ${i === 0 ? 'text-gold' : 'text-slate-500'}`}>
+                  <span className={`text-xs font-bold w-5 ${i === 0 ? 'text-gold' : 'text-zinc-500'}`}>
                     #{i + 1}
                   </span>
-                  <span className={i === 0 ? 'text-slate-200 font-medium' : 'text-slate-400'}>
+                  <span className={i === 0 ? 'text-zinc-200 font-medium' : 'text-zinc-400'}>
                     {c.city}
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-slate-300 mr-3">{formatSilver(c.price)}</span>
+                  <span className="text-zinc-300 mr-3">{formatSilver(c.price)}</span>
                   <span className={`font-medium ${c.profit > 0 ? 'text-profit' : 'text-loss'}`}>
                     {c.profit > 0 ? '+' : ''}{formatSilver(c.profit)}
                   </span>
@@ -168,13 +168,13 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
           : 'bg-red-950/30 border-red-800/30'
       }`}>
         <div className="flex justify-between items-center mb-1">
-          <span className="text-sm font-medium text-slate-300">Net Profit</span>
+          <span className="text-sm font-medium text-zinc-300">Net Profit</span>
           <span className={`text-2xl font-bold ${isProfit ? 'text-profit' : 'text-loss'}`}>
             {isProfit ? '+' : ''}{formatSilver(profit)}
           </span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-slate-500">Margin</span>
+          <span className="text-xs text-zinc-500">Margin</span>
           <span className={`text-sm font-semibold ${isProfit ? 'text-profit' : 'text-loss'}`}>
             {isProfit ? '+' : ''}{formatPercent(sellPrice > 0 ? (profit / sellPrice) * 100 : 0)}
           </span>

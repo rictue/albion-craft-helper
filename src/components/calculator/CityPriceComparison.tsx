@@ -47,7 +47,7 @@ export default function CityPriceComparison({ prices, itemId, mainVariantId }: P
 
   return (
     <div className="bg-surface rounded-xl border border-surface-lighter p-4">
-      <h3 className="text-xs text-slate-500 uppercase tracking-wider mb-3">City Sell Prices <span className="normal-case text-slate-600">(sell orders / BM buy orders)</span></h3>
+      <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-3">City Sell Prices <span className="normal-case text-zinc-600">(sell orders / BM buy orders)</span></h3>
       <div className="space-y-1.5">
         {cityPrices.map((cp, i) => {
           const price = cp.sell || cp.buy;
@@ -56,14 +56,14 @@ export default function CityPriceComparison({ prices, itemId, mainVariantId }: P
 
           return (
             <div key={cp.city} className="flex items-center gap-2">
-              <span className={`text-xs font-bold w-4 text-right shrink-0 ${i === 0 ? 'text-gold' : i < 3 ? 'text-slate-400' : 'text-slate-600'}`}>{i + 1}</span>
-              <span className="text-xs text-slate-400 w-24 shrink-0 truncate">{cp.city}</span>
+              <span className={`text-xs font-bold w-4 text-right shrink-0 ${i === 0 ? 'text-gold' : i < 3 ? 'text-zinc-400' : 'text-zinc-600'}`}>{i + 1}</span>
+              <span className="text-xs text-zinc-400 w-24 shrink-0 truncate">{cp.city}</span>
               <div className="flex-1 h-5 bg-surface-light rounded overflow-hidden relative">
                 <div
                   className={`h-full rounded transition-all ${isBuy ? 'bg-blue-600/40' : 'bg-gold/30'}`}
                   style={{ width: `${barWidth}%` }}
                 />
-                <span className="absolute inset-0 flex items-center px-2 text-xs text-slate-200 font-medium">
+                <span className="absolute inset-0 flex items-center px-2 text-xs text-zinc-200 font-medium">
                   {formatSilver(price)}
                   {isBuy && <span className="text-blue-400 ml-1 text-[10px]">(buy)</span>}
                 </span>

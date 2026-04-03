@@ -1,5 +1,4 @@
 import type { Enchantment } from '../../types';
-import { ENCHANTMENT_COLORS, ENCHANTMENT_NAMES } from '../../data/materials';
 
 interface Props {
   value: Enchantment;
@@ -8,22 +7,38 @@ interface Props {
 
 const ENCHANTS: Enchantment[] = [0, 1, 2, 3, 4];
 
+const ENCHANT_COLORS: Record<number, string> = {
+  0: '#a1a1aa',
+  1: '#22c55e',
+  2: '#3b82f6',
+  3: '#a855f7',
+  4: '#eab308',
+};
+
+const ENCHANT_NAMES: Record<number, string> = {
+  0: 'Normal',
+  1: 'Uncommon',
+  2: 'Rare',
+  3: 'Epic',
+  4: 'Legendary',
+};
+
 export default function EnchantmentSelector({ value, onChange }: Props) {
   return (
     <div>
-      <label className="text-xs text-slate-500 uppercase tracking-wider mb-1 block">Enchant</label>
+      <label className="text-xs text-zinc-500 uppercase tracking-wider font-medium mb-1.5 block">Enchant</label>
       <div className="flex gap-1">
         {ENCHANTS.map((e) => (
           <button
             key={e}
             onClick={() => onChange(e)}
-            title={ENCHANTMENT_NAMES[e]}
-            className={`w-10 h-10 rounded-lg text-sm font-bold transition-all ${
+            title={ENCHANT_NAMES[e]}
+            className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${
               value === e
-                ? 'bg-surface-lighter ring-2 ring-gold/50'
-                : 'bg-surface-light hover:bg-surface-lighter'
+                ? 'bg-zinc-700 ring-2 ring-gold/40 shadow-sm'
+                : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-500'
             }`}
-            style={{ color: value === e ? ENCHANTMENT_COLORS[e] : '#94a3b8' }}
+            style={{ color: value === e ? ENCHANT_COLORS[e] : undefined }}
           >
             {e}
           </button>

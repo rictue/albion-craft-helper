@@ -60,7 +60,7 @@ export default function ReturnRateSlider({ subcategory, baseId, itemName }: Prop
   return (
     <div className="bg-surface rounded-xl border border-surface-lighter p-4">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs text-slate-500 uppercase tracking-wider">Return Rate</h3>
+        <h3 className="text-xs text-zinc-500 uppercase tracking-wider">Return Rate</h3>
         {isOverride && (
           <button
             onClick={() => updateSettings({ returnRateOverride: null })}
@@ -74,11 +74,11 @@ export default function ReturnRateSlider({ subcategory, baseId, itemName }: Prop
       {/* Spec inputs */}
       <div className="flex gap-4 mb-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-400">{subName} Mastery:</label>
+          <label className="text-xs text-zinc-400">{subName} Mastery:</label>
           <input
             type="number" min={0} max={120} value={masteryInput}
             onChange={(e) => handleMastery(parseInt(e.target.value) || 0)}
-            className="w-14 bg-surface-light border border-surface-lighter rounded px-1.5 py-1 text-xs text-slate-200 text-center focus:outline-none focus:ring-1 focus:ring-gold/50"
+            className="w-14 bg-surface-light border border-surface-lighter rounded px-1.5 py-1 text-xs text-zinc-200 text-center focus:outline-none focus:ring-1 focus:ring-gold/50"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -86,7 +86,7 @@ export default function ReturnRateSlider({ subcategory, baseId, itemName }: Prop
           <input
             type="number" min={0} max={120} value={specInput}
             onChange={(e) => handleSpec(parseInt(e.target.value) || 0)}
-            className="w-14 bg-surface-light border border-surface-lighter rounded px-1.5 py-1 text-xs text-slate-200 text-center focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+            className="w-14 bg-surface-light border border-surface-lighter rounded px-1.5 py-1 text-xs text-zinc-200 text-center focus:outline-none focus:ring-1 focus:ring-purple-500/50"
           />
         </div>
       </div>
@@ -107,7 +107,7 @@ export default function ReturnRateSlider({ subcategory, baseId, itemName }: Prop
       </div>
 
       <div className="flex gap-2 mt-2 flex-wrap">
-        <span className="text-xs px-2 py-0.5 rounded bg-surface-light text-slate-400">
+        <span className="text-xs px-2 py-0.5 rounded bg-surface-light text-zinc-400">
           Base: 15.3%
         </span>
         {hasBonus && (
@@ -125,7 +125,7 @@ export default function ReturnRateSlider({ subcategory, baseId, itemName }: Prop
             Spec {specInput} (+{bonusLPB.toFixed(1)}%)
           </span>
         )}
-        <span className="text-xs px-2 py-0.5 rounded bg-surface-lighter text-slate-300">
+        <span className="text-xs px-2 py-0.5 rounded bg-surface-lighter text-zinc-300">
           LPB: {lpb.toFixed(1)}%
         </span>
         {!isOverride && (
