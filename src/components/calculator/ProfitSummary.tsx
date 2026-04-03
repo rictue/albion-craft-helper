@@ -35,14 +35,7 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
     return bestSell;
   }, [prices, itemId, altItemId, settings.sellingLocation]);
 
-  const sellPrice = directSellPrice || result.sellPrice;
-  const taxRate = settings.hasPremium ? 0.065 : 0.105;
-  const tax = sellPrice * taxRate;
-  const profit = sellPrice - tax - result.investment;
-  const isProfit = profit > 0;
-  const hasData = sellPrice > 0;
-
-  // Find top 3 most profitable cities to sell
+  // Find top 3 most profitable cities to sell (computed first, used for outlier detection)
   const topCities = useMemo(() => {
     const taxRate = settings.hasPremium ? 0.065 : 0.105;
     const results: { city: string; price: number; profit: number }[] = [];
@@ -81,6 +74,19 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
 
     return results.sort((a, b) => b.profit - a.profit).slice(0, 3);
   }, [prices, itemId, altItemId, result.investment, settings.hasPremium]);
+
+  // Sell price: use selected city, but fallback to #1 best city if outlier (>3x best)
+  const bestCityPrice = topCities.length > 0 ? topCities[0].price : 0;
+  const sellPrice = (() => {
+    if (!directSellPrice) return bestCityPrice || result.sellPrice;
+    if (bestCityPrice > 0 && directSellPrice > bestCityPrice * 3) return bestCityPrice;
+    return directSellPrice;
+  })();
+  const taxRate = settings.hasPremium ? 0.065 : 0.105;
+  const tax = sellPrice * taxRate;
+  const profit = sellPrice - tax - result.investment;
+  const isProfit = profit > 0;
+  const hasData = sellPrice > 0;
 
   const handleAdd = () => {
     onAddToPlan();

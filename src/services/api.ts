@@ -1,6 +1,28 @@
 import type { MarketPrice } from '../types';
 
-const API_BASE = 'https://europe.albion-online-data.com/api/v2/stats/prices';
+export type AlbionServer = 'europe' | 'west' | 'east';
+
+const SERVER_URLS: Record<AlbionServer, string> = {
+  europe: 'https://europe.albion-online-data.com/api/v2/stats/prices',
+  west: 'https://west.albion-online-data.com/api/v2/stats/prices',
+  east: 'https://east.albion-online-data.com/api/v2/stats/prices',
+};
+
+const STORAGE_KEY = 'albion-server';
+
+export function getServer(): AlbionServer {
+  return (localStorage.getItem(STORAGE_KEY) as AlbionServer) || 'europe';
+}
+
+export function setServer(server: AlbionServer): void {
+  localStorage.setItem(STORAGE_KEY, server);
+  clearPriceCache();
+}
+
+function getApiBase(): string {
+  return SERVER_URLS[getServer()];
+}
+
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface CacheEntry {
@@ -10,17 +32,25 @@ interface CacheEntry {
 
 const priceCache = new Map<string, CacheEntry>();
 
+// Track last fetch time for UI display
+let lastFetchTime: number | null = null;
+export function getLastFetchTime(): number | null { return lastFetchTime; }
+
+// Clear cache to force fresh fetch
+export function clearPriceCache(): void { priceCache.clear(); }
+
 export async function fetchPrices(
   itemIds: string[],
   locations: string[] = ['Caerleon', 'Bridgewatch', 'Fort Sterling', 'Lymhurst', 'Martlock', 'Thetford', 'Black Market'],
   allQualities = false,
+  forceRefresh = false,
 ): Promise<MarketPrice[]> {
   if (itemIds.length === 0) return [];
 
   const qualityParam = allQualities ? '' : '&qualities=1';
   const cacheKey = itemIds.sort().join(',') + '|' + locations.join(',') + qualityParam;
   const cached = priceCache.get(cacheKey);
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
+  if (!forceRefresh && cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
     return cached.data;
   }
 
@@ -28,7 +58,7 @@ export async function fetchPrices(
   const results: MarketPrice[] = [];
   for (let i = 0; i < itemIds.length; i += 50) {
     const batch = itemIds.slice(i, i + 50);
-    const url = `${API_BASE}/${batch.join(',')}.json?locations=${locations.join(',')}${qualityParam}`;
+    const url = `${getApiBase()}/${batch.join(',')}.json?locations=${locations.join(',')}${qualityParam}`;
 
     try {
       const response = await fetch(url);
@@ -42,7 +72,9 @@ export async function fetchPrices(
     }
   }
 
-  priceCache.set(cacheKey, { data: results, fetchedAt: Date.now() });
+  const now = Date.now();
+  priceCache.set(cacheKey, { data: results, fetchedAt: now });
+  lastFetchTime = now;
   return results;
 }
 
