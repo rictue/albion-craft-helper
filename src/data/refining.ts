@@ -1,91 +1,129 @@
-// Albion Online refining data
-// Refining converts raw resources into refined materials
-// Each tier requires previous tier refined + raw resource of current tier
+// Albion Online refining data with enchanted tiers
+// Enchanted refining requires enchanted raw + previous tier enchanted refined
 
 export interface RefineRecipe {
-  rawId: string;         // e.g. T4_WOOD
-  refinedId: string;     // e.g. T4_PLANKS
-  prevRefinedId: string; // e.g. T3_PLANKS (previous tier refined needed)
+  rawId: string;
+  refinedId: string;
+  prevRefinedId: string;
   rawName: string;
   refinedName: string;
   tier: number;
-  rawPerCraft: number;   // raw resources needed
-  prevPerCraft: number;  // previous tier refined needed
+  enchant: number;
+  rawPerCraft: number;
+  prevPerCraft: number;
   outputPerCraft: number;
 }
 
 export interface ResourceType {
   id: string;
   name: string;
-  rawPrefix: string;     // e.g. WOOD, ORE, HIDE, FIBER, ROCK
-  refinedPrefix: string; // e.g. PLANKS, METALBAR, LEATHER, CLOTH, STONEBLOCK
+  rawPrefix: string;
+  refinedPrefix: string;
   recipes: RefineRecipe[];
 }
 
+function generateRecipes(
+  rawPrefix: string,
+  refinedPrefix: string,
+  tierNames: Record<number, { raw: string; refined: string }>,
+): RefineRecipe[] {
+  const recipes: RefineRecipe[] = [];
+  const enchantNames = ['', 'Uncommon', 'Rare', 'Epic'];
+
+  for (let tier = 2; tier <= 8; tier++) {
+    const names = tierNames[tier];
+    if (!names) continue;
+
+    // Base (enchant 0)
+    const prevRefined = tier > 2 ? `T${tier - 1}_${refinedPrefix}` : '';
+    recipes.push({
+      rawId: `T${tier}_${rawPrefix}`,
+      refinedId: `T${tier}_${refinedPrefix}`,
+      prevRefinedId: prevRefined,
+      rawName: names.raw,
+      refinedName: names.refined,
+      tier, enchant: 0,
+      rawPerCraft: 2, prevPerCraft: tier > 2 ? 1 : 0, outputPerCraft: 1,
+    });
+
+    // Enchanted (1-3) only for T4+
+    if (tier >= 4) {
+      for (let e = 1; e <= 3; e++) {
+        const prevEnchRef = `T${tier - 1}_${refinedPrefix}_LEVEL${e}@${e}`;
+        recipes.push({
+          rawId: `T${tier}_${rawPrefix}_LEVEL${e}@${e}`,
+          refinedId: `T${tier}_${refinedPrefix}_LEVEL${e}@${e}`,
+          prevRefinedId: prevEnchRef,
+          rawName: `${enchantNames[e]} ${names.raw}`,
+          refinedName: `${enchantNames[e]} ${names.refined}`,
+          tier, enchant: e,
+          rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1,
+        });
+      }
+    }
+  }
+
+  return recipes;
+}
+
+const WOOD_NAMES: Record<number, { raw: string; refined: string }> = {
+  2: { raw: 'Birch Log', refined: 'Birch Planks' },
+  3: { raw: 'Chestnut Log', refined: 'Chestnut Planks' },
+  4: { raw: 'Pine Log', refined: 'Pine Planks' },
+  5: { raw: 'Cedar Log', refined: 'Cedar Planks' },
+  6: { raw: 'Bloodoak Log', refined: 'Bloodoak Planks' },
+  7: { raw: 'Ashenbark Log', refined: 'Ashenbark Planks' },
+  8: { raw: 'Whitewood Log', refined: 'Whitewood Planks' },
+};
+
+const ORE_NAMES: Record<number, { raw: string; refined: string }> = {
+  2: { raw: 'Copper Ore', refined: 'Copper Bar' },
+  3: { raw: 'Tin Ore', refined: 'Bronze Bar' },
+  4: { raw: 'Iron Ore', refined: 'Steel Bar' },
+  5: { raw: 'Titanium Ore', refined: 'Titanium Bar' },
+  6: { raw: 'Runite Ore', refined: 'Runite Bar' },
+  7: { raw: 'Meteorite Ore', refined: 'Meteorite Bar' },
+  8: { raw: 'Adamantium Ore', refined: 'Adamantium Bar' },
+};
+
+const HIDE_NAMES: Record<number, { raw: string; refined: string }> = {
+  2: { raw: 'Rugged Hide', refined: 'Stiff Leather' },
+  3: { raw: 'Thin Hide', refined: 'Thick Leather' },
+  4: { raw: 'Medium Hide', refined: 'Worked Leather' },
+  5: { raw: 'Heavy Hide', refined: 'Cured Leather' },
+  6: { raw: 'Robust Hide', refined: 'Hardened Leather' },
+  7: { raw: 'Thick Hide', refined: 'Reinforced Leather' },
+  8: { raw: 'Resilient Hide', refined: 'Fortified Leather' },
+};
+
+const FIBER_NAMES: Record<number, { raw: string; refined: string }> = {
+  2: { raw: 'Cotton', refined: 'Simple Cloth' },
+  3: { raw: 'Flax', refined: 'Neat Cloth' },
+  4: { raw: 'Hemp', refined: 'Fine Cloth' },
+  5: { raw: 'Skyflower', refined: 'Ornate Cloth' },
+  6: { raw: 'Redleaf Cotton', refined: 'Royal Cloth' },
+  7: { raw: 'Sunflower', refined: 'Regal Cloth' },
+  8: { raw: 'Ghost Cotton', refined: 'Imperial Cloth' },
+};
+
+const ROCK_NAMES: Record<number, { raw: string; refined: string }> = {
+  2: { raw: 'Limestone', refined: 'Limestone Block' },
+  3: { raw: 'Sandstone', refined: 'Sandstone Block' },
+  4: { raw: 'Travertine', refined: 'Travertine Block' },
+  5: { raw: 'Granite', refined: 'Granite Block' },
+  6: { raw: 'Slate', refined: 'Slate Block' },
+  7: { raw: 'Basalt', refined: 'Basalt Block' },
+  8: { raw: 'Marble', refined: 'Marble Block' },
+};
+
 export const RESOURCE_TYPES: ResourceType[] = [
-  {
-    id: 'wood', name: 'Wood → Planks', rawPrefix: 'WOOD', refinedPrefix: 'PLANKS',
-    recipes: [
-      { rawId: 'T2_WOOD', refinedId: 'T2_PLANKS', prevRefinedId: '', rawName: 'Birch Log', refinedName: 'Birch Planks', tier: 2, rawPerCraft: 2, prevPerCraft: 0, outputPerCraft: 1 },
-      { rawId: 'T3_WOOD', refinedId: 'T3_PLANKS', prevRefinedId: 'T2_PLANKS', rawName: 'Chestnut Log', refinedName: 'Chestnut Planks', tier: 3, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T4_WOOD', refinedId: 'T4_PLANKS', prevRefinedId: 'T3_PLANKS', rawName: 'Pine Log', refinedName: 'Pine Planks', tier: 4, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T5_WOOD', refinedId: 'T5_PLANKS', prevRefinedId: 'T4_PLANKS', rawName: 'Cedar Log', refinedName: 'Cedar Planks', tier: 5, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T6_WOOD', refinedId: 'T6_PLANKS', prevRefinedId: 'T5_PLANKS', rawName: 'Bloodoak Log', refinedName: 'Bloodoak Planks', tier: 6, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T7_WOOD', refinedId: 'T7_PLANKS', prevRefinedId: 'T6_PLANKS', rawName: 'Ashenbark Log', refinedName: 'Ashenbark Planks', tier: 7, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T8_WOOD', refinedId: 'T8_PLANKS', prevRefinedId: 'T7_PLANKS', rawName: 'Whitewood Log', refinedName: 'Whitewood Planks', tier: 8, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-    ],
-  },
-  {
-    id: 'ore', name: 'Ore → Metal Bars', rawPrefix: 'ORE', refinedPrefix: 'METALBAR',
-    recipes: [
-      { rawId: 'T2_ORE', refinedId: 'T2_METALBAR', prevRefinedId: '', rawName: 'Copper Ore', refinedName: 'Copper Bar', tier: 2, rawPerCraft: 2, prevPerCraft: 0, outputPerCraft: 1 },
-      { rawId: 'T3_ORE', refinedId: 'T3_METALBAR', prevRefinedId: 'T2_METALBAR', rawName: 'Tin Ore', refinedName: 'Bronze Bar', tier: 3, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T4_ORE', refinedId: 'T4_METALBAR', prevRefinedId: 'T3_METALBAR', rawName: 'Iron Ore', refinedName: 'Steel Bar', tier: 4, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T5_ORE', refinedId: 'T5_METALBAR', prevRefinedId: 'T4_METALBAR', rawName: 'Titanium Ore', refinedName: 'Titanium Bar', tier: 5, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T6_ORE', refinedId: 'T6_METALBAR', prevRefinedId: 'T5_METALBAR', rawName: 'Runite Ore', refinedName: 'Runite Bar', tier: 6, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T7_ORE', refinedId: 'T7_METALBAR', prevRefinedId: 'T6_METALBAR', rawName: 'Meteorite Ore', refinedName: 'Meteorite Bar', tier: 7, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T8_ORE', refinedId: 'T8_METALBAR', prevRefinedId: 'T7_METALBAR', rawName: 'Adamantium Ore', refinedName: 'Adamantium Bar', tier: 8, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-    ],
-  },
-  {
-    id: 'hide', name: 'Hide → Leather', rawPrefix: 'HIDE', refinedPrefix: 'LEATHER',
-    recipes: [
-      { rawId: 'T2_HIDE', refinedId: 'T2_LEATHER', prevRefinedId: '', rawName: 'Rugged Hide', refinedName: 'Stiff Leather', tier: 2, rawPerCraft: 2, prevPerCraft: 0, outputPerCraft: 1 },
-      { rawId: 'T3_HIDE', refinedId: 'T3_LEATHER', prevRefinedId: 'T2_LEATHER', rawName: 'Thin Hide', refinedName: 'Thick Leather', tier: 3, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T4_HIDE', refinedId: 'T4_LEATHER', prevRefinedId: 'T3_LEATHER', rawName: 'Medium Hide', refinedName: 'Worked Leather', tier: 4, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T5_HIDE', refinedId: 'T5_LEATHER', prevRefinedId: 'T4_LEATHER', rawName: 'Heavy Hide', refinedName: 'Cured Leather', tier: 5, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T6_HIDE', refinedId: 'T6_LEATHER', prevRefinedId: 'T5_LEATHER', rawName: 'Robust Hide', refinedName: 'Hardened Leather', tier: 6, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T7_HIDE', refinedId: 'T7_LEATHER', prevRefinedId: 'T6_LEATHER', rawName: 'Thick Hide', refinedName: 'Reinforced Leather', tier: 7, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T8_HIDE', refinedId: 'T8_LEATHER', prevRefinedId: 'T7_LEATHER', rawName: 'Resilient Hide', refinedName: 'Fortified Leather', tier: 8, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-    ],
-  },
-  {
-    id: 'fiber', name: 'Fiber → Cloth', rawPrefix: 'FIBER', refinedPrefix: 'CLOTH',
-    recipes: [
-      { rawId: 'T2_FIBER', refinedId: 'T2_CLOTH', prevRefinedId: '', rawName: 'Cotton', refinedName: 'Simple Cloth', tier: 2, rawPerCraft: 2, prevPerCraft: 0, outputPerCraft: 1 },
-      { rawId: 'T3_FIBER', refinedId: 'T3_CLOTH', prevRefinedId: 'T2_CLOTH', rawName: 'Flax', refinedName: 'Neat Cloth', tier: 3, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T4_FIBER', refinedId: 'T4_CLOTH', prevRefinedId: 'T3_CLOTH', rawName: 'Hemp', refinedName: 'Fine Cloth', tier: 4, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T5_FIBER', refinedId: 'T5_CLOTH', prevRefinedId: 'T4_CLOTH', rawName: 'Skyflower', refinedName: 'Ornate Cloth', tier: 5, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T6_FIBER', refinedId: 'T6_CLOTH', prevRefinedId: 'T5_CLOTH', rawName: 'Redleaf Cotton', refinedName: 'Royal Cloth', tier: 6, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T7_FIBER', refinedId: 'T7_CLOTH', prevRefinedId: 'T6_CLOTH', rawName: 'Sunflower', refinedName: 'Regal Cloth', tier: 7, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T8_FIBER', refinedId: 'T8_CLOTH', prevRefinedId: 'T7_CLOTH', rawName: 'Ghost Cotton', refinedName: 'Imperial Cloth', tier: 8, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-    ],
-  },
-  {
-    id: 'rock', name: 'Rock → Stone Blocks', rawPrefix: 'ROCK', refinedPrefix: 'STONEBLOCK',
-    recipes: [
-      { rawId: 'T2_ROCK', refinedId: 'T2_STONEBLOCK', prevRefinedId: '', rawName: 'Limestone', refinedName: 'Limestone Block', tier: 2, rawPerCraft: 2, prevPerCraft: 0, outputPerCraft: 1 },
-      { rawId: 'T3_ROCK', refinedId: 'T3_STONEBLOCK', prevRefinedId: 'T2_STONEBLOCK', rawName: 'Sandstone', refinedName: 'Sandstone Block', tier: 3, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T4_ROCK', refinedId: 'T4_STONEBLOCK', prevRefinedId: 'T3_STONEBLOCK', rawName: 'Travertine', refinedName: 'Travertine Block', tier: 4, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T5_ROCK', refinedId: 'T5_STONEBLOCK', prevRefinedId: 'T4_STONEBLOCK', rawName: 'Granite', refinedName: 'Granite Block', tier: 5, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T6_ROCK', refinedId: 'T6_STONEBLOCK', prevRefinedId: 'T5_STONEBLOCK', rawName: 'Slate', refinedName: 'Slate Block', tier: 6, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T7_ROCK', refinedId: 'T7_STONEBLOCK', prevRefinedId: 'T6_STONEBLOCK', rawName: 'Basalt', refinedName: 'Basalt Block', tier: 7, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-      { rawId: 'T8_ROCK', refinedId: 'T8_STONEBLOCK', prevRefinedId: 'T7_STONEBLOCK', rawName: 'Marble', refinedName: 'Marble Block', tier: 8, rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1 },
-    ],
-  },
+  { id: 'wood', name: 'Wood → Planks', rawPrefix: 'WOOD', refinedPrefix: 'PLANKS', recipes: generateRecipes('WOOD', 'PLANKS', WOOD_NAMES) },
+  { id: 'ore', name: 'Ore → Metal Bars', rawPrefix: 'ORE', refinedPrefix: 'METALBAR', recipes: generateRecipes('ORE', 'METALBAR', ORE_NAMES) },
+  { id: 'hide', name: 'Hide → Leather', rawPrefix: 'HIDE', refinedPrefix: 'LEATHER', recipes: generateRecipes('HIDE', 'LEATHER', HIDE_NAMES) },
+  { id: 'fiber', name: 'Fiber → Cloth', rawPrefix: 'FIBER', refinedPrefix: 'CLOTH', recipes: generateRecipes('FIBER', 'CLOTH', FIBER_NAMES) },
+  { id: 'rock', name: 'Rock → Stone', rawPrefix: 'ROCK', refinedPrefix: 'STONEBLOCK', recipes: generateRecipes('ROCK', 'STONEBLOCK', ROCK_NAMES) },
 ];
 
-// City refining bonuses (resource return rate bonus)
 export const CITY_REFINE_BONUS: Record<string, string[]> = {
   'Fort Sterling': ['rock', 'wood'],
   'Lymhurst': ['fiber', 'hide'],

@@ -7,18 +7,25 @@ import { formatSilver, formatPercent } from '../../utils/formatters';
 import { useAppStore } from '../../store/appStore';
 import { CITIES } from '../../data/cities';
 
-// Refining LPB: base 15 + city bonus 53 (if matching) + focus 53 + spec bonus
 const BASE_REFINE_LPB = 15;
 const CITY_REFINE_LPB = 53;
 const FOCUS_REFINE_LPB = 53;
 
+const ENCHANT_COLORS: Record<number, string> = {
+  0: 'text-slate-300',
+  1: 'text-green-400',
+  2: 'text-blue-400',
+  3: 'text-purple-400',
+};
+
 interface RefineResult {
   resourceType: string;
+  resourceId: string;
   tier: number;
+  enchant: number;
   rawName: string;
   refinedName: string;
   rawCost: number;
-  prevCost: number;
   totalCost: number;
   sellPrice: number;
   profit: number;
@@ -35,15 +42,20 @@ export default function RefiningCalculator() {
   const [scannedAt, setScannedAt] = useState<string | null>(null);
   const [useFocus, setUseFocus] = useState(true);
   const [refineCity, setRefineCity] = useState(settings.craftingCity);
+  const [showAll, setShowAll] = useState(false);
+
+  // Determine which resources have specs
+  const speccedResources = DEFAULT_REFINE_SPECS.map(s => s.resource);
 
   const scan = useCallback(async () => {
     setScanning(true);
     setResults([]);
 
     try {
-      // Collect all resource IDs
       const allIds: string[] = [];
-      for (const rt of RESOURCE_TYPES) {
+      const typesToScan = showAll ? RESOURCE_TYPES : RESOURCE_TYPES.filter(rt => speccedResources.includes(rt.refinedPrefix));
+
+      for (const rt of typesToScan) {
         for (const r of rt.recipes) {
           allIds.push(r.rawId, r.refinedId);
           if (r.prevRefinedId) allIds.push(r.prevRefinedId);
@@ -52,17 +64,14 @@ export default function RefiningCalculator() {
 
       const allPrices = await fetchPrices([...new Set(allIds)]);
 
-      // Build price maps
       const cheapest = new Map<string, number>();
       const bestSell = new Map<string, { price: number; city: string }>();
 
       for (const p of allPrices) {
         if (p.sell_price_min > 0) {
-          // Buy materials from cheapest city
           const ex = cheapest.get(p.item_id);
           if (!ex || p.sell_price_min < ex) cheapest.set(p.item_id, p.sell_price_min);
 
-          // Sell refined at best price (exclude Caerleon - low prices, transport risk)
           if (p.city !== 'Caerleon' && p.city !== 'Black Market') {
             const exS = bestSell.get(p.item_id);
             if (!exS || p.sell_price_min > exS.price) bestSell.set(p.item_id, { price: p.sell_price_min, city: p.city });
@@ -73,14 +82,13 @@ export default function RefiningCalculator() {
       const cityBonus = CITY_REFINE_BONUS[refineCity] || [];
       const refineResults: RefineResult[] = [];
 
-      for (const rt of RESOURCE_TYPES) {
+      for (const rt of typesToScan) {
         for (const recipe of rt.recipes) {
           const rawPrice = cheapest.get(recipe.rawId) || 0;
           const prevPrice = recipe.prevRefinedId ? (cheapest.get(recipe.prevRefinedId) || 0) : 0;
           const sell = bestSell.get(recipe.refinedId);
           if (!sell || rawPrice === 0) continue;
 
-          // LPB calculation for refining
           const specLevel = getRefineSpec(DEFAULT_REFINE_SPECS, rt.refinedPrefix, recipe.tier);
           const specBonusLPB = specLevel * 0.3;
           let lpb = BASE_REFINE_LPB;
@@ -89,29 +97,24 @@ export default function RefiningCalculator() {
           lpb += specBonusLPB;
 
           const returnRate = lpbToReturnRate(lpb);
-
-          // Cost: raw + previous tier, adjusted for return rate
           const rawCost = rawPrice * recipe.rawPerCraft;
           const prevCost = prevPrice * recipe.prevPerCraft;
           const totalInputCost = rawCost + prevCost;
           const effectiveCost = totalInputCost * (1 - returnRate);
-
           const profit = sell.price - effectiveCost;
           const margin = sell.price > 0 ? (profit / sell.price) * 100 : 0;
 
           refineResults.push({
             resourceType: rt.name,
+            resourceId: rt.id,
             tier: recipe.tier,
+            enchant: recipe.enchant,
             rawName: recipe.rawName,
             refinedName: recipe.refinedName,
             rawCost: totalInputCost,
-            prevCost,
             totalCost: effectiveCost,
             sellPrice: sell.price,
-            profit,
-            margin,
-            returnRate,
-            specLevel,
+            profit, margin, returnRate, specLevel,
             bestSellCity: sell.city,
           });
         }
@@ -125,7 +128,7 @@ export default function RefiningCalculator() {
     } finally {
       setScanning(false);
     }
-  }, [useFocus, refineCity]);
+  }, [useFocus, refineCity, showAll, speccedResources]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
@@ -147,9 +150,18 @@ export default function RefiningCalculator() {
             <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-blue-500" />
             <span className="text-sm text-slate-300">Focus</span>
           </label>
+          <label className="flex items-center gap-2 cursor-pointer pb-1">
+            <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} className="accent-gold" />
+            <span className="text-sm text-slate-300">Show All Resources</span>
+          </label>
           {CITY_REFINE_BONUS[refineCity]?.length > 0 && (
             <span className="text-xs px-2 py-1 rounded bg-green-900/30 text-green-400">
               +53% LPB ({CITY_REFINE_BONUS[refineCity].join(', ')})
+            </span>
+          )}
+          {!showAll && (
+            <span className="text-xs text-slate-500 pb-1">
+              Showing: {speccedResources.length > 0 ? speccedResources.join(', ') : 'none'} (your specs)
             </span>
           )}
           <button
@@ -166,7 +178,7 @@ export default function RefiningCalculator() {
         <div className="bg-surface rounded-xl border border-surface-lighter overflow-hidden">
           <div className="px-4 py-3 border-b border-surface-lighter flex justify-between items-center">
             <h3 className="text-sm font-medium text-cyan-300">
-              Refining Profit (per craft)
+              Refining Profit ({results.length} recipes)
             </h3>
             {scannedAt && <span className="text-xs text-slate-500">Scanned at {scannedAt}</span>}
           </div>
@@ -189,13 +201,14 @@ export default function RefiningCalculator() {
               </thead>
               <tbody>
                 {results.map((r) => (
-                  <tr key={r.refinedName} className="border-b border-surface-lighter/50 hover:bg-surface-light transition-colors">
+                  <tr key={r.refinedName + r.tier + r.enchant} className="border-b border-surface-lighter/50 hover:bg-surface-light transition-colors">
                     <td className="px-3 py-2.5">
-                      <div className="text-slate-200">{r.refinedName}</div>
+                      <div className={ENCHANT_COLORS[r.enchant] || 'text-slate-200'}>{r.refinedName}</div>
                       <div className="text-xs text-slate-500">{r.rawName}</div>
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       <span className="text-xs font-bold text-gold">T{r.tier}</span>
+                      {r.enchant > 0 && <span className={`text-xs ml-0.5 ${ENCHANT_COLORS[r.enchant]}`}>.{r.enchant}</span>}
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       {r.specLevel > 0 ? (
@@ -232,10 +245,12 @@ export default function RefiningCalculator() {
           <div className="text-5xl mb-4 opacity-20">&#9874;</div>
           <h2 className="text-lg text-slate-400 mb-2">Refining Calculator</h2>
           <p className="text-sm text-slate-500">
-            Compare refining profits across all resources and tiers.
+            Compare refining profits with enchanted tiers included.
           </p>
           <p className="text-xs text-slate-600 mt-2">
-            Wood specs loaded. Select city and click scan.
+            {speccedResources.length > 0
+              ? `Your specs: ${speccedResources.join(', ')}. Check "Show All" to see all resources.`
+              : 'No refine specs found. Check "Show All" to see all resources.'}
           </p>
         </div>
       )}
