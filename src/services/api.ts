@@ -13,10 +13,12 @@ const priceCache = new Map<string, CacheEntry>();
 export async function fetchPrices(
   itemIds: string[],
   locations: string[] = ['Caerleon', 'Bridgewatch', 'Fort Sterling', 'Lymhurst', 'Martlock', 'Thetford', 'Black Market'],
+  allQualities = false,
 ): Promise<MarketPrice[]> {
   if (itemIds.length === 0) return [];
 
-  const cacheKey = itemIds.sort().join(',') + '|' + locations.join(',');
+  const qualityParam = allQualities ? '' : '&qualities=1';
+  const cacheKey = itemIds.sort().join(',') + '|' + locations.join(',') + qualityParam;
   const cached = priceCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
     return cached.data;
@@ -26,7 +28,7 @@ export async function fetchPrices(
   const results: MarketPrice[] = [];
   for (let i = 0; i < itemIds.length; i += 50) {
     const batch = itemIds.slice(i, i + 50);
-    const url = `${API_BASE}/${batch.join(',')}.json?locations=${locations.join(',')}&qualities=1`;
+    const url = `${API_BASE}/${batch.join(',')}.json?locations=${locations.join(',')}${qualityParam}`;
 
     try {
       const response = await fetch(url);

@@ -75,11 +75,13 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
       const idArray = [...allIds];
       const allPrices: MarketPrice[] = [];
       const batchSize = 50;
+      // For BM mode: fetch all qualities to count buy orders
+      const useAllQualities = blackMarketOnly;
       const totalBatches = Math.ceil(idArray.length / batchSize);
 
       for (let i = 0; i < idArray.length; i += batchSize) {
         const batch = idArray.slice(i, i + batchSize);
-        const data = await fetchPrices(batch);
+        const data = await fetchPrices(batch, undefined, useAllQualities);
         allPrices.push(...data);
         setProgress(Math.round(((i / batchSize + 1) / totalBatches) * 100));
       }
@@ -302,14 +304,15 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-surface-lighter">
-                  <th className="text-left px-3 py-2 w-8"></th>
-                  <th className="text-left px-3 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('name')}>Item{sortIcon('name')}</th>
-                  {!blackMarketOnly && <th className="text-left px-3 py-2">Sell At</th>}
-                  <th className="text-right px-3 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('materialCost')}>Craft Cost{sortIcon('materialCost')}</th>
-                  <th className="text-right px-3 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('sellPrice')}>{blackMarketOnly ? 'BM Buy' : 'Sell'}{sortIcon('sellPrice')}</th>
-                  <th className="text-right px-3 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('profit')}>Profit{sortIcon('profit')}</th>
-                  <th className="text-right px-3 py-2 cursor-pointer hover:text-gold" onClick={() => handleSort('margin')}>Margin{sortIcon('margin')}</th>
-                  {blackMarketOnly && <th className="text-left px-3 py-2">Craft vs Flip</th>}
+                  <th className="text-left px-3 py-2.5 w-12"></th>
+                  <th className="text-left px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('name')}>Item{sortIcon('name')}</th>
+                  {!blackMarketOnly && <th className="text-left px-3 py-2.5">Sell At</th>}
+                  {blackMarketOnly && <th className="text-center px-3 py-2.5">Orders</th>}
+                  <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('materialCost')}>Craft Cost{sortIcon('materialCost')}</th>
+                  <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('sellPrice')}>{blackMarketOnly ? 'BM Buy' : 'Sell'}{sortIcon('sellPrice')}</th>
+                  <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('profit')}>Profit{sortIcon('profit')}</th>
+                  <th className="text-right px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('margin')}>Margin{sortIcon('margin')}</th>
+                  {blackMarketOnly && <th className="text-left px-3 py-2.5">Craft vs Flip</th>}
                 </tr>
               </thead>
               <tbody>
@@ -319,26 +322,41 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                     onClick={() => handleItemClick(r)}
                     className="border-b border-surface-lighter/50 hover:bg-surface-light cursor-pointer transition-colors"
                   >
-                    <td className="px-3 py-2">
-                      <ItemIcon itemId={r.itemId} size={28} className="bg-surface-lighter rounded" />
+                    <td className="px-3 py-2.5">
+                      <ItemIcon itemId={r.itemId} size={32} className="bg-surface-lighter rounded" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2.5">
                       <span className="text-slate-200">{r.item.name}</span>
                       {r.item.artifactId && <span className="text-purple-400 text-xs ml-1">*</span>}
                     </td>
                     {!blackMarketOnly && (
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2.5">
                         <span className={`text-xs px-1.5 py-0.5 rounded ${
                           r.sellCity === 'Black Market' ? 'bg-red-900/30 text-red-300' : 'bg-surface-lighter text-slate-300'
                         }`}>{r.sellCity}</span>
                       </td>
                     )}
-                    <td className="px-3 py-2 text-right text-slate-400">{formatSilver(r.materialCost)}</td>
-                    <td className="px-3 py-2 text-right text-slate-200">{formatSilver(r.sellPrice)}</td>
-                    <td className="px-3 py-2 text-right font-medium text-profit">+{formatSilver(r.profit)}</td>
-                    <td className="px-3 py-2 text-right font-medium text-profit">+{formatPercent(r.margin)}</td>
                     {blackMarketOnly && (
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2.5 text-center">
+                        {r.bmBuyOrders && r.bmBuyOrders > 0 ? (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                            r.bmBuyOrders >= 4 ? 'bg-green-900/30 text-green-400' :
+                            r.bmBuyOrders >= 2 ? 'bg-yellow-900/30 text-yellow-400' :
+                            'bg-slate-800 text-slate-400'
+                          }`}>
+                            {r.bmBuyOrders}/5
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-600">-</span>
+                        )}
+                      </td>
+                    )}
+                    <td className="px-3 py-2.5 text-right text-slate-400">{formatSilver(r.materialCost)}</td>
+                    <td className="px-3 py-2.5 text-right text-slate-200">{formatSilver(r.sellPrice)}</td>
+                    <td className="px-3 py-2.5 text-right font-medium text-profit">+{formatSilver(r.profit)}</td>
+                    <td className="px-3 py-2.5 text-right font-medium text-profit">+{formatPercent(r.margin)}</td>
+                    {blackMarketOnly && (
+                      <td className="px-3 py-2.5">
                         {r.cheapestFlipCity ? (
                           <div className="flex flex-col gap-0.5">
                             {r.isCraftBetter ? (
