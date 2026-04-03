@@ -11,11 +11,11 @@ export default function Header() {
   return (
     <header className="border-b border-surface-lighter bg-surface/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <NavLink to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <h1 className="text-lg font-bold text-gold tracking-wide">
             ALBION CRAFT HELPER
           </h1>
-        </div>
+        </NavLink>
         <nav className="flex gap-2">
           <NavLink to="/" className={linkClass}>Calculator</NavLink>
           <NavLink to="/suggested" className={linkClass}>Suggested</NavLink>
