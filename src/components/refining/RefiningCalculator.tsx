@@ -11,6 +11,11 @@ const BASE_REFINE_LPB = 15;
 const CITY_REFINE_LPB = 53;
 const FOCUS_REFINE_LPB = 53;
 
+// Base focus cost per refine (before spec reduction). Approximate values.
+const FOCUS_COST_PER_TIER: Record<number, number> = {
+  2: 10, 3: 23, 4: 45, 5: 90, 6: 180, 7: 360, 8: 540,
+};
+
 const ENCHANT_COLORS: Record<number, string> = {
   0: 'text-zinc-300',
   1: 'text-green-400',
@@ -36,6 +41,9 @@ interface RefineResult {
   cheapestRawCity: string;
   cheapestRawPrice: number;
   refineCityRawPrice: number;
+  rawPerCraft: number;
+  prevPerCraft: number;
+  focusCostPerCraft: number;
 }
 
 export default function RefiningCalculator() {
@@ -44,6 +52,7 @@ export default function RefiningCalculator() {
   const [scanning, setScanning] = useState(false);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
   const [useFocus, setUseFocus] = useState(true);
+  const [rawCounts, setRawCounts] = useState<Record<string, number>>({});
   const [refineCity, setRefineCity] = useState(settings.craftingCity);
   const [filterResource, setFilterResource] = useState<string>('all');
 
@@ -131,6 +140,9 @@ export default function RefiningCalculator() {
             cheapestRawCity: rawInfo?.city || '',
             cheapestRawPrice: rawPrice,
             refineCityRawPrice,
+            rawPerCraft: recipe.rawPerCraft,
+            prevPerCraft: recipe.prevPerCraft,
+            focusCostPerCraft: Math.round((FOCUS_COST_PER_TIER[recipe.tier] || 45) * (1 - specLevel * 0.005)),
           });
         }
       }
@@ -217,6 +229,8 @@ export default function RefiningCalculator() {
                   <th className="text-right px-3 py-2.5">Profit</th>
                   <th className="text-right px-3 py-2.5">Margin</th>
                   <th className="text-left px-3 py-2.5">Sell At</th>
+                  <th className="text-center px-3 py-2.5">30K Focus</th>
+                  <th className="text-center px-3 py-2.5">Calculator</th>
                 </tr>
               </thead>
               <tbody>
@@ -262,6 +276,48 @@ export default function RefiningCalculator() {
                     </td>
                     <td className="px-3 py-2.5">
                       <span className="text-xs text-zinc-400">{r.bestSellCity}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      {r.focusCostPerCraft > 0 ? (() => {
+                        const crafts = Math.floor(30000 / r.focusCostPerCraft);
+                        const rawNeeded = crafts * r.rawPerCraft;
+                        const prevNeeded = crafts * r.prevPerCraft;
+                        const totalProfit = crafts * r.profit;
+                        return (
+                          <div className="text-[11px]">
+                            <div className="text-zinc-300">{crafts} craft</div>
+                            <div className="text-zinc-500">{rawNeeded} raw + {prevNeeded} prev</div>
+                            <div className={totalProfit > 0 ? 'text-profit' : 'text-loss'}>
+                              {totalProfit > 0 ? '+' : ''}{formatSilver(totalProfit)}
+                            </div>
+                          </div>
+                        );
+                      })() : '-'}
+                    </td>
+                    <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      {(() => {
+                        const key = r.refinedName + r.tier + r.enchant;
+                        const rawInput = rawCounts[key] || 0;
+                        const crafts = rawInput > 0 ? Math.floor(rawInput / r.rawPerCraft) : 0;
+                        const prevNeeded = crafts * r.prevPerCraft;
+                        const output = crafts;
+                        return (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number" min={0} value={rawInput || ''}
+                              placeholder="Raw"
+                              onChange={(e) => setRawCounts(prev => ({ ...prev, [key]: parseInt(e.target.value) || 0 }))}
+                              className="w-14 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[11px] text-zinc-200 text-center"
+                            />
+                            {crafts > 0 && (
+                              <div className="text-[11px]">
+                                <span className="text-zinc-500">→ {prevNeeded} prev</span>
+                                <span className="text-zinc-400 ml-1">= {output} out</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}
