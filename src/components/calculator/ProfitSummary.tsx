@@ -58,7 +58,8 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
 
       if (bestSell <= 0) continue;
 
-      const profit = bestSell * (1 - taxRate) - result.investment;
+      const totalSell = bestSell * (settings.quantity || 1);
+      const profit = totalSell * (1 - taxRate) - result.investment;
       results.push({ city: city.name, price: bestSell, profit });
     }
 
@@ -75,18 +76,19 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
     return results.sort((a, b) => b.profit - a.profit).slice(0, 3);
   }, [prices, itemId, altItemId, result.investment, settings.hasPremium]);
 
-  // Sell price: use selected city, but fallback to #1 best city if outlier (>3x best)
+  // Sell price per unit: use selected city, fallback to #1 best city if outlier
   const bestCityPrice = topCities.length > 0 ? topCities[0].price : 0;
-  const sellPrice = (() => {
-    if (!directSellPrice) return bestCityPrice || result.sellPrice;
+  const unitSellPrice = (() => {
+    if (!directSellPrice) return bestCityPrice || (result.sellPrice / (settings.quantity || 1));
     if (bestCityPrice > 0 && directSellPrice > bestCityPrice * 3) return bestCityPrice;
     return directSellPrice;
   })();
+  const sellPrice = unitSellPrice * (settings.quantity || 1);
   const taxRate = settings.hasPremium ? 0.065 : 0.105;
   const tax = sellPrice * taxRate;
   const profit = sellPrice - tax - result.investment;
   const isProfit = profit > 0;
-  const hasData = sellPrice > 0;
+  const hasData = unitSellPrice > 0;
 
   const handleAdd = () => {
     onAddToPlan();

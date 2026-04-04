@@ -11,6 +11,7 @@ export default function CraftingPlanner() {
   const {
     plannerItems, removeFromPlan, updatePlanQuantity, clearPlan,
     settings, prices, setPrices, setPricesLoading, customPrices,
+    profitHistory, addProfitRecord, clearProfitHistory,
   } = useAppStore();
 
   const loadAllPrices = useCallback(async () => {
@@ -235,7 +236,48 @@ export default function CraftingPlanner() {
             </div>
           </div>
         </div>
+        <button
+          onClick={() => {
+            results.forEach(({ entry, result }) => {
+              addProfitRecord({ itemName: entry.item.name + ' T' + entry.tier + '.' + entry.enchantment, quantity: entry.quantity, profit: result.profit });
+            });
+            clearPlan();
+          }}
+          className="mt-4 w-full bg-green-900/30 hover:bg-green-900/50 text-green-300 border border-green-800/30 rounded-lg py-2.5 text-sm font-semibold transition-colors"
+        >
+          Mark All as Crafted
+        </button>
       </div>
+
+      {/* Profit History */}
+      {profitHistory.length > 0 && (
+        <div className="bg-surface rounded-xl border border-surface-lighter p-4">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-xs text-zinc-500 uppercase tracking-wider">
+              Craft History ({profitHistory.length})
+            </h3>
+            <div className="flex items-center gap-3">
+              <span className={`text-sm font-bold ${profitHistory.reduce((s, r) => s + r.profit, 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                Total: {profitHistory.reduce((s, r) => s + r.profit, 0) >= 0 ? '+' : ''}{formatSilver(profitHistory.reduce((s, r) => s + r.profit, 0))}
+              </span>
+              <button onClick={clearProfitHistory} className="text-xs text-zinc-600 hover:text-red-400">Clear</button>
+            </div>
+          </div>
+          <div className="space-y-1 max-h-60 overflow-y-auto">
+            {profitHistory.slice(0, 50).map(r => (
+              <div key={r.id} className="flex justify-between text-xs py-1 border-b border-zinc-800/50">
+                <span className="text-zinc-400">{r.itemName} x{r.quantity}</span>
+                <div className="flex gap-3">
+                  <span className={r.profit >= 0 ? 'text-profit' : 'text-loss'}>
+                    {r.profit >= 0 ? '+' : ''}{formatSilver(r.profit)}
+                  </span>
+                  <span className="text-zinc-600">{new Date(r.date).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

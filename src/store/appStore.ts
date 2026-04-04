@@ -2,6 +2,14 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ItemDefinition, Tier, Enchantment, CraftingSettings, PlannerEntry, MarketPrice } from '../types';
 
+export interface ProfitRecord {
+  id: string;
+  itemName: string;
+  quantity: number;
+  profit: number;
+  date: string;
+}
+
 interface AppState {
   // Calculator
   selectedItem: ItemDefinition | null;
@@ -22,6 +30,11 @@ interface AppState {
   updatePlanQuantity: (id: string, quantity: number) => void;
   clearPlan: () => void;
 
+  // Profit history
+  profitHistory: ProfitRecord[];
+  addProfitRecord: (record: Omit<ProfitRecord, 'id' | 'date'>) => void;
+  clearProfitHistory: () => void;
+
   // Prices (not persisted)
   prices: MarketPrice[];
   setPrices: (prices: MarketPrice[]) => void;
@@ -38,7 +51,6 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
-      // Calculator
       selectedItem: null,
       tier: 4,
       enchantment: 0,
@@ -46,7 +58,6 @@ export const useAppStore = create<AppState>()(
       setTier: (tier) => set({ tier }),
       setEnchantment: (enchantment) => set({ enchantment }),
 
-      // Settings
       settings: {
         craftingCity: 'Martlock',
         sellingLocation: 'Black Market',
@@ -57,11 +68,8 @@ export const useAppStore = create<AppState>()(
         quantity: 1,
       },
       updateSettings: (partial) =>
-        set((state) => ({
-          settings: { ...state.settings, ...partial },
-        })),
+        set((state) => ({ settings: { ...state.settings, ...partial } })),
 
-      // Planner
       plannerItems: [],
       addToPlan: (entry) =>
         set((state) => ({
@@ -71,9 +79,7 @@ export const useAppStore = create<AppState>()(
           ],
         })),
       removeFromPlan: (id) =>
-        set((state) => ({
-          plannerItems: state.plannerItems.filter((item) => item.id !== id),
-        })),
+        set((state) => ({ plannerItems: state.plannerItems.filter((item) => item.id !== id) })),
       updatePlanQuantity: (id, quantity) =>
         set((state) => ({
           plannerItems: state.plannerItems.map((item) =>
@@ -82,18 +88,24 @@ export const useAppStore = create<AppState>()(
         })),
       clearPlan: () => set({ plannerItems: [] }),
 
-      // Prices
+      profitHistory: [],
+      addProfitRecord: (record) =>
+        set((state) => ({
+          profitHistory: [
+            { ...record, id: Date.now().toString(), date: new Date().toISOString() },
+            ...state.profitHistory,
+          ].slice(0, 500), // keep last 500
+        })),
+      clearProfitHistory: () => set({ profitHistory: [] }),
+
       prices: [],
       setPrices: (prices) => set({ prices }),
       pricesLoading: false,
       setPricesLoading: (loading) => set({ pricesLoading: loading }),
 
-      // Custom prices
       customPrices: {},
       setCustomPrice: (key, price) =>
-        set((state) => ({
-          customPrices: { ...state.customPrices, [key]: price },
-        })),
+        set((state) => ({ customPrices: { ...state.customPrices, [key]: price } })),
       removeCustomPrice: (key) =>
         set((state) => {
           const { [key]: _, ...rest } = state.customPrices;
@@ -107,6 +119,7 @@ export const useAppStore = create<AppState>()(
         settings: state.settings,
         plannerItems: state.plannerItems,
         customPrices: state.customPrices,
+        profitHistory: state.profitHistory,
         tier: state.tier,
         enchantment: state.enchantment,
       }),

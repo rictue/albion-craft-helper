@@ -377,19 +377,29 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                     {blackMarketOnly && (
                       <td className="px-3 py-2.5">
                         {r.bmQualities && r.bmQualities.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {[...r.bmQualities].sort((a, b) => a.quality - b.quality).map((q) => {
-                              const qNames = ['', 'Normal', 'Good', 'Outstanding', 'Excellent', 'Masterpiece'];
-                              const qColors = ['', 'text-zinc-300', 'text-green-400', 'text-blue-400', 'text-purple-400', 'text-yellow-400'];
-                              const hasMultiple = q.priceMin > 0 && q.priceMin !== q.price;
-                              return (
-                                <span key={q.quality} className={`text-[11px] px-1.5 py-0.5 rounded bg-surface-lighter ${qColors[q.quality] || 'text-zinc-400'}`}>
-                                  {qNames[q.quality]}: {formatSilver(q.price)}
-                                  {hasMultiple && <span className="text-zinc-500 ml-0.5">(2+)</span>}
-                                </span>
-                              );
-                            })}
-                          </div>
+                          (() => {
+                            const sorted = [...r.bmQualities].sort((a, b) => a.quality - b.quality);
+                            // Best quality to target: has multiple orders (2+), NOT masterpiece (q5)
+                            const withMultiple = sorted.filter(q => q.priceMin > 0 && q.priceMin !== q.price && q.quality < 5);
+                            const bestTarget = withMultiple.length > 0 ? withMultiple[0].quality : sorted.filter(q => q.quality < 5)[0]?.quality;
+                            return (
+                              <div className="flex flex-wrap gap-1">
+                                {sorted.map((q) => {
+                                  const qNames = ['', 'Normal', 'Good', 'Outstanding', 'Excellent', 'Masterpiece'];
+                                  const qColors = ['', 'text-zinc-300', 'text-green-400', 'text-blue-400', 'text-purple-400', 'text-yellow-400'];
+                                  const hasMultiple = q.priceMin > 0 && q.priceMin !== q.price;
+                                  const isBest = q.quality === bestTarget;
+                                  return (
+                                    <span key={q.quality} className={`text-[11px] px-1.5 py-0.5 rounded ${isBest ? 'bg-gold/20 ring-1 ring-gold/40' : 'bg-surface-lighter'} ${qColors[q.quality] || 'text-zinc-400'}`}>
+                                      {qNames[q.quality]}: {formatSilver(q.price)}
+                                      {hasMultiple && <span className="text-zinc-500 ml-0.5">(2+)</span>}
+                                      {q.quality === 5 && <span className="text-zinc-600 ml-0.5">(!)</span>}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()
                         ) : (
                           <span className="text-xs text-zinc-600">-</span>
                         )}
