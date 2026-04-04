@@ -58,10 +58,12 @@ export function setRefineSpec(resource: string, tier: number, level: number): vo
   saveSpec(`refine:${resource}:${tier}`, level);
 }
 
-// Calculate spec bonus for return rate
+// Spec does NOT affect return rate - only reduces focus cost
+// Return rate is only affected by: base LPB + city bonus + focus
 export function getSpecBonus(subcategory: string, baseId: string): SpecBonus {
   const masteryLevel = getMastery(subcategory);
   const specLevel = getItemSpec(baseId);
-  const bonusLPB = specLevel * 0.3;
+  // Spec does NOT add LPB - it only reduces focus cost
+  const bonusLPB = 0;
   return { masteryLevel, specLevel, bonusLPB };
 }

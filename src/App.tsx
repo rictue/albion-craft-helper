@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import Header from './components/common/Header';
 import CraftingCalculator from './components/calculator/CraftingCalculator';
 import CraftingPlanner from './components/planner/CraftingPlanner';
@@ -10,7 +10,7 @@ import Profile from './components/profile/Profile';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <div className="min-h-screen bg-bg">
         <Header />
         <Routes>
@@ -24,6 +24,6 @@ export default function App() {
           <Route path="/database" element={<CustomDatabase />} />
         </Routes>
       </div>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
