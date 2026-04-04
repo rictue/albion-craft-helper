@@ -111,11 +111,10 @@ export default function RefiningCalculator() {
           const refineCityRawPrice = refineCityPrices?.get(refineCity) || 0;
 
           const specLevel = getRefineSpec(rt.refinedPrefix, recipe.tier);
-          const specBonusLPB = specLevel * 0.3;
+          // Spec reduces focus cost, does NOT affect return rate
           let lpb = BASE_REFINE_LPB;
           if (cityBonus.includes(rt.id)) lpb += CITY_REFINE_LPB;
           if (useFocus) lpb += FOCUS_REFINE_LPB;
-          lpb += specBonusLPB;
 
           const returnRate = lpbToReturnRate(lpb);
           const rawCost = rawPrice * recipe.rawPerCraft;

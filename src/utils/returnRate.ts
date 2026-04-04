@@ -16,7 +16,8 @@ export function calculateLPB(city: string, subcategory: string, useFocus: boolea
     lpb += FOCUS_LPB;
   }
 
-  // Spec bonus: each spec level adds 0.3 LPB
+  // Legacy param kept for backwards compat, but always 0
+  // Spec does NOT affect return rate in Albion Online
   lpb += specBonusLPB;
 
   return lpb;

@@ -3,7 +3,6 @@ import { useAppStore } from '../../store/appStore';
 import { fetchPrices, buildPriceMap } from '../../services/api';
 import { calculateCrafting } from '../../utils/profitCalculator';
 import { calculateReturnRate } from '../../utils/returnRate';
-import { getSpecBonus } from '../../data/specs';
 import { resolveItemId, resolveMaterialId, resolveArtifactId } from '../../utils/itemIdParser';
 import ItemSearch from './ItemSearch';
 import CraftingSettings from './CraftingSettings';
@@ -147,8 +146,7 @@ export default function CraftingCalculator() {
   const returnRate = useMemo(() => {
     if (settings.returnRateOverride !== null) return settings.returnRateOverride / 100;
     if (!selectedItem) return 0.152;
-    const spec = getSpecBonus(selectedItem.subcategory, selectedItem.baseId);
-    return calculateReturnRate(settings.craftingCity, selectedItem.subcategory, settings.useFocus, spec.bonusLPB);
+    return calculateReturnRate(settings.craftingCity, selectedItem.subcategory, settings.useFocus);
   }, [settings.craftingCity, settings.useFocus, settings.returnRateOverride, selectedItem]);
 
   const result = useMemo(() => {
