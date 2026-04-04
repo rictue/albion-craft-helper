@@ -33,6 +33,9 @@ interface RefineResult {
   returnRate: number;
   specLevel: number;
   bestSellCity: string;
+  cheapestRawCity: string;
+  cheapestRawPrice: number;
+  refineCityRawPrice: number;
 }
 
 export default function RefiningCalculator() {
@@ -61,13 +64,19 @@ export default function RefiningCalculator() {
 
       const allPrices = await fetchPrices([...new Set(allIds)]);
 
-      const cheapest = new Map<string, number>();
+      const cheapest = new Map<string, { price: number; city: string }>();
       const bestSell = new Map<string, { price: number; city: string }>();
+      // Price per city for comparison
+      const priceByCity = new Map<string, Map<string, number>>();
 
       for (const p of allPrices) {
         if (p.sell_price_min > 0) {
           const ex = cheapest.get(p.item_id);
-          if (!ex || p.sell_price_min < ex) cheapest.set(p.item_id, p.sell_price_min);
+          if (!ex || p.sell_price_min < ex.price) cheapest.set(p.item_id, { price: p.sell_price_min, city: p.city });
+
+          // Track per-city prices
+          if (!priceByCity.has(p.item_id)) priceByCity.set(p.item_id, new Map());
+          priceByCity.get(p.item_id)!.set(p.city, p.sell_price_min);
 
           if (p.city !== 'Caerleon' && p.city !== 'Black Market') {
             const exS = bestSell.get(p.item_id);
@@ -81,10 +90,16 @@ export default function RefiningCalculator() {
 
       for (const rt of typesToScan) {
         for (const recipe of rt.recipes) {
-          const rawPrice = cheapest.get(recipe.rawId) || 0;
-          const prevPrice = recipe.prevRefinedId ? (cheapest.get(recipe.prevRefinedId) || 0) : 0;
+          const rawInfo = cheapest.get(recipe.rawId);
+          const rawPrice = rawInfo?.price || 0;
+          const prevInfo = recipe.prevRefinedId ? cheapest.get(recipe.prevRefinedId) : undefined;
+          const prevPrice = prevInfo?.price || 0;
           const sell = bestSell.get(recipe.refinedId);
           if (!sell || rawPrice === 0) continue;
+
+          // Price in refine city vs cheapest city
+          const refineCityPrices = priceByCity.get(recipe.rawId);
+          const refineCityRawPrice = refineCityPrices?.get(refineCity) || 0;
 
           const specLevel = getRefineSpec(rt.refinedPrefix, recipe.tier);
           const specBonusLPB = specLevel * 0.3;
@@ -113,6 +128,9 @@ export default function RefiningCalculator() {
             sellPrice: sell.price,
             profit, margin, returnRate, specLevel,
             bestSellCity: sell.city,
+            cheapestRawCity: rawInfo?.city || '',
+            cheapestRawPrice: rawPrice,
+            refineCityRawPrice,
           });
         }
       }
@@ -192,6 +210,7 @@ export default function RefiningCalculator() {
                   <th className="text-center px-3 py-2.5">Tier</th>
                   <th className="text-center px-3 py-2.5">Spec</th>
                   <th className="text-center px-3 py-2.5">RR</th>
+                  <th className="text-left px-3 py-2.5">Buy Raw From</th>
                   <th className="text-right px-3 py-2.5">Input Cost</th>
                   <th className="text-right px-3 py-2.5">After Return</th>
                   <th className="text-right px-3 py-2.5">Sell</th>
@@ -220,6 +239,17 @@ export default function RefiningCalculator() {
                     </td>
                     <td className="px-3 py-2.5 text-center text-xs text-zinc-400">
                       {formatPercent(r.returnRate * 100)}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className={`text-xs ${r.cheapestRawCity === refineCity ? 'text-green-400' : 'text-cyan-400'}`}>
+                        {r.cheapestRawCity}
+                      </span>
+                      <span className="text-[11px] text-zinc-500 ml-1">{formatSilver(r.cheapestRawPrice)}</span>
+                      {r.refineCityRawPrice > 0 && r.cheapestRawCity !== refineCity && (
+                        <div className="text-[11px] text-zinc-600">
+                          {refineCity}: {formatSilver(r.refineCityRawPrice)}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-right text-zinc-400">{formatSilver(r.rawCost)}</td>
                     <td className="px-3 py-2.5 text-right text-zinc-300">{formatSilver(r.totalCost)}</td>

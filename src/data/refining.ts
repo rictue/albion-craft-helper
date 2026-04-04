@@ -139,3 +139,12 @@ export const CITY_REFINE_BONUS: Record<string, string[]> = {
   'Thetford': ['fiber', 'ore'],
   'Caerleon': [],
 };
+
+// Cities where each raw resource is typically cheapest (biome proximity)
+export const RESOURCE_CHEAP_CITIES: Record<string, string[]> = {
+  'WOOD': ['Lymhurst', 'Fort Sterling', 'Martlock'],
+  'ORE': ['Thetford', 'Bridgewatch'],
+  'HIDE': ['Martlock', 'Lymhurst'],
+  'FIBER': ['Thetford', 'Lymhurst'],
+  'ROCK': ['Bridgewatch', 'Fort Sterling'],
+};
