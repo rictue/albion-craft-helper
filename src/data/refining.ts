@@ -22,6 +22,11 @@ export interface ResourceType {
   recipes: RefineRecipe[];
 }
 
+// Raw resources needed per tier (from in-game data)
+const RAW_PER_TIER: Record<number, number> = {
+  2: 1, 3: 2, 4: 2, 5: 3, 6: 4, 7: 5, 8: 5,
+};
+
 function generateRecipes(
   rawPrefix: string,
   refinedPrefix: string,
@@ -34,8 +39,10 @@ function generateRecipes(
     const names = tierNames[tier];
     if (!names) continue;
 
-    // Base (enchant 0)
+    const rawCount = RAW_PER_TIER[tier];
     const prevRefined = tier > 2 ? `T${tier - 1}_${refinedPrefix}` : '';
+
+    // Base (enchant 0)
     recipes.push({
       rawId: `T${tier}_${rawPrefix}`,
       refinedId: `T${tier}_${refinedPrefix}`,
@@ -43,7 +50,7 @@ function generateRecipes(
       rawName: names.raw,
       refinedName: names.refined,
       tier, enchant: 0,
-      rawPerCraft: 2, prevPerCraft: tier > 2 ? 1 : 0, outputPerCraft: 1,
+      rawPerCraft: rawCount, prevPerCraft: tier > 2 ? 1 : 0, outputPerCraft: 1,
     });
 
     // Enchanted (1-3) only for T4+
@@ -57,7 +64,7 @@ function generateRecipes(
           rawName: `${enchantNames[e]} ${names.raw}`,
           refinedName: `${enchantNames[e]} ${names.refined}`,
           tier, enchant: e,
-          rawPerCraft: 2, prevPerCraft: 1, outputPerCraft: 1,
+          rawPerCraft: rawCount, prevPerCraft: 1, outputPerCraft: 1,
         });
       }
     }
