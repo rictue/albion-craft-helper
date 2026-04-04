@@ -7,9 +7,13 @@ import { formatSilver, formatPercent } from '../../utils/formatters';
 import { useAppStore } from '../../store/appStore';
 import { CITIES } from '../../data/cities';
 
-const BASE_REFINE_LPB = 15;
-const CITY_REFINE_LPB = 53;
-const FOCUS_REFINE_LPB = 53;
+// Correct values from Albion Wiki:
+// Base royal city = 18 LPB (15.2% RRR)
+// Refining specialization = +40 LPB
+// Focus = +59 LPB flat
+const BASE_REFINE_LPB = 18;
+const CITY_REFINE_LPB = 40;
+const FOCUS_REFINE_LPB = 59;
 
 // Base focus cost per refine (before spec reduction). Approximate values.
 const FOCUS_COST_PER_TIER: Record<number, number> = {
@@ -191,7 +195,7 @@ export default function RefiningCalculator() {
           </div>
           {CITY_REFINE_BONUS[refineCity]?.length > 0 && (
             <span className="text-xs px-2 py-1 rounded bg-green-900/30 text-green-400">
-              +53% LPB ({CITY_REFINE_BONUS[refineCity].join(', ')})
+              +40 LPB ({CITY_REFINE_BONUS[refineCity].join(', ')})
             </span>
           )}
           <button

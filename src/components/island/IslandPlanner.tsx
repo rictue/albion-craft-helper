@@ -96,8 +96,9 @@ export default function IslandPlanner() {
         const bonusMult = bonusTypes.includes(item.type) ? 1.1 : 1.0;
         const totalYield = Math.floor(item.seedsPerPlot * yieldPerSeed * bonusMult);
 
-        // Focus: 100% seed return. No focus: ~33% seed return
-        const seedReturnRate = useFocus ? 1.0 : 0.33;
+        // Watered crops: 100% seed return (net seed cost = 0)
+        // Unwatered: ~80% seed return (20% seed loss)
+        const seedReturnRate = useFocus ? 1.0 : 0.80;
         const seedReturn = Math.floor(item.seedsPerPlot * seedReturnRate);
         const netSeedCost = (item.seedsPerPlot - seedReturn) * seedCost;
 
