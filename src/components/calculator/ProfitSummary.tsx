@@ -76,11 +76,16 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
     return results.sort((a, b) => b.profit - a.profit).slice(0, 3);
   }, [prices, itemId, altItemId, result.investment, settings.hasPremium]);
 
-  // Sell price per unit: use selected city, fallback to #1 best city if outlier
-  const bestCityPrice = topCities.length > 0 ? topCities[0].price : 0;
+  // Sell price per unit: use selected city, detect outliers via median
+  const allCityPrices = topCities.map(c => c.price).sort((a, b) => a - b);
+  const medianPrice = allCityPrices.length > 0 ? allCityPrices[Math.floor(allCityPrices.length / 2)] : 0;
   const unitSellPrice = (() => {
-    if (!directSellPrice) return bestCityPrice || (result.sellPrice / (settings.quantity || 1));
-    if (bestCityPrice > 0 && directSellPrice > bestCityPrice * 3) return bestCityPrice;
+    if (!directSellPrice) {
+      // No price at selected city, use median or first available
+      return medianPrice || (topCities.length > 0 ? topCities[0].price : 0) || (result.sellPrice / (settings.quantity || 1));
+    }
+    // If selected city price is >3x median, it's an outlier - use median instead
+    if (medianPrice > 0 && directSellPrice > medianPrice * 3) return medianPrice;
     return directSellPrice;
   })();
   const sellPrice = unitSellPrice * (settings.quantity || 1);
