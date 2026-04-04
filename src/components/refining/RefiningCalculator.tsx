@@ -300,19 +300,25 @@ export default function RefiningCalculator() {
                         const rawInput = rawCounts[key] || 0;
                         const crafts = rawInput > 0 ? Math.floor(rawInput / r.rawPerCraft) : 0;
                         const prevNeeded = crafts * r.prevPerCraft;
-                        const output = crafts;
                         return (
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number" min={0} value={rawInput || ''}
-                              placeholder="Raw"
-                              onChange={(e) => setRawCounts(prev => ({ ...prev, [key]: parseInt(e.target.value) || 0 }))}
-                              className="w-14 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[11px] text-zinc-200 text-center"
-                            />
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs text-zinc-500 w-8">Raw:</span>
+                              <input
+                                type="number" min={0}
+                                value={rawInput === 0 ? '' : rawInput}
+                                placeholder="0"
+                                onChange={(e) => setRawCounts(prev => ({ ...prev, [key]: parseInt(e.target.value) || 0 }))}
+                                className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 text-center focus:outline-none focus:ring-2 focus:ring-gold/40"
+                              />
+                            </div>
                             {crafts > 0 && (
-                              <div className="text-[11px]">
-                                <span className="text-zinc-500">→ {prevNeeded} prev</span>
-                                <span className="text-zinc-400 ml-1">= {output} out</span>
+                              <div className="text-xs space-y-0.5">
+                                <div className="text-zinc-400">Need: <span className="text-zinc-200 font-medium">{prevNeeded}</span> prev tier</div>
+                                <div className="text-zinc-400">Output: <span className="text-gold font-medium">{crafts}</span> refined</div>
+                                <div className={`font-medium ${crafts * r.profit > 0 ? 'text-profit' : 'text-loss'}`}>
+                                  Profit: {crafts * r.profit > 0 ? '+' : ''}{formatSilver(crafts * r.profit)}
+                                </div>
                               </div>
                             )}
                           </div>
