@@ -32,6 +32,7 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
     const results: CityPrice[] = [];
 
     for (const city of CITIES) {
+      if (city.id === 'Caerleon') continue; // skip risky city
       let bestSell = 0;
       let isBuy = false;
 

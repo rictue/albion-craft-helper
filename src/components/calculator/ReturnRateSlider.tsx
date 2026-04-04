@@ -36,7 +36,8 @@ export default function ReturnRateSlider({ subcategory, baseId, itemName }: Prop
     setItemSpec(baseId, val);
   };
 
-  const bonusLPB = specInput * 0.3;
+  // Spec does NOT affect return rate - only focus cost
+  const bonusLPB = 0;
 
   const autoRate = useMemo(
     () => calculateReturnRate(settings.craftingCity, subcategory, settings.useFocus, bonusLPB),
@@ -121,8 +122,8 @@ export default function ReturnRateSlider({ subcategory, baseId, itemName }: Prop
           </span>
         )}
         {specInput > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded bg-purple-900/30 text-purple-400">
-            Spec {specInput} (+{bonusLPB.toFixed(1)}%)
+          <span className="text-xs px-2 py-0.5 rounded bg-purple-900/30 text-purple-400" title="Spec reduces focus cost, not return rate">
+            Spec {specInput} (focus only)
           </span>
         )}
         <span className="text-xs px-2 py-0.5 rounded bg-surface-lighter text-zinc-300">
