@@ -6,7 +6,6 @@ export default function CraftingSettings() {
   const { settings, updateSettings } = useAppStore();
 
   const cityOptions = CITIES.filter(c => c.id !== 'Black Market').map(c => ({ value: c.id, label: c.name }));
-  const allCityOptions = CITIES.map(c => ({ value: c.id, label: c.name }));
 
   return (
     <Card padding="sm">
@@ -19,17 +18,6 @@ export default function CraftingSettings() {
             className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-gold/40"
           >
             {cityOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-zinc-500 font-medium">Sell:</label>
-          <select
-            value={settings.sellingLocation}
-            onChange={(e) => updateSettings({ sellingLocation: e.target.value })}
-            className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-gold/40"
-          >
-            {allCityOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
         </div>
 

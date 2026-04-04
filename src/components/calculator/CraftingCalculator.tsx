@@ -9,7 +9,6 @@ import ItemSearch from './ItemSearch';
 import CraftingSettings from './CraftingSettings';
 import RecipeDisplay from './RecipeDisplay';
 import ReturnRateSlider from './ReturnRateSlider';
-import CityPriceComparison from './CityPriceComparison';
 import ProfitSummary from './ProfitSummary';
 import TierSelector from '../common/TierSelector';
 import EnchantmentSelector from '../common/EnchantmentSelector';
@@ -206,13 +205,6 @@ export default function CraftingCalculator() {
 
               {result && <RecipeDisplay result={result} prices={prices} />}
 
-              {prices.length > 0 && (
-                <CityPriceComparison
-                  prices={prices}
-                  itemId={craftedItemId}
-                  mainVariantId={altVariantId}
-                />
-              )}
             </>
           ) : (
             <div className="bg-surface rounded-xl border border-surface-lighter p-12 text-center">

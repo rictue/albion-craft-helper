@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { CraftingResult } from '../../utils/profitCalculator';
 import type { MarketPrice } from '../../types';
-import { formatSilver, formatPercent } from '../../utils/formatters';
+import { formatSilver } from '../../utils/formatters';
 import { useAppStore } from '../../store/appStore';
 import { CITIES } from '../../data/cities';
 import ItemIcon from '../common/ItemIcon';
@@ -14,86 +14,61 @@ interface Props {
   altItemId?: string;
 }
 
+interface CityPrice {
+  city: string;
+  price: number;
+  profit: number;
+  isBuy: boolean;
+}
+
 export default function ProfitSummary({ result, onAddToPlan, prices, itemId, altItemId }: Props) {
   const [added, setAdded] = useState(false);
   const { settings } = useAppStore();
-  // Use the directly-calculated sell price for the selected city (more accurate than priceMap)
-  const directSellPrice = useMemo(() => {
-    let bestSell = 0;
-    for (const p of prices) {
-      if (p.city !== settings.sellingLocation) continue;
-      if (p.item_id !== itemId && p.item_id !== altItemId) continue;
+  const qty = settings.quantity || 1;
+  const taxRate = settings.hasPremium ? 0.065 : 0.105;
 
-      if (settings.sellingLocation === 'Black Market') {
-        if (p.buy_price_max > bestSell) bestSell = p.buy_price_max;
-      } else {
-        if (p.sell_price_min > 0 && (bestSell === 0 || p.sell_price_min < bestSell)) {
-          bestSell = p.sell_price_min;
-        }
-      }
-    }
-    return bestSell;
-  }, [prices, itemId, altItemId, settings.sellingLocation]);
-
-  // Find top 3 most profitable cities to sell (computed first, used for outlier detection)
-  const topCities = useMemo(() => {
-    const taxRate = settings.hasPremium ? 0.065 : 0.105;
-    const results: { city: string; price: number; profit: number }[] = [];
+  // All city prices for this item
+  const cityPrices = useMemo(() => {
+    const results: CityPrice[] = [];
 
     for (const city of CITIES) {
-      // Find sell_price_min for this item in this city
       let bestSell = 0;
+      let isBuy = false;
+
       for (const p of prices) {
         if (p.city !== city.id) continue;
         if (p.item_id !== itemId && p.item_id !== altItemId) continue;
 
         if (city.id === 'Black Market') {
-          if (p.buy_price_max > bestSell) bestSell = p.buy_price_max;
+          if (p.buy_price_max > bestSell) { bestSell = p.buy_price_max; isBuy = true; }
         } else {
           if (p.sell_price_min > 0 && (bestSell === 0 || p.sell_price_min < bestSell)) {
-            bestSell = p.sell_price_min;
+            bestSell = p.sell_price_min; isBuy = false;
           }
         }
       }
 
       if (bestSell <= 0) continue;
 
-      const totalSell = bestSell * (settings.quantity || 1);
+      const totalSell = bestSell * qty;
       const profit = totalSell * (1 - taxRate) - result.investment;
-      results.push({ city: city.name, price: bestSell, profit });
+      results.push({ city: city.name, price: bestSell, profit, isBuy });
     }
 
-    // Filter outliers: remove prices > 5x median
+    // Filter outliers
     if (results.length >= 2) {
-      const sortedPrices = [...results].sort((a, b) => a.price - b.price);
-      const median = sortedPrices[Math.floor(sortedPrices.length / 2)].price;
-      return results
-        .filter(r => r.price <= median * 5)
-        .sort((a, b) => b.profit - a.profit)
-        .slice(0, 3);
+      const sorted = [...results].sort((a, b) => a.price - b.price);
+      const median = sorted[Math.floor(sorted.length / 2)].price;
+      return results.filter(r => r.price <= median * 5).sort((a, b) => b.profit - a.profit);
     }
 
-    return results.sort((a, b) => b.profit - a.profit).slice(0, 3);
-  }, [prices, itemId, altItemId, result.investment, settings.hasPremium]);
+    return results.sort((a, b) => b.profit - a.profit);
+  }, [prices, itemId, altItemId, result.investment, taxRate, qty]);
 
-  // Sell price per unit: use selected city, detect outliers via median
-  const allCityPrices = topCities.map(c => c.price).sort((a, b) => a - b);
-  const medianPrice = allCityPrices.length > 0 ? allCityPrices[Math.floor(allCityPrices.length / 2)] : 0;
-  const unitSellPrice = (() => {
-    if (!directSellPrice) {
-      // No price at selected city, use median or first available
-      return medianPrice || (topCities.length > 0 ? topCities[0].price : 0) || (result.sellPrice / (settings.quantity || 1));
-    }
-    // If selected city price is >3x median, it's an outlier - use median instead
-    if (medianPrice > 0 && directSellPrice > medianPrice * 3) return medianPrice;
-    return directSellPrice;
-  })();
-  const sellPrice = unitSellPrice * (settings.quantity || 1);
-  const taxRate = settings.hasPremium ? 0.065 : 0.105;
-  const tax = sellPrice * taxRate;
-  const profit = sellPrice - tax - result.investment;
-  const isProfit = profit > 0;
-  const hasData = unitSellPrice > 0;
+  const bestCity = cityPrices[0];
+  const bestProfit = bestCity?.profit || 0;
+  const bestPrice = bestCity?.price || 0;
+  const isProfit = bestProfit > 0;
 
   const handleAdd = () => {
     onAddToPlan();
@@ -102,96 +77,74 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
   };
 
   return (
-    <div className="space-y-4">
-      {/* Item card */}
-      <div className="bg-surface rounded-xl border border-surface-lighter p-4">
+    <div className="space-y-3">
+      {/* Item + best city */}
+      <div className="bg-bg-raised rounded-xl border border-border p-4">
         <div className="flex items-center gap-3 mb-3">
-          <ItemIcon itemId={result.itemId} size={56} quality={1} className="rounded-lg" />
-          <div>
-            <div className="text-xs text-zinc-500 uppercase tracking-wider">
-              Sell Price <span className="text-gold normal-case">@ {settings.sellingLocation}</span>
+          <ItemIcon itemId={result.itemId} size={48} quality={1} className="rounded-lg" />
+          <div className="flex-1">
+            <div className="text-xs text-zinc-500">Investment</div>
+            <div className="text-lg font-bold text-zinc-200">{formatSilver(result.investment)}</div>
+          </div>
+        </div>
+
+        {/* Profit card */}
+        <div className={`rounded-lg p-3 ${isProfit ? 'bg-green-950/30' : 'bg-red-950/30'}`}>
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="text-xs text-zinc-500">Best Profit</div>
+              <div className={`text-xl font-bold ${isProfit ? 'text-profit' : 'text-loss'}`}>
+                {isProfit ? '+' : ''}{formatSilver(bestProfit)}
+              </div>
             </div>
-            {hasData ? (
-              <div className="text-2xl font-bold text-zinc-100">{formatSilver(sellPrice)}</div>
-            ) : (
-              <div className="text-lg font-bold text-yellow-500">No data</div>
+            {bestCity && (
+              <div className="text-right">
+                <div className="text-xs text-zinc-500">Sell at {bestCity.city}</div>
+                <div className="text-sm text-zinc-300">{formatSilver(bestPrice)} ea</div>
+              </div>
             )}
           </div>
         </div>
-
-        <div className="space-y-1.5 text-sm">
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Investment</span>
-            <span className="text-zinc-300">{formatSilver(result.investment)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Revenue</span>
-            <span className="text-zinc-300">{formatSilver(sellPrice)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Tax ({(taxRate * 100).toFixed(1)}%)</span>
-            <span className="text-red-400">-{formatSilver(tax)}</span>
-          </div>
-          {result.usageFee > 0 && (
-            <div className="flex justify-between">
-              <span className="text-zinc-500">Usage Fee</span>
-              <span className="text-red-400">-{formatSilver(result.usageFee)}</span>
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Top cities */}
-      {topCities.length > 0 && (
-        <div className="bg-surface rounded-xl border border-surface-lighter p-3">
-          <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Best Cities to Sell</div>
-          <div className="space-y-1.5">
-            {topCities.map((c, i) => (
-              <div key={c.city} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-bold w-5 ${i === 0 ? 'text-gold' : 'text-zinc-500'}`}>
-                    #{i + 1}
-                  </span>
-                  <span className={i === 0 ? 'text-zinc-200 font-medium' : 'text-zinc-400'}>
-                    {c.city}
-                  </span>
+      {/* All cities */}
+      {cityPrices.length > 0 && (
+        <div className="bg-bg-raised rounded-xl border border-border p-3">
+          <div className="text-xs text-zinc-500 uppercase tracking-wider font-medium mb-2">Sell Prices by City</div>
+          <div className="space-y-1">
+            {cityPrices.map((cp, i) => {
+              const barMax = cityPrices[0]?.price || 1;
+              const barW = Math.max(5, (cp.price / barMax) * 100);
+              return (
+                <div key={cp.city} className="flex items-center gap-2">
+                  <span className={`text-[11px] font-bold w-3 ${i === 0 ? 'text-gold' : 'text-zinc-600'}`}>{i + 1}</span>
+                  <span className="text-xs text-zinc-400 w-20 shrink-0">{cp.city}</span>
+                  <div className="flex-1 h-6 bg-zinc-800/50 rounded relative overflow-hidden">
+                    <div
+                      className={`h-full rounded ${cp.profit > 0 ? 'bg-green-900/40' : 'bg-red-900/30'}`}
+                      style={{ width: `${barW}%` }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-between px-2">
+                      <span className="text-[11px] text-zinc-200 font-medium">
+                        {formatSilver(cp.price)}
+                        {cp.isBuy && <span className="text-blue-400 ml-1">(buy)</span>}
+                      </span>
+                      <span className={`text-[11px] font-medium ${cp.profit > 0 ? 'text-profit' : 'text-loss'}`}>
+                        {cp.profit > 0 ? '+' : ''}{formatSilver(cp.profit)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-zinc-300 mr-3">{formatSilver(c.price)}</span>
-                  <span className={`font-medium ${c.profit > 0 ? 'text-profit' : 'text-loss'}`}>
-                    {c.profit > 0 ? '+' : ''}{formatSilver(c.profit)}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Profit card */}
-      <div className={`rounded-xl border p-4 ${
-        isProfit
-          ? 'bg-green-950/30 border-green-800/30'
-          : 'bg-red-950/30 border-red-800/30'
-      }`}>
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-sm font-medium text-zinc-300">Net Profit</span>
-          <span className={`text-2xl font-bold ${isProfit ? 'text-profit' : 'text-loss'}`}>
-            {isProfit ? '+' : ''}{formatSilver(profit)}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-xs text-zinc-500">Margin</span>
-          <span className={`text-sm font-semibold ${isProfit ? 'text-profit' : 'text-loss'}`}>
-            {isProfit ? '+' : ''}{formatPercent(sellPrice > 0 ? (profit / sellPrice) * 100 : 0)}
-          </span>
-        </div>
-      </div>
-
-      {/* Add to planner button */}
+      {/* Add to planner */}
       <button
         onClick={handleAdd}
-        className={`w-full rounded-lg py-2.5 text-sm font-medium transition-all ${
+        className={`w-full rounded-lg py-2 text-sm font-medium transition-all ${
           added
             ? 'bg-green-600/20 text-green-400 border border-green-600/30'
             : 'bg-gold/20 hover:bg-gold/30 text-gold border border-gold/30'
