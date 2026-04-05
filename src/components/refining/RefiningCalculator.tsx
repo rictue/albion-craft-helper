@@ -145,7 +145,9 @@ export default function RefiningCalculator() {
           const rawCost = rawPrice * recipe.rawPerCraft;
           const prevCost = prevPrice * recipe.prevPerCraft;
           const totalInputCost = rawCost + prevCost;
-          const effectiveCost = totalInputCost * (1 - returnRate);
+          // Return rate in Albion refining applies ONLY to the raw resources.
+          // Previous-tier refined inputs are fully consumed, no return.
+          const effectiveCost = rawCost * (1 - returnRate) + prevCost;
           const profit = sell.price - effectiveCost;
           const margin = sell.price > 0 ? (profit / sell.price) * 100 : 0;
 
@@ -196,7 +198,8 @@ export default function RefiningCalculator() {
         </div>
         <div className="text-xs text-zinc-400">
           <div className="text-zinc-200 font-semibold mb-0.5">Refining Profit Calculator</div>
-          Fetches raw + previous-tier prices from all cities, calculates refining profit with return rate, city bonus, and focus. Sorted by profit.
+          Return rate applies only to raw resources (logs/ore/hide/fiber/rock). Previous-tier refined inputs are fully consumed.
+          <span className="text-amber-400/80"> Profit shown is expected average — single-craft results vary due to RNG; run 30+ crafts to converge.</span>
         </div>
       </div>
 
