@@ -84,7 +84,7 @@ const inFlight = new Map<string, Promise<MarketPrice[]>>();
 
 export async function fetchPrices(
   itemIds: string[],
-  locations: string[] = ['Caerleon', 'Bridgewatch', 'Fort Sterling', 'Lymhurst', 'Martlock', 'Thetford', 'Black Market'],
+  locations: string[] = ['Bridgewatch', 'Fort Sterling', 'Lymhurst', 'Martlock', 'Thetford', 'Black Market'],
   allQualities = false,
   forceRefresh = false,
 ): Promise<MarketPrice[]> {

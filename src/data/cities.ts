@@ -32,12 +32,6 @@ export const CITIES: CityInfo[] = [
     specializations: ['mace', 'naturestaff', 'firestaff', 'cape'],
   },
   {
-    id: 'Caerleon',
-    name: 'Caerleon',
-    // War Gloves, Knuckles
-    specializations: ['knuckles'],
-  },
-  {
     id: 'Black Market',
     name: 'Black Market',
     specializations: [],
