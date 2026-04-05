@@ -10,6 +10,16 @@ const BASE_LPB = 18;
 const CITY_LPB = 40;
 const FOCUS_LPB = 59;
 
+interface Pass {
+  pass: number;
+  crafts: number;
+  outputs: number;
+  rawConsumed: number;
+  prevConsumed: number;
+  rawReturned: number;
+  prevReturned: number;
+}
+
 interface Result {
   rawId: string;
   refinedId: string;
@@ -24,11 +34,17 @@ interface Result {
   cheapPrev: number;
   bestSell: number; bestSellCity: string;
   returnRate: number;
-  crafts: number;
+  initialRaw: number;
+  initialPrev: number;
+  totalCrafts: number;
   totalOutput: number;
   totalCost: number;
   totalRevenue: number;
   profit: number;
+  passes: Pass[];
+  stoppedBecause: string;
+  leftoverRaw: number;
+  leftoverPrev: number;
 }
 
 export default function ManualRefineCalc() {
@@ -93,14 +109,67 @@ export default function ManualRefineCalc() {
     if (useFocus) lpb += FOCUS_LPB;
     const rr = lpbToReturnRate(lpb);
 
-    // Crafts the user can run with their raw count
-    const crafts = Math.floor(rawCount / recipe.rawPerCraft);
-    // Reinvest model: total output per craft = 1 / (1 - RR)
-    const outputMult = rr < 1 ? 1 / (1 - rr) : 1;
-    const totalOutput = crafts * outputMult;
+    // EXPLICIT REINVEST SIMULATION
+    // User starts with `rawCount` raws + matching prev planks.
+    // Each pass: do as many crafts as possible with current stockpile,
+    // then add the proportional returned materials, loop until materials
+    // run out for one of the two inputs.
+    const rawPerCraft = recipe.rawPerCraft;
+    const prevPerCraft = recipe.prevPerCraft;
 
-    const rawCost = crafts * recipe.rawPerCraft * cheapRaw.price;
-    const prevCost = recipe.prevRefinedId ? crafts * recipe.prevPerCraft * (cheapPrev?.price || 0) : 0;
+    // Initial prev count matches max crafts the user would want to do
+    // with their raws (assume they bought exactly enough prev planks).
+    const initialCrafts = Math.floor(rawCount / rawPerCraft);
+    let raw = initialCrafts * rawPerCraft;
+    let prev = initialCrafts * prevPerCraft;
+    const initialRaw = raw;
+    const initialPrev = prev;
+
+    let totalCrafts = 0;
+    let totalOutput = 0;
+    const passes: Pass[] = [];
+    let stoppedBecause = 'out of materials';
+
+    for (let passNum = 1; passNum <= 40; passNum++) {
+      const craftsFromRaw = Math.floor(raw / rawPerCraft);
+      const craftsFromPrev = prevPerCraft > 0 ? Math.floor(prev / prevPerCraft) : Infinity;
+      const crafts = Math.min(craftsFromRaw, craftsFromPrev);
+      if (crafts <= 0) {
+        if (craftsFromRaw < craftsFromPrev) stoppedBecause = 'raw material ran out';
+        else if (craftsFromPrev < craftsFromRaw) stoppedBecause = 'previous-tier material ran out';
+        break;
+      }
+
+      const rawConsumed = crafts * rawPerCraft;
+      const prevConsumed = crafts * prevPerCraft;
+      // Each resource independently rolls return at RR%. Use expected value.
+      const rawReturned = rawConsumed * rr;
+      const prevReturned = prevConsumed * rr;
+
+      raw = raw - rawConsumed + rawReturned;
+      prev = prev - prevConsumed + prevReturned;
+
+      totalCrafts += crafts;
+      totalOutput += crafts;
+
+      passes.push({
+        pass: passNum,
+        crafts,
+        outputs: crafts,
+        rawConsumed,
+        prevConsumed,
+        rawReturned,
+        prevReturned,
+      });
+
+      if (crafts < 1) break;
+    }
+
+    const leftoverRaw = raw;
+    const leftoverPrev = prev;
+
+    const rawCost = initialRaw * cheapRaw.price;
+    const prevCost = recipe.prevRefinedId ? initialPrev * (cheapPrev?.price || 0) : 0;
     const totalCost = rawCost + prevCost;
     const totalRevenue = totalOutput * bestSell.price;
     const profit = totalRevenue - totalCost;
@@ -112,19 +181,23 @@ export default function ManualRefineCalc() {
       rawName: recipe.rawName,
       refinedName: recipe.refinedName,
       tier, enchant,
-      rawPerCraft: recipe.rawPerCraft,
-      prevPerCraft: recipe.prevPerCraft,
+      rawPerCraft, prevPerCraft,
       cheapRaw: cheapRaw.price,
       cheapRawCity: cheapRaw.city,
       cheapPrev: cheapPrev?.price || 0,
       bestSell: bestSell.price,
       bestSellCity: bestSell.city,
       returnRate: rr,
-      crafts,
+      initialRaw, initialPrev,
+      totalCrafts,
       totalOutput,
       totalCost,
       totalRevenue,
       profit,
+      passes,
+      stoppedBecause,
+      leftoverRaw,
+      leftoverPrev,
     });
     setLoading(false);
   }, [resource, tier, enchant, rawCount, city, useFocus]);
@@ -191,7 +264,7 @@ export default function ManualRefineCalc() {
                 <ItemIcon itemId={result.refinedId} size={40} />
                 <div>
                   <div className="text-sm font-bold text-zinc-200">{result.refinedName}</div>
-                  <div className="text-[10px] text-zinc-500">T{result.tier}{result.enchant > 0 && `.${result.enchant}`} · {formatPercent(result.returnRate * 100)} RR · {result.crafts} crafts</div>
+                  <div className="text-[10px] text-zinc-500">T{result.tier}{result.enchant > 0 && `.${result.enchant}`} · {formatPercent(result.returnRate * 100)} RR · {result.passes.length} passes · {result.totalCrafts} crafts</div>
                 </div>
               </div>
               <div className={`text-right px-3 py-1.5 rounded-lg border ${result.profit > 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
@@ -206,27 +279,63 @@ export default function ManualRefineCalc() {
 
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="bg-zinc-900 border border-zinc-800 rounded p-2">
-                <div className="text-[10px] uppercase text-zinc-600">Upfront cost</div>
+                <div className="text-[10px] uppercase text-zinc-600">Upfront buy</div>
                 <div className="text-zinc-300 font-semibold tabular-nums">{formatSilver(result.totalCost)}</div>
                 <div className="text-[10px] text-zinc-600">
-                  {result.crafts * result.rawPerCraft} raw × {formatSilver(result.cheapRaw)} @ {result.cheapRawCity}
-                  {result.prevPerCraft > 0 && ` + ${result.crafts * result.prevPerCraft} prev × ${formatSilver(result.cheapPrev)}`}
+                  {result.initialRaw} raw × {formatSilver(result.cheapRaw)} @ {result.cheapRawCity}
+                  {result.prevPerCraft > 0 && ` + ${result.initialPrev} prev × ${formatSilver(result.cheapPrev)}`}
                 </div>
               </div>
               <div className="bg-zinc-900 border border-zinc-800 rounded p-2">
-                <div className="text-[10px] uppercase text-zinc-600">Output w/ reinvest</div>
-                <div className="text-zinc-300 font-semibold tabular-nums">{Math.floor(result.totalOutput)} planks</div>
-                <div className="text-[10px] text-zinc-600">×{(result.totalOutput / Math.max(1, result.crafts)).toFixed(2)} multiplier</div>
+                <div className="text-[10px] uppercase text-zinc-600">Total output</div>
+                <div className="text-zinc-300 font-semibold tabular-nums">{result.totalOutput} planks</div>
+                <div className="text-[10px] text-zinc-600">after {result.passes.length} reinvest passes</div>
               </div>
               <div className="bg-zinc-900 border border-zinc-800 rounded p-2 col-span-2">
                 <div className="text-[10px] uppercase text-zinc-600">Revenue @ {result.bestSellCity}</div>
                 <div className="text-green-400 font-semibold tabular-nums">{formatSilver(result.totalRevenue)}</div>
-                <div className="text-[10px] text-zinc-600">{formatSilver(result.bestSell)} × {Math.floor(result.totalOutput)} outputs</div>
+                <div className="text-[10px] text-zinc-600">{formatSilver(result.bestSell)} × {result.totalOutput} outputs</div>
               </div>
             </div>
 
+            {/* Pass-by-pass breakdown */}
+            <details className="bg-zinc-900 border border-zinc-800 rounded">
+              <summary className="cursor-pointer px-3 py-2 text-[10px] uppercase tracking-wider text-zinc-500 hover:text-zinc-300">
+                Reinvest loop breakdown ({result.passes.length} passes)
+              </summary>
+              <div className="px-3 pb-3">
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr className="text-zinc-600 border-b border-zinc-800">
+                      <th className="text-left py-1">Pass</th>
+                      <th className="text-right py-1">Crafts</th>
+                      <th className="text-right py-1">Raws used</th>
+                      <th className="text-right py-1">Prev used</th>
+                      <th className="text-right py-1">Raws ret.</th>
+                      <th className="text-right py-1">Prev ret.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.passes.map(p => (
+                      <tr key={p.pass} className="border-b border-zinc-800/50">
+                        <td className="py-1 text-zinc-400">#{p.pass}</td>
+                        <td className="py-1 text-right text-zinc-300 tabular-nums">{p.crafts}</td>
+                        <td className="py-1 text-right text-zinc-500 tabular-nums">{Math.round(p.rawConsumed)}</td>
+                        <td className="py-1 text-right text-zinc-500 tabular-nums">{Math.round(p.prevConsumed)}</td>
+                        <td className="py-1 text-right text-cyan-400 tabular-nums">+{Math.round(p.rawReturned)}</td>
+                        <td className="py-1 text-right text-cyan-400 tabular-nums">+{Math.round(p.prevReturned)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="text-[10px] text-zinc-600 mt-2">
+                  Stopped: <span className="text-amber-400">{result.stoppedBecause}</span> · Leftover: {result.leftoverRaw.toFixed(1)} raw, {result.leftoverPrev.toFixed(1)} prev
+                </div>
+              </div>
+            </details>
+
             <div className="text-[10px] text-amber-400/70 italic">
-              Expected value — single runs vary ±20–30% from average due to RNG. Run 30+ cycles for convergence.
+              Returns use expected values — actual runs will vary ±20–30% due to RNG. Run 30+ cycles for convergence.
             </div>
           </div>
         )}
