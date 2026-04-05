@@ -71,7 +71,6 @@ const DAGGER: ItemDefinition[] = [
 ];
 
 const KNUCKLES: ItemDefinition[] = [
-  { baseId: '2H_IRONGAUNTLETS_HELL', name: 'Black Hands', category: 'weapon_2h', subcategory: 'knuckles', recipe: [{ materialBase: 'METALBAR', count: 12 }, { materialBase: 'LEATHER', count: 20 }], artifactId: 'ARTEFACT_2H_IRONGAUNTLETS_HELL' },
   { baseId: '2H_KNUCKLES_SET1', name: 'Brawler Gloves', category: 'weapon_2h', subcategory: 'knuckles', recipe: [{ materialBase: 'METALBAR', count: 12 }, { materialBase: 'LEATHER', count: 20 }] },
   { baseId: '2H_KNUCKLES_SET2', name: 'Battle Bracers', category: 'weapon_2h', subcategory: 'knuckles', recipe: [{ materialBase: 'METALBAR', count: 12 }, { materialBase: 'LEATHER', count: 20 }] },
   { baseId: '2H_KNUCKLES_SET3', name: 'Spiked Gauntlets', category: 'weapon_2h', subcategory: 'knuckles', recipe: [{ materialBase: 'METALBAR', count: 12 }, { materialBase: 'LEATHER', count: 20 }] },
