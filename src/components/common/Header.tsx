@@ -75,7 +75,6 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
     {
       title: 'Market',
       links: [
-        { to: '/', label: 'Calculator' },
         { to: '/suggested', label: 'Suggested' },
         { to: '/blackmarket', label: 'Black Market' },
         { to: '/prices', label: 'Prices' },
@@ -85,6 +84,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
     {
       title: 'Economy',
       links: [
+        { to: '/', label: 'Craft Calculator' },
         { to: '/refining', label: 'Refining' },
         { to: '/cooking', label: 'Cooking' },
         { to: '/butcher', label: 'Butcher' },
@@ -226,7 +226,6 @@ export default function Header() {
 
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-0">
-            <NavLink to="/" className={linkClass}>Calculator</NavLink>
             <NavDropdown label="Market" items={[
               { to: '/suggested', label: 'Suggested Crafts' },
               { to: '/blackmarket', label: 'Black Market' },
@@ -234,6 +233,7 @@ export default function Header() {
               { to: '/gold', label: 'Gold Prices' },
             ]} />
             <NavDropdown label="Economy" items={[
+              { to: '/', label: 'Craft Calculator' },
               { to: '/refining', label: 'Refining' },
               { to: '/cooking', label: 'Cooking' },
               { to: '/butcher', label: 'Butcher' },

@@ -6,6 +6,12 @@ import { ITEM_CATEGORIES } from '../../data/items';
 const REFINE_RESOURCES = ['PLANKS', 'METALBAR', 'LEATHER', 'CLOTH', 'STONEBLOCK'];
 const REFINE_LABELS: Record<string, string> = { PLANKS: 'Wood', METALBAR: 'Ore', LEATHER: 'Hide', CLOTH: 'Fiber', STONEBLOCK: 'Rock' };
 
+const COOK_CATEGORIES = ['SOUP', 'SALAD', 'OMELETTE', 'SANDWICH', 'PIE', 'STEW', 'ROAST', 'FISH'];
+const COOK_LABELS: Record<string, string> = {
+  SOUP: 'Soup', SALAD: 'Salad', OMELETTE: 'Omelette', SANDWICH: 'Sandwich',
+  PIE: 'Pie', STEW: 'Stew', ROAST: 'Roast', FISH: 'Fish',
+};
+
 const CAT_DISPLAY: Record<string, string> = {
   knuckles: 'War Gloves', cursestaff: 'Cursed Staffs', firestaff: 'Fire Staffs',
   froststaff: 'Frost Staffs', holystaff: 'Holy Staffs', arcanestaff: 'Arcane Staffs',
@@ -276,6 +282,34 @@ export default function Profile() {
                     value={specs[`refine:${res}:${tier}`] || 0}
                     onChange={(v) => updateSpec(`refine:${res}:${tier}`, v)}
                     accent="cyan"
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Cooking Specs */}
+      <div>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h2 className="text-xs uppercase tracking-wider text-zinc-500 font-semibold">Cooking Specializations</h2>
+          <span className="text-[10px] text-zinc-600">Per meal category × tier</span>
+        </div>
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-2">
+          {COOK_CATEGORIES.map(cat => (
+            <div key={cat} className="flex items-center gap-3">
+              <div className="w-20 shrink-0">
+                <div className="text-sm font-bold text-orange-400">{COOK_LABELS[cat]}</div>
+              </div>
+              <div className="flex-1 grid grid-cols-5 gap-2">
+                {[4, 5, 6, 7, 8].map(tier => (
+                  <SpecInput
+                    key={tier}
+                    label={`T${tier}`}
+                    value={specs[`cook:${cat}:${tier}`] || 0}
+                    onChange={(v) => updateSpec(`cook:${cat}:${tier}`, v)}
+                    accent="gold"
                   />
                 ))}
               </div>
