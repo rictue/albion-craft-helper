@@ -7,8 +7,12 @@ const GAMEINFO_URLS: Record<string, string> = {
   east: 'https://gameinfo-sgp.albiononline.com/api/gameinfo',
 };
 
-// Gameinfo API does not set CORS headers; route via public proxy.
-const CORS_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
+// Gameinfo API does not set CORS headers; route via public proxies (tried in order).
+const CORS_PROXIES: ((url: string) => string)[] = [
+  (u) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`,
+  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+];
 
 function getBase(): string {
   const server = (localStorage.getItem('albion-server') || 'europe') as keyof typeof GAMEINFO_URLS;
@@ -17,14 +21,24 @@ function getBase(): string {
 
 async function fetchJson<T>(path: string): Promise<T | null> {
   const target = `${getBase()}${path}`;
-  try {
-    const res = await fetch(`${CORS_PROXY}${encodeURIComponent(target)}`);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (err) {
-    console.error('Gameinfo fetch failed:', err);
-    return null;
+  for (const buildUrl of CORS_PROXIES) {
+    try {
+      const res = await fetch(buildUrl(target), { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (!text) continue;
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        continue;
+      }
+    } catch (err) {
+      console.warn('Proxy failed, trying next:', err);
+      continue;
+    }
   }
+  console.error('All CORS proxies failed for:', target);
+  return null;
 }
 
 // ============= TYPES =============
