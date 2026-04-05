@@ -331,6 +331,28 @@ export default function ManualRefineCalc() {
                 <div className="text-[10px] text-zinc-600 mt-2">
                   Stopped: <span className="text-amber-400">{result.stoppedBecause}</span> · Leftover: {result.leftoverRaw.toFixed(1)} raw, {result.leftoverPrev.toFixed(1)} prev
                 </div>
+
+                {/* Loop totals */}
+                <div className="mt-3 pt-3 border-t border-zinc-800 grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px]">
+                  <div>
+                    <div className="uppercase text-zinc-600">Total planks</div>
+                    <div className="text-zinc-200 font-bold text-sm tabular-nums">{result.totalOutput}</div>
+                  </div>
+                  <div>
+                    <div className="uppercase text-zinc-600">Sell total</div>
+                    <div className="text-green-400 font-bold text-sm tabular-nums">{formatSilver(result.totalRevenue)}</div>
+                  </div>
+                  <div>
+                    <div className="uppercase text-zinc-600">Upfront cost</div>
+                    <div className="text-red-400 font-bold text-sm tabular-nums">-{formatSilver(result.totalCost)}</div>
+                  </div>
+                  <div>
+                    <div className="uppercase text-zinc-600">Net profit</div>
+                    <div className={`font-bold text-sm tabular-nums ${result.profit > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {result.profit > 0 ? '+' : ''}{formatSilver(result.profit)}
+                    </div>
+                  </div>
+                </div>
               </div>
             </details>
 
