@@ -23,6 +23,15 @@ export default function ReturnRateSlider({ subcategory, baseId, itemName }: Prop
     setSpecInput(getItemSpec(baseId));
   }, [subcategory, baseId]);
 
+  // Auto-clear manual RR override when city, focus, or item category changes
+  // so the computed rate reflects the new context
+  useEffect(() => {
+    if (settings.returnRateOverride !== null) {
+      updateSettings({ returnRateOverride: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.craftingCity, settings.useFocus, subcategory]);
+
   // Save to localStorage on change
   const handleMastery = (v: number) => {
     const val = Math.max(0, Math.min(120, v));

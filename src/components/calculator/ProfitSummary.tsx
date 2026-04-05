@@ -56,11 +56,16 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
       results.push({ city: city.name, price: bestSell, profit, isBuy });
     }
 
-    // Filter outliers
-    if (results.length >= 2) {
-      const sorted = [...results].sort((a, b) => a.price - b.price);
+    // Filter outliers on royal-city sell prices (2x median). Leave Black Market
+    // buy orders alone — they operate on a different scale by design.
+    const royal = results.filter(r => !r.isBuy);
+    if (royal.length >= 2) {
+      const sorted = [...royal].sort((a, b) => a.price - b.price);
       const median = sorted[Math.floor(sorted.length / 2)].price;
-      return results.filter(r => r.price <= median * 5).sort((a, b) => b.profit - a.profit);
+      const cutoff = median * 2;
+      return results
+        .filter(r => r.isBuy || r.price <= cutoff)
+        .sort((a, b) => b.profit - a.profit);
     }
 
     return results.sort((a, b) => b.profit - a.profit);
