@@ -7,14 +7,18 @@ const GAMEINFO_URLS: Record<string, string> = {
   east: 'https://gameinfo-sgp.albiononline.com/api/gameinfo',
 };
 
+// Gameinfo API does not set CORS headers; route via public proxy.
+const CORS_PROXY = 'https://corsproxy.io/?url=';
+
 function getBase(): string {
   const server = (localStorage.getItem('albion-server') || 'europe') as keyof typeof GAMEINFO_URLS;
   return GAMEINFO_URLS[server] || GAMEINFO_URLS.europe;
 }
 
 async function fetchJson<T>(path: string): Promise<T | null> {
+  const target = `${getBase()}${path}`;
   try {
-    const res = await fetch(`${getBase()}${path}`);
+    const res = await fetch(`${CORS_PROXY}${encodeURIComponent(target)}`);
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
