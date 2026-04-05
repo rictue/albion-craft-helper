@@ -7,6 +7,7 @@ import { formatSilver, formatPercent } from '../../utils/formatters';
 import { useAppStore } from '../../store/appStore';
 import { CITIES } from '../../data/cities';
 import ItemIcon from '../common/ItemIcon';
+import ManualRefineCalc from './ManualRefineCalc';
 
 // Correct values from Albion Wiki:
 // Base royal city = 18 LPB (15.2% RRR)
@@ -258,6 +259,8 @@ export default function RefiningCalculator() {
           </button>
         </div>
       </div>
+
+      <ManualRefineCalc />
 
       {scannedAt && (
         <div className="text-[10px] text-zinc-600 text-right px-1">

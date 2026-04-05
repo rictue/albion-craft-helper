@@ -131,13 +131,13 @@ export const RESOURCE_TYPES: ResourceType[] = [
   { id: 'rock', name: 'Rock → Stone', rawPrefix: 'ROCK', refinedPrefix: 'STONEBLOCK', recipes: generateRecipes('ROCK', 'STONEBLOCK', ROCK_NAMES) },
 ];
 
+// Albion refining city bonuses (each city specializes in exactly one resource).
 export const CITY_REFINE_BONUS: Record<string, string[]> = {
-  'Fort Sterling': ['rock', 'wood'],
-  'Lymhurst': ['fiber', 'hide'],
-  'Bridgewatch': ['ore', 'rock'],
-  'Martlock': ['wood', 'hide'],
-  'Thetford': ['fiber', 'ore'],
-  'Caerleon': [],
+  'Fort Sterling': ['wood'],
+  'Lymhurst': ['fiber'],
+  'Bridgewatch': ['rock'],
+  'Martlock': ['hide'],
+  'Thetford': ['ore'],
 };
 
 // Cities where each raw resource is typically cheapest (biome proximity)
