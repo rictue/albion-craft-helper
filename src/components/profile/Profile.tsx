@@ -6,10 +6,10 @@ import { ITEM_CATEGORIES } from '../../data/items';
 const REFINE_RESOURCES = ['PLANKS', 'METALBAR', 'LEATHER', 'CLOTH', 'STONEBLOCK'];
 const REFINE_LABELS: Record<string, string> = { PLANKS: 'Wood', METALBAR: 'Ore', LEATHER: 'Hide', CLOTH: 'Fiber', STONEBLOCK: 'Rock' };
 
-const COOK_CATEGORIES = ['SOUP', 'SALAD', 'OMELETTE', 'SANDWICH', 'PIE', 'STEW', 'ROAST', 'FISH'];
+const COOK_CATEGORIES = ['SOUP', 'SALAD', 'OMELETTE', 'SANDWICH', 'PIE', 'STEW', 'ROAST'];
 const COOK_LABELS: Record<string, string> = {
   SOUP: 'Soup', SALAD: 'Salad', OMELETTE: 'Omelette', SANDWICH: 'Sandwich',
-  PIE: 'Pie', STEW: 'Stew', ROAST: 'Roast', FISH: 'Fish',
+  PIE: 'Pie', STEW: 'Stew', ROAST: 'Roast',
 };
 
 const CAT_DISPLAY: Record<string, string> = {

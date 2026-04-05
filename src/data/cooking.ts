@@ -36,16 +36,6 @@ const MEAT: Record<number, { id: string; name: string }> = {
   8: { id: 'T8_MEAT', name: 'Beef' },
 };
 
-// Fish (generic deep sea fish per tier - representative)
-const FISH: Record<number, { id: string; name: string }> = {
-  3: { id: 'T3_FISH_FRESHWATER_ALL_COMMON',  name: 'Common Freshwater' },
-  4: { id: 'T4_FISH_FRESHWATER_ALL_COMMON',  name: 'Common Freshwater' },
-  5: { id: 'T5_FISH_FRESHWATER_ALL_COMMON',  name: 'Common Freshwater' },
-  6: { id: 'T6_FISH_FRESHWATER_ALL_COMMON',  name: 'Common Freshwater' },
-  7: { id: 'T7_FISH_FRESHWATER_ALL_COMMON',  name: 'Common Freshwater' },
-  8: { id: 'T8_FISH_FRESHWATER_ALL_COMMON',  name: 'Common Freshwater' },
-};
-
 // Eggs per tier
 const EGG: Record<number, { id: string; name: string }> = {
   3: { id: 'T3_EGG', name: 'Chicken Egg' },
@@ -167,20 +157,6 @@ function makeRoast(tier: number): CookingRecipe {
   };
 }
 
-function makeFishMeal(tier: number): CookingRecipe {
-  const fish = FISH[tier];
-  return {
-    mealId: `T${tier}_MEAL_FISH`,
-    mealName: `${fish.name} Dish`,
-    category: 'Fish',
-    tier,
-    ingredients: [
-      { itemId: fish.id, name: fish.name, count: PRIMARY_COUNT[tier] },
-      { itemId: BUTTER(tier).id, name: BUTTER(tier).name, count: 1 },
-    ],
-  };
-}
-
 export const COOKING_RECIPES: CookingRecipe[] = [
   // Soup + Salad: T2-T8
   ...[2, 3, 4, 5, 6, 7, 8].map(makeSoup),
@@ -192,15 +168,13 @@ export const COOKING_RECIPES: CookingRecipe[] = [
   ...[3, 4, 5, 6, 7, 8].map(makePie),
   ...[3, 4, 5, 6, 7, 8].map(makeStew),
   ...[3, 4, 5, 6, 7, 8].map(makeRoast),
-  // Fish: T3-T8
-  ...[3, 4, 5, 6, 7, 8].map(makeFishMeal),
 ];
 
-export const COOKING_CATEGORIES = ['Soup', 'Salad', 'Omelette', 'Sandwich', 'Pie', 'Stew', 'Roast', 'Fish'];
+export const COOKING_CATEGORIES = ['Soup', 'Salad', 'Omelette', 'Sandwich', 'Pie', 'Stew', 'Roast'];
 
 // Cooking city bonuses - matching in-game station bonuses
 export const COOKING_CITY_BONUS: Record<string, string[]> = {
-  'Martlock': ['Stew', 'Roast', 'Fish'],
+  'Martlock': ['Stew', 'Roast'],
   'Lymhurst': ['Salad', 'Omelette'],
   'Bridgewatch': ['Sandwich', 'Pie'],
   'Fort Sterling': ['Soup'],
