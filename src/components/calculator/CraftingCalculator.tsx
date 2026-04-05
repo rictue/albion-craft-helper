@@ -88,15 +88,23 @@ export default function CraftingCalculator() {
       }
     }
 
-    // For CRAFTED ITEM sell price: highest sell_price_min across all cities (sell high)
+    // For CRAFTED ITEM sell price: highest sell_price_min across royal cities
+    // (sell high) — but filter outliers at 2x median to avoid a single overpriced
+    // listing skewing results.
     const allCitiesSell = new Map<string, number>();
+    const byItemCityPrices = new Map<string, number[]>();
     for (const price of prices) {
-      if (price.sell_price_min > 0) {
-        const existing = allCitiesSell.get(price.item_id);
-        if (!existing || price.sell_price_min > existing) {
-          allCitiesSell.set(price.item_id, price.sell_price_min);
-        }
-      }
+      if (price.sell_price_min <= 0) continue;
+      if (price.city === 'Black Market' || price.city === 'Caerleon') continue;
+      if (!byItemCityPrices.has(price.item_id)) byItemCityPrices.set(price.item_id, []);
+      byItemCityPrices.get(price.item_id)!.push(price.sell_price_min);
+    }
+    for (const [id, list] of byItemCityPrices.entries()) {
+      if (list.length === 0) continue;
+      const sorted = [...list].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const filtered = list.filter(p => p <= median * 2);
+      if (filtered.length > 0) allCitiesSell.set(id, Math.max(...filtered));
     }
 
     // Start with material fallback prices, then override with crafting city

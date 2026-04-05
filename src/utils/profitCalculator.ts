@@ -14,8 +14,8 @@ export interface CraftingResult {
   itemId: string;
   materials: MaterialCost[];
   artifactCost: { id: string; price: number } | null;
-  totalMaterialCost: number;
-  effectiveMaterialCost: number;
+  totalMaterialCost: number;      // raw materials + artifact (display)
+  effectiveMaterialCost: number;  // materials × (1 - RR) + artifact (true cost paid per craft set)
   sellPrice: number;
   tax: number;
   taxRate: number;
@@ -31,7 +31,34 @@ const MATERIAL_NAMES: Record<string, string> = {
   PLANKS: 'Planks',
   CLOTH: 'Cloth',
   LEATHER: 'Leather',
+  STONEBLOCK: 'Stone Block',
 };
+
+// Albion Item Value per resource tier (used for station nutrition/setup fee).
+// These are the fixed game-defined values, NOT market prices.
+const RESOURCE_ITEM_VALUE: Record<number, number> = {
+  2: 2,
+  3: 6,
+  4: 14,
+  5: 30,
+  6: 62,
+  7: 126,
+  8: 254,
+};
+
+// Enchanted resources add to base item value. Approx multipliers from wiki.
+const ENCHANT_IV_MULT: Record<number, number> = {
+  0: 1,
+  1: 2,
+  2: 6,
+  3: 14,
+  4: 30,
+};
+
+function getResourceItemValue(tier: number, enchant: number): number {
+  const base = RESOURCE_ITEM_VALUE[tier] || 0;
+  return base * (ENCHANT_IV_MULT[enchant] || 1);
+}
 
 export function calculateCrafting(
   item: ItemDefinition,
@@ -66,17 +93,27 @@ export function calculateCrafting(
     artifactCost = { id: artifactFullId, price: artifactPrice * quantity };
   }
 
-  const totalMaterialCost = materials.reduce((sum, m) => sum + m.totalPrice, 0) + (artifactCost?.price || 0);
-  const effectiveMaterialCost = totalMaterialCost * (1 - returnRate);
+  // CRITICAL: Return rate only applies to REFINED materials, never to artifacts.
+  // Artifacts are always fully consumed per craft.
+  const rawMaterialCost = materials.reduce((sum, m) => sum + m.totalPrice, 0);
+  const artifactTotal = artifactCost?.price || 0;
+  const totalMaterialCost = rawMaterialCost + artifactTotal;
+  const effectiveMaterialCost = rawMaterialCost * (1 - returnRate) + artifactTotal;
 
   const sellPrice = (priceMap.get(itemId) || 0) * quantity;
   const taxRate = hasPremium ? 0.065 : 0.105;
   const tax = sellPrice * taxRate;
 
-  // Usage fee: simplified - based on item value * nutrition factor
-  const itemValue = sellPrice / quantity;
-  const nutritionPerItem = itemValue * 0.1125;
-  const usageFee = (nutritionPerItem / 100) * usageFeePerHundred * quantity;
+  // Station usage fee (setup/nutrition).
+  // Nutrition per craft = sum(resource count × resource item value) × 0.1125
+  // Fee = (nutrition / 100) × fee_per_100_nutrition
+  let nutritionPerCraft = 0;
+  for (const req of item.recipe) {
+    const iv = getResourceItemValue(tier, enchantment);
+    nutritionPerCraft += req.count * iv;
+  }
+  nutritionPerCraft = nutritionPerCraft * 0.1125;
+  const usageFee = (nutritionPerCraft / 100) * usageFeePerHundred * quantity;
 
   const investment = effectiveMaterialCost + usageFee;
   const profit = sellPrice - tax - effectiveMaterialCost - usageFee;
