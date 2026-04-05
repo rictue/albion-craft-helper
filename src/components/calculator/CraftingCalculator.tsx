@@ -9,6 +9,7 @@ import CraftingSettings from './CraftingSettings';
 import RecipeDisplay from './RecipeDisplay';
 import ReturnRateSlider from './ReturnRateSlider';
 import ProfitSummary from './ProfitSummary';
+import JournalBoostCard from './JournalBoostCard';
 import TierSelector from '../common/TierSelector';
 import EnchantmentSelector from '../common/EnchantmentSelector';
 import type { Tier, Enchantment } from '../../types';
@@ -203,6 +204,13 @@ export default function CraftingCalculator() {
 
               {result && <RecipeDisplay result={result} prices={prices} />}
 
+              <JournalBoostCard
+                selectedItem={selectedItem}
+                tier={tier}
+                enchantment={enchantment}
+                quantity={settings.quantity}
+                hasPremium={settings.hasPremium}
+              />
             </>
           ) : (
             <div className="bg-surface rounded-xl border border-surface-lighter p-12 text-center">

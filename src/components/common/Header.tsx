@@ -14,14 +14,19 @@ const SERVER_LABELS: Record<AlbionServer, string> = {
 interface DropdownItem {
   to: string;
   label: string;
-  icon?: string;
 }
 
-function NavDropdown({ label, items }: { label: string; items: DropdownItem[] }) {
+interface DropdownGroup {
+  title: string;
+  items: DropdownItem[];
+}
+
+function NavDropdown({ label, groups }: { label: string; groups: DropdownGroup[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const location = useLocation();
-  const isActive = items.some(i => i.to === location.pathname);
+  const allItems = groups.flatMap(g => g.items);
+  const isActive = allItems.some(i => i.to === location.pathname);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -47,20 +52,27 @@ function NavDropdown({ label, items }: { label: string; items: DropdownItem[] })
         </svg>
       </button>
       {open && (
-        <div className="absolute top-full mt-1 left-0 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl py-1 min-w-[180px] z-50 animate-fade-in">
-          {items.map(item => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={() => setOpen(false)}
-              className={({ isActive }) =>
-                `block px-4 py-2 text-xs uppercase tracking-wider font-semibold transition-colors ${
-                  isActive ? 'text-gold bg-gold/10' : 'text-zinc-300 hover:bg-zinc-800 hover:text-gold'
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
+        <div className="absolute top-full mt-1 left-0 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl p-2 z-50 animate-fade-in flex gap-2">
+          {groups.map(group => (
+            <div key={group.title} className="min-w-[160px]">
+              <div className="px-3 pt-1 pb-2 text-[9px] uppercase tracking-widest text-zinc-600 font-bold border-b border-zinc-800 mb-1">
+                {group.title}
+              </div>
+              {group.items.map(item => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setOpen(false)}
+                  className={({ isActive }) =>
+                    `block px-3 py-2 rounded text-xs uppercase tracking-wider font-semibold transition-colors ${
+                      isActive ? 'text-gold bg-gold/10' : 'text-zinc-300 hover:bg-zinc-800 hover:text-gold'
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -95,7 +107,6 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
         { to: '/island', label: 'Island' },
         { to: '/planner', label: 'Planner' },
         { to: '/fame', label: 'Crafting Fame' },
-        { to: '/journals', label: 'Journals' },
         { to: '/focus', label: 'Focus Efficiency' },
       ],
     },
@@ -234,32 +245,61 @@ export default function Header() {
 
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-0">
-            <NavDropdown label="Market" items={[
-              { to: '/suggested', label: 'Suggested Crafts' },
-              { to: '/blackmarket', label: 'Black Market' },
-              { to: '/prices', label: 'Prices' },
-              { to: '/history', label: 'Price History' },
-              { to: '/gold', label: 'Gold Prices' },
-              { to: '/arbitrage', label: 'Arbitrage Scanner' },
-              { to: '/transmute', label: 'Transmutation' },
+            <NavDropdown label="Market" groups={[
+              {
+                title: 'Trading',
+                items: [
+                  { to: '/suggested', label: 'Suggested Crafts' },
+                  { to: '/blackmarket', label: 'Black Market' },
+                  { to: '/arbitrage', label: 'Arbitrage Scanner' },
+                  { to: '/transmute', label: 'Transmutation' },
+                ],
+              },
+              {
+                title: 'Prices',
+                items: [
+                  { to: '/prices', label: 'Prices' },
+                  { to: '/history', label: 'Price History' },
+                  { to: '/gold', label: 'Gold Prices' },
+                ],
+              },
             ]} />
-            <NavDropdown label="Economy" items={[
-              { to: '/', label: 'Craft Calculator' },
-              { to: '/refining', label: 'Refining' },
-              { to: '/cooking', label: 'Cooking' },
-              { to: '/butcher', label: 'Butcher' },
-              { to: '/farming', label: 'Farming' },
-              { to: '/island', label: 'Island Planner' },
-              { to: '/planner', label: 'Craft Planner' },
-              { to: '/fame', label: 'Crafting Fame' },
-              { to: '/journals', label: 'Journal Filler' },
-              { to: '/focus', label: 'Focus Efficiency' },
+            <NavDropdown label="Economy" groups={[
+              {
+                title: 'Crafting',
+                items: [
+                  { to: '/', label: 'Craft Calculator' },
+                  { to: '/refining', label: 'Refining' },
+                  { to: '/cooking', label: 'Cooking' },
+                  { to: '/butcher', label: 'Butcher' },
+                  { to: '/farming', label: 'Farming' },
+                ],
+              },
+              {
+                title: 'Tools',
+                items: [
+                  { to: '/planner', label: 'Craft Planner' },
+                  { to: '/island', label: 'Island Planner' },
+                  { to: '/fame', label: 'Crafting Fame' },
+                  { to: '/focus', label: 'Focus Efficiency' },
+                ],
+              },
             ]} />
-            <NavDropdown label="Community" items={[
-              { to: '/players', label: 'Players' },
-              { to: '/guilds', label: 'Guilds' },
-              { to: '/killboard', label: 'Killboard' },
-              { to: '/top-fame', label: 'Top Kill Fame' },
+            <NavDropdown label="Community" groups={[
+              {
+                title: 'Search',
+                items: [
+                  { to: '/players', label: 'Players' },
+                  { to: '/guilds', label: 'Guilds' },
+                ],
+              },
+              {
+                title: 'Activity',
+                items: [
+                  { to: '/killboard', label: 'Killboard' },
+                  { to: '/top-fame', label: 'Top Kill Fame' },
+                ],
+              },
             ]} />
             <NavLink to="/database" className={linkClass}>Database</NavLink>
           </nav>

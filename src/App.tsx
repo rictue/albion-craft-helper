@@ -20,7 +20,6 @@ import FocusEfficiency from './components/focus/FocusEfficiency';
 import PriceHistory from './components/history/PriceHistory';
 import CraftingFame from './components/fame/CraftingFame';
 import Transmutation from './components/transmute/Transmutation';
-import JournalFiller from './components/journal/JournalFiller';
 import Farming from './components/farming/Farming';
 
 export default function App() {
@@ -48,7 +47,6 @@ export default function App() {
           <Route path="/history" element={<PriceHistory />} />
           <Route path="/fame" element={<CraftingFame />} />
           <Route path="/transmute" element={<Transmutation />} />
-          <Route path="/journals" element={<JournalFiller />} />
           <Route path="/farming" element={<Farming />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/database" element={<CustomDatabase />} />
