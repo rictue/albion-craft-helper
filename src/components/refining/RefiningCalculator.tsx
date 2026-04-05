@@ -79,23 +79,39 @@ export default function RefiningCalculator() {
 
       const cheapest = new Map<string, { price: number; city: string }>();
       const bestSell = new Map<string, { price: number; city: string }>();
-      // Price per city for comparison
       const priceByCity = new Map<string, Map<string, number>>();
 
+      // First pass: collect all prices
       for (const p of allPrices) {
         if (p.sell_price_min > 0) {
           const ex = cheapest.get(p.item_id);
           if (!ex || p.sell_price_min < ex.price) cheapest.set(p.item_id, { price: p.sell_price_min, city: p.city });
 
-          // Track per-city prices
           if (!priceByCity.has(p.item_id)) priceByCity.set(p.item_id, new Map());
           priceByCity.get(p.item_id)!.set(p.city, p.sell_price_min);
-
-          if (p.city !== 'Caerleon' && p.city !== 'Black Market') {
-            const exS = bestSell.get(p.item_id);
-            if (!exS || p.sell_price_min > exS.price) bestSell.set(p.item_id, { price: p.sell_price_min, city: p.city });
-          }
         }
+      }
+
+      // Second pass: calculate bestSell using outlier-filtered highest price
+      // Group prices by item, filter outliers (>2x median), then pick highest
+      for (const [itemId, cityPrices] of priceByCity.entries()) {
+        const entries = [...cityPrices.entries()]
+          .filter(([city]) => city !== 'Caerleon' && city !== 'Black Market')
+          .map(([city, price]) => ({ city, price }));
+
+        if (entries.length === 0) continue;
+
+        // Calculate median
+        const sortedByPrice = [...entries].sort((a, b) => a.price - b.price);
+        const median = sortedByPrice[Math.floor(sortedByPrice.length / 2)].price;
+
+        // Filter outliers: price > 2x median is suspicious (likely overpriced single listing)
+        const filtered = entries.filter(e => e.price <= median * 2);
+        if (filtered.length === 0) continue;
+
+        // Pick highest among filtered
+        filtered.sort((a, b) => b.price - a.price);
+        bestSell.set(itemId, filtered[0]);
       }
 
       const cityBonus = CITY_REFINE_BONUS[refineCity] || [];
