@@ -345,7 +345,7 @@ export const ITEM_CATEGORIES: CategoryGroup[] = [
   { id: 'booktype', name: 'Tomes', category: 'offhand', items: BOOKTYPE },
   { id: 'torchtype', name: 'Torches', category: 'offhand', items: TORCHTYPE },
   { id: 'bags', name: 'Bags', category: 'bag', items: BAGS },
-  { id: 'cape', name: 'cape', category: 'cape', items: CAPE },
+  { id: 'cape', name: 'Cape', category: 'cape', items: CAPE },
 ];
 
 export const ALL_ITEMS: ItemDefinition[] = ITEM_CATEGORIES.flatMap(c => c.items);
