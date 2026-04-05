@@ -10,7 +10,7 @@ interface CookingResult {
   mealName: string;
   category: string;
   tier: number;
-  ingredients: { itemId: string; name: string; count: number; unitPrice: number; totalPrice: number; city: string }[];
+  ingredients: { itemId: string; name: string; count: number; unitPrice: number; totalPrice: number; city: string; missing: boolean }[];
   totalCost: number;
   effectiveCost: number;
   sellPrice: number;
@@ -19,6 +19,7 @@ interface CookingResult {
   margin: number;
   returnRate: number;
   cityBonus: boolean;
+  hasMissing: boolean;
 }
 
 // Cooking return rates (approximation from in-game values)
@@ -91,20 +92,27 @@ export default function Cooking() {
 
         const ingDetails: CookingResult['ingredients'] = [];
         let totalCost = 0;
-        let missing = false;
+        let hasMissing = false;
 
         for (const ing of recipe.ingredients) {
           const info = cheapest.get(ing.itemId);
-          if (!info) { missing = true; break; }
+          if (!info) {
+            hasMissing = true;
+            ingDetails.push({
+              itemId: ing.itemId, name: ing.name, count: ing.count,
+              unitPrice: 0, totalPrice: 0, city: '-', missing: true,
+            });
+            continue;
+          }
           const totalPrice = info.price * ing.count;
           totalCost += totalPrice;
           ingDetails.push({
             itemId: ing.itemId, name: ing.name, count: ing.count,
-            unitPrice: info.price, totalPrice, city: info.city,
+            unitPrice: info.price, totalPrice, city: info.city, missing: false,
           });
         }
 
-        if (missing || totalCost === 0) continue;
+        if (totalCost === 0) continue;
 
         // Return rate
         const cityBonus = cityBonuses.includes(recipe.category);
@@ -131,6 +139,7 @@ export default function Cooking() {
           margin,
           returnRate: rr,
           cityBonus,
+          hasMissing,
         });
       }
 
@@ -246,13 +255,22 @@ export default function Cooking() {
                 {/* Ingredients */}
                 <div className="px-4 py-3 space-y-1.5 border-b border-zinc-800">
                   {r.ingredients.map(ing => (
-                    <div key={ing.itemId} className="flex items-center gap-2 text-xs">
+                    <div key={ing.itemId} className={`flex items-center gap-2 text-xs ${ing.missing ? 'opacity-50' : ''}`}>
                       <ItemIcon itemId={ing.itemId} size={22} />
                       <span className="text-zinc-400 flex-1 truncate">{ing.name} <span className="text-zinc-600">x{ing.count}</span></span>
-                      <span className="text-[10px] text-zinc-600">{ing.city.substring(0, 5)}</span>
-                      <span className="text-zinc-300 tabular-nums">{formatSilver(ing.totalPrice)}</span>
+                      {ing.missing ? (
+                        <span className="text-[10px] text-amber-500 italic">no price</span>
+                      ) : (
+                        <>
+                          <span className="text-[10px] text-zinc-600">{ing.city.substring(0, 5)}</span>
+                          <span className="text-zinc-300 tabular-nums">{formatSilver(ing.totalPrice)}</span>
+                        </>
+                      )}
                     </div>
                   ))}
+                  {r.hasMissing && (
+                    <div className="text-[10px] text-amber-500/80 mt-1 italic">Some ingredients have no market data — partial estimate only</div>
+                  )}
                 </div>
 
                 {/* Summary */}

@@ -8,7 +8,7 @@ const GAMEINFO_URLS: Record<string, string> = {
 };
 
 // Gameinfo API does not set CORS headers; route via public proxy.
-const CORS_PROXY = 'https://corsproxy.io/?url=';
+const CORS_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
 
 function getBase(): string {
   const server = (localStorage.getItem('albion-server') || 'europe') as keyof typeof GAMEINFO_URLS;
