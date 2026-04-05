@@ -145,11 +145,16 @@ export default function RefiningCalculator() {
           const rawCost = rawPrice * recipe.rawPerCraft;
           const prevCost = prevPrice * recipe.prevPerCraft;
           const totalInputCost = rawCost + prevCost;
-          // Return rate in Albion refining applies ONLY to the raw resources.
-          // Previous-tier refined inputs are fully consumed, no return.
-          const effectiveCost = rawCost * (1 - returnRate) + prevCost;
-          const profit = sell.price - effectiveCost;
-          const margin = sell.price > 0 ? (profit / sell.price) * 100 : 0;
+          // Reinvest model: you refine returned materials again and again until
+          // they run out. For every 1 initial craft's worth of materials you end
+          // up with 1/(1 - RR) total refined outputs on average.
+          const effectiveOutputPerCraft = returnRate < 1 ? 1 / (1 - returnRate) : 1;
+          const totalRevenue = sell.price * effectiveOutputPerCraft;
+          const profit = totalRevenue - totalInputCost;
+          const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+          // Keep "effective cost" display equal to the initial investment since
+          // that's what the user actually pays upfront to start the chain.
+          const effectiveCost = totalInputCost;
 
           refineResults.push({
             resourceType: rt.name,
@@ -198,8 +203,8 @@ export default function RefiningCalculator() {
         </div>
         <div className="text-xs text-zinc-400">
           <div className="text-zinc-200 font-semibold mb-0.5">Refining Profit Calculator</div>
-          Return rate applies only to raw resources (logs/ore/hide/fiber/rock). Previous-tier refined inputs are fully consumed.
-          <span className="text-amber-400/80"> Profit shown is expected average — single-craft results vary due to RNG; run 30+ crafts to converge.</span>
+          Uses the reinvest model: returned materials are refined again and again until exhausted. Profit is based on total refined output from 1 craft's worth of upfront materials.
+          <span className="text-amber-400/80"> Actual results vary per craft due to RNG — run 30+ crafts for the average to kick in.</span>
         </div>
       </div>
 
@@ -316,18 +321,26 @@ export default function RefiningCalculator() {
 
                 {/* Summary */}
                 <div className="px-4 py-3 space-y-1 text-xs border-b border-zinc-800">
-                  <div className="flex justify-between text-zinc-500">
-                    <span>Raw cost</span>
-                    <span className="tabular-nums">{formatSilver(r.rawCost)}</span>
-                  </div>
-                  <div className="flex justify-between text-zinc-400">
-                    <span>After return ({formatPercent(r.returnRate * 100)})</span>
-                    <span className="tabular-nums">{formatSilver(r.totalCost)}</span>
-                  </div>
-                  <div className="flex justify-between text-zinc-300">
-                    <span>Sell @ {r.bestSellCity}</span>
-                    <span className="tabular-nums font-semibold">{formatSilver(r.sellPrice)}</span>
-                  </div>
+                  {(() => {
+                    const outPerCraft = r.returnRate < 1 ? 1 / (1 - r.returnRate) : 1;
+                    const revenue = r.sellPrice * outPerCraft;
+                    return (
+                      <>
+                        <div className="flex justify-between text-zinc-500">
+                          <span>Upfront cost (1 craft)</span>
+                          <span className="tabular-nums">{formatSilver(r.rawCost)}</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-400">
+                          <span>Output w/ reinvest ({outPerCraft.toFixed(2)}×)</span>
+                          <span className="tabular-nums">{outPerCraft.toFixed(2)} planks</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-300">
+                          <span>Sell @ {r.bestSellCity}</span>
+                          <span className="tabular-nums font-semibold">{formatSilver(revenue)}</span>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* 30K Focus + manual calc */}
