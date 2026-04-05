@@ -24,6 +24,8 @@ function getApiBase(): string {
 }
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const LS_CACHE_KEY = 'albion-price-cache-v2';
+const LS_CACHE_MAX_ENTRIES = 40; // cap to avoid localStorage quota issues
 
 interface CacheEntry {
   data: MarketPrice[];
@@ -32,12 +34,53 @@ interface CacheEntry {
 
 const priceCache = new Map<string, CacheEntry>();
 
+// Hydrate from localStorage on module load
+try {
+  const raw = localStorage.getItem(LS_CACHE_KEY);
+  if (raw) {
+    const parsed: Record<string, CacheEntry> = JSON.parse(raw);
+    const now = Date.now();
+    for (const [k, v] of Object.entries(parsed)) {
+      if (v && v.fetchedAt && now - v.fetchedAt < CACHE_TTL) {
+        priceCache.set(k, v);
+      }
+    }
+  }
+} catch {}
+
+function persistCache() {
+  try {
+    // Keep only N most recent entries to stay under quota
+    const entries = [...priceCache.entries()].sort((a, b) => b[1].fetchedAt - a[1].fetchedAt).slice(0, LS_CACHE_MAX_ENTRIES);
+    const obj: Record<string, CacheEntry> = {};
+    for (const [k, v] of entries) obj[k] = v;
+    localStorage.setItem(LS_CACHE_KEY, JSON.stringify(obj));
+  } catch {
+    // Quota exceeded - drop half
+    const entries = [...priceCache.entries()].sort((a, b) => b[1].fetchedAt - a[1].fetchedAt).slice(0, LS_CACHE_MAX_ENTRIES / 2);
+    priceCache.clear();
+    for (const [k, v] of entries) priceCache.set(k, v);
+    try {
+      const obj: Record<string, CacheEntry> = {};
+      for (const [k, v] of entries) obj[k] = v;
+      localStorage.setItem(LS_CACHE_KEY, JSON.stringify(obj));
+    } catch {}
+  }
+}
+
 // Track last fetch time for UI display
 let lastFetchTime: number | null = null;
 export function getLastFetchTime(): number | null { return lastFetchTime; }
 
 // Clear cache to force fresh fetch
-export function clearPriceCache(): void { priceCache.clear(); }
+export function clearPriceCache(): void {
+  priceCache.clear();
+  try { localStorage.removeItem(LS_CACHE_KEY); } catch {}
+}
+
+// In-flight request deduplication: if the same cacheKey is already being fetched,
+// subsequent callers get the same promise instead of firing a parallel request.
+const inFlight = new Map<string, Promise<MarketPrice[]>>();
 
 export async function fetchPrices(
   itemIds: string[],
@@ -48,34 +91,48 @@ export async function fetchPrices(
   if (itemIds.length === 0) return [];
 
   const qualityParam = allQualities ? '' : '&qualities=1';
-  const cacheKey = itemIds.sort().join(',') + '|' + locations.join(',') + qualityParam;
+  const cacheKey = itemIds.slice().sort().join(',') + '|' + locations.join(',') + qualityParam;
   const cached = priceCache.get(cacheKey);
   if (!forceRefresh && cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
     return cached.data;
   }
 
-  // Batch in groups of 50 to stay under URL limits
-  const results: MarketPrice[] = [];
-  for (let i = 0; i < itemIds.length; i += 50) {
-    const batch = itemIds.slice(i, i + 50);
-    const url = `${getApiBase()}/${batch.join(',')}.json?locations=${locations.join(',')}${qualityParam}`;
+  // If an identical request is already in flight, return its promise
+  const existing = inFlight.get(cacheKey);
+  if (existing && !forceRefresh) return existing;
 
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
-      const data: MarketPrice[] = await response.json();
-      results.push(...data);
-    } catch (error) {
-      console.error('Failed to fetch prices:', error);
-      // Return stale cache if available
-      if (cached) return cached.data;
+  const promise = (async () => {
+    // Batch in groups of 50 to stay under URL limits
+    const results: MarketPrice[] = [];
+    for (let i = 0; i < itemIds.length; i += 50) {
+      const batch = itemIds.slice(i, i + 50);
+      const url = `${getApiBase()}/${batch.join(',')}.json?locations=${locations.join(',')}${qualityParam}`;
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`API error: ${response.status}`);
+        const data: MarketPrice[] = await response.json();
+        results.push(...data);
+      } catch (error) {
+        console.error('Failed to fetch prices:', error);
+        // Return stale cache if available
+        if (cached) return cached.data;
+      }
     }
-  }
 
-  const now = Date.now();
-  priceCache.set(cacheKey, { data: results, fetchedAt: now });
-  lastFetchTime = now;
-  return results;
+    const now = Date.now();
+    priceCache.set(cacheKey, { data: results, fetchedAt: now });
+    lastFetchTime = now;
+    persistCache();
+    return results;
+  })();
+
+  inFlight.set(cacheKey, promise);
+  try {
+    return await promise;
+  } finally {
+    inFlight.delete(cacheKey);
+  }
 }
 
 export function buildPriceMap(prices: MarketPrice[], city: string, useBlackMarketBuyPrice = false): Map<string, number> {

@@ -14,6 +14,9 @@ import GoldPrices from './components/gold/GoldPrices';
 import PricesBrowser from './components/prices/PricesBrowser';
 import Cooking from './components/cooking/Cooking';
 import Butcher from './components/butcher/Butcher';
+import TopKillFame from './components/killboard/TopKillFame';
+import Arbitrage from './components/arbitrage/Arbitrage';
+import FocusEfficiency from './components/focus/FocusEfficiency';
 
 export default function App() {
   return (
@@ -34,6 +37,9 @@ export default function App() {
           <Route path="/players" element={<Players />} />
           <Route path="/guilds" element={<Guilds />} />
           <Route path="/killboard" element={<Killboard />} />
+          <Route path="/top-fame" element={<TopKillFame />} />
+          <Route path="/arbitrage" element={<Arbitrage />} />
+          <Route path="/focus" element={<FocusEfficiency />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/database" element={<CustomDatabase />} />
         </Routes>

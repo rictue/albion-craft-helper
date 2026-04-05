@@ -79,6 +79,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
         { to: '/blackmarket', label: 'Black Market' },
         { to: '/prices', label: 'Prices' },
         { to: '/gold', label: 'Gold Prices' },
+        { to: '/arbitrage', label: 'Arbitrage' },
       ],
     },
     {
@@ -90,6 +91,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
         { to: '/butcher', label: 'Butcher' },
         { to: '/island', label: 'Island' },
         { to: '/planner', label: 'Planner' },
+        { to: '/focus', label: 'Focus Efficiency' },
       ],
     },
     {
@@ -98,6 +100,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
         { to: '/players', label: 'Players' },
         { to: '/guilds', label: 'Guilds' },
         { to: '/killboard', label: 'Killboard' },
+        { to: '/top-fame', label: 'Top Fame' },
       ],
     },
     {
@@ -231,6 +234,7 @@ export default function Header() {
               { to: '/blackmarket', label: 'Black Market' },
               { to: '/prices', label: 'Prices' },
               { to: '/gold', label: 'Gold Prices' },
+              { to: '/arbitrage', label: 'Arbitrage Scanner' },
             ]} />
             <NavDropdown label="Economy" items={[
               { to: '/', label: 'Craft Calculator' },
@@ -239,11 +243,13 @@ export default function Header() {
               { to: '/butcher', label: 'Butcher' },
               { to: '/island', label: 'Island Planner' },
               { to: '/planner', label: 'Craft Planner' },
+              { to: '/focus', label: 'Focus Efficiency' },
             ]} />
             <NavDropdown label="Community" items={[
               { to: '/players', label: 'Players' },
               { to: '/guilds', label: 'Guilds' },
               { to: '/killboard', label: 'Killboard' },
+              { to: '/top-fame', label: 'Top Kill Fame' },
             ]} />
             <NavLink to="/database" className={linkClass}>Database</NavLink>
           </nav>
