@@ -17,6 +17,11 @@ import Butcher from './components/butcher/Butcher';
 import TopKillFame from './components/killboard/TopKillFame';
 import Arbitrage from './components/arbitrage/Arbitrage';
 import FocusEfficiency from './components/focus/FocusEfficiency';
+import PriceHistory from './components/history/PriceHistory';
+import CraftingFame from './components/fame/CraftingFame';
+import Transmutation from './components/transmute/Transmutation';
+import JournalFiller from './components/journal/JournalFiller';
+import Farming from './components/farming/Farming';
 
 export default function App() {
   return (
@@ -40,6 +45,11 @@ export default function App() {
           <Route path="/top-fame" element={<TopKillFame />} />
           <Route path="/arbitrage" element={<Arbitrage />} />
           <Route path="/focus" element={<FocusEfficiency />} />
+          <Route path="/history" element={<PriceHistory />} />
+          <Route path="/fame" element={<CraftingFame />} />
+          <Route path="/transmute" element={<Transmutation />} />
+          <Route path="/journals" element={<JournalFiller />} />
+          <Route path="/farming" element={<Farming />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/database" element={<CustomDatabase />} />
         </Routes>

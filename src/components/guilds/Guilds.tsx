@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { searchPlayersAndGuilds, getGuild, getGuildMembers } from '../../services/gameinfo';
-import type { GuildSearchResult, GuildInfo, PlayerSearchResult } from '../../services/gameinfo';
+import { searchPlayersAndGuilds, getGuild, getGuildMembers, getGuildTopKills } from '../../services/gameinfo';
+import type { GuildSearchResult, GuildInfo, PlayerSearchResult, KillEvent } from '../../services/gameinfo';
 import { formatSilver } from '../../utils/formatters';
 
 export default function Guilds() {
@@ -8,6 +8,7 @@ export default function Guilds() {
   const [results, setResults] = useState<GuildSearchResult[]>([]);
   const [selected, setSelected] = useState<GuildInfo | null>(null);
   const [members, setMembers] = useState<PlayerSearchResult[]>([]);
+  const [topKills, setTopKills] = useState<KillEvent[]>([]);
   const [loading, setLoading] = useState(false);
 
   const handleSearch = async () => {
@@ -18,9 +19,14 @@ export default function Guilds() {
 
   const selectGuild = async (id: string) => {
     setLoading(true);
-    const [guild, guildMembers] = await Promise.all([getGuild(id), getGuildMembers(id)]);
+    const [guild, guildMembers, kills] = await Promise.all([
+      getGuild(id),
+      getGuildMembers(id),
+      getGuildTopKills(id),
+    ]);
     setSelected(guild);
     setMembers(guildMembers || []);
+    setTopKills(kills || []);
     setLoading(false);
   };
 
@@ -68,7 +74,7 @@ export default function Guilds() {
 
       {selected && (
         <div className="space-y-4">
-          <button onClick={() => { setSelected(null); setMembers([]); }} className="text-xs text-zinc-500 hover:text-gold">← Back</button>
+          <button onClick={() => { setSelected(null); setMembers([]); setTopKills([]); }} className="text-xs text-zinc-500 hover:text-gold">← Back</button>
 
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6">
             <div className="mb-4">
@@ -101,7 +107,49 @@ export default function Guilds() {
                 <div className="text-lg font-bold text-gold">{selected.overall?.ratio || '-'}</div>
               </div>
             </div>
+
+            {/* K/D visual bar */}
+            {(selected.guild.killFame > 0 || selected.guild.DeathFame > 0) && (() => {
+              const total = selected.guild.killFame + selected.guild.DeathFame;
+              const killPct = total > 0 ? (selected.guild.killFame / total) * 100 : 50;
+              return (
+                <div className="mt-4">
+                  <div className="flex justify-between text-[10px] uppercase tracking-wider text-zinc-500 mb-1">
+                    <span>Kill dominance</span>
+                    <span>{killPct.toFixed(1)}% / {(100 - killPct).toFixed(1)}%</span>
+                  </div>
+                  <div className="h-3 bg-zinc-800 rounded-full overflow-hidden flex">
+                    <div className="bg-gradient-to-r from-green-600 to-green-400 h-full" style={{ width: `${killPct}%` }} />
+                    <div className="bg-gradient-to-r from-red-400 to-red-600 h-full" style={{ width: `${100 - killPct}%` }} />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
+
+          {/* Top weekly kills */}
+          {topKills.length > 0 && (
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+              <div className="px-4 py-3 border-b border-zinc-800">
+                <h3 className="text-xs uppercase tracking-wider text-zinc-500 font-semibold">Top Weekly Kills</h3>
+                <div className="text-[10px] text-zinc-600">Biggest kills this week</div>
+              </div>
+              <div className="divide-y divide-zinc-800">
+                {topKills.slice(0, 10).map(k => (
+                  <div key={k.EventId} className="px-4 py-2.5 flex items-center gap-3 text-xs">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-green-400 font-medium">{k.Killer.Name}</span>
+                      <span className="text-zinc-600"> killed </span>
+                      <span className="text-red-400 font-medium">{k.Victim.Name}</span>
+                      {k.Victim.GuildName && <span className="text-zinc-600"> [{k.Victim.GuildName}]</span>}
+                    </div>
+                    <span className="text-gold font-bold shrink-0">{formatSilver(k.TotalVictimKillFame)}</span>
+                    <span className="text-zinc-600 text-[10px] shrink-0">{new Date(k.TimeStamp).toLocaleDateString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {members.length > 0 && (
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">

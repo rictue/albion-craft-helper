@@ -193,6 +193,14 @@ export async function getGuildMembers(id: string): Promise<PlayerSearchResult[] 
   return await fetchJson<PlayerSearchResult[]>(`/guilds/${id}/members`);
 }
 
+export async function getGuildTopKills(id: string): Promise<KillEvent[] | null> {
+  return await fetchJson<KillEvent[]>(`/guilds/${id}/top?range=week&limit=10`);
+}
+
+export async function getGuildStats(id: string): Promise<{ kills: Array<{ timestamp: string; value: number }>; deaths: Array<{ timestamp: string; value: number }> } | null> {
+  return await fetchJson(`/guilds/${id}/stats`);
+}
+
 export async function getRecentEvents(limit: number = 51, offset: number = 0): Promise<KillEvent[] | null> {
   return await fetchJson<KillEvent[]>(`/events?limit=${limit}&offset=${offset}`);
 }
