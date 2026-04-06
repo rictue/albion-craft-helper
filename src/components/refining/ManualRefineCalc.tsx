@@ -320,6 +320,9 @@ export default function ManualRefineCalc() {
                     {result.initialPrev} prev × {formatSilver(result.cheapPrev)}
                   </div>
                 )}
+                <div className="text-[9px] text-zinc-700 mt-1">
+                  Per craft: {result.rawPerCraft} raw + {result.prevPerCraft > 0 ? `${result.prevPerCraft} prev` : 'no prev'} → {Math.floor(result.initialRaw / result.rawPerCraft)} crafts
+                </div>
               </div>
               <div className="bg-zinc-950/60 border border-zinc-800 rounded-xl p-4">
                 <div className="text-[9px] uppercase tracking-widest text-cyan-400/60 font-semibold">Output</div>
