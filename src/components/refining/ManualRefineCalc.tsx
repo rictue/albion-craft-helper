@@ -54,6 +54,9 @@ export default function ManualRefineCalc() {
   const [rawCount, setRawCount] = useState(600);
   const [city, setCity] = useState('Fort Sterling');
   const [useFocus, setUseFocus] = useState(false);
+  const [customRawPrice, setCustomRawPrice] = useState<number | null>(null);
+  const [customPrevPrice, setCustomPrevPrice] = useState<number | null>(null);
+  const [customSellPrice, setCustomSellPrice] = useState<number | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -97,7 +100,14 @@ export default function ManualRefineCalc() {
     const cheapRaw = cheapest.get(recipe.rawId);
     const cheapPrev = recipe.prevRefinedId ? cheapest.get(recipe.prevRefinedId) : undefined;
 
-    if (!cheapRaw || bestSell.price === 0) {
+    // Use custom prices if provided, otherwise market prices
+    const finalRawPrice = customRawPrice ?? cheapRaw?.price ?? 0;
+    const finalRawCity = customRawPrice ? 'Custom' : (cheapRaw?.city || '');
+    const finalPrevPrice = customPrevPrice ?? cheapPrev?.price ?? 0;
+    const finalSellPrice = customSellPrice ?? bestSell.price;
+    const finalSellCity = customSellPrice ? 'Custom' : bestSell.city;
+
+    if (finalRawPrice === 0 || finalSellPrice === 0) {
       setLoading(false);
       return;
     }
@@ -168,10 +178,10 @@ export default function ManualRefineCalc() {
     const leftoverRaw = raw;
     const leftoverPrev = prev;
 
-    const rawCost = initialRaw * cheapRaw.price;
-    const prevCost = recipe.prevRefinedId ? initialPrev * (cheapPrev?.price || 0) : 0;
+    const rawCost = initialRaw * finalRawPrice;
+    const prevCost = recipe.prevRefinedId ? initialPrev * finalPrevPrice : 0;
     const totalCost = rawCost + prevCost;
-    const totalRevenue = totalOutput * bestSell.price;
+    const totalRevenue = totalOutput * finalSellPrice;
     const profit = totalRevenue - totalCost;
 
     setResult({
@@ -182,11 +192,11 @@ export default function ManualRefineCalc() {
       refinedName: recipe.refinedName,
       tier, enchant,
       rawPerCraft, prevPerCraft,
-      cheapRaw: cheapRaw.price,
-      cheapRawCity: cheapRaw.city,
-      cheapPrev: cheapPrev?.price || 0,
-      bestSell: bestSell.price,
-      bestSellCity: bestSell.city,
+      cheapRaw: finalRawPrice,
+      cheapRawCity: finalRawCity,
+      cheapPrev: finalPrevPrice,
+      bestSell: finalSellPrice,
+      bestSellCity: finalSellCity,
       returnRate: rr,
       initialRaw, initialPrev,
       totalCrafts,
@@ -255,6 +265,23 @@ export default function ManualRefineCalc() {
           <button onClick={calculate} disabled={loading} className="ml-auto px-6 py-2 rounded-lg text-sm font-semibold bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 disabled:opacity-50">
             {loading ? 'Calculating...' : 'Calculate'}
           </button>
+        </div>
+
+        {/* Custom price overrides */}
+        <div className="flex flex-wrap items-end gap-3 pt-2 border-t border-zinc-800">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-600 w-full">Custom Prices <span className="normal-case text-zinc-700">(leave empty to use market prices)</span></div>
+          <div>
+            <label className="text-[10px] text-zinc-500 block mb-1">Raw Price (per 1)</label>
+            <input type="number" min={0} placeholder="Market" value={customRawPrice ?? ''} onChange={(e) => setCustomRawPrice(e.target.value ? parseInt(e.target.value) : null)} className="w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 placeholder-zinc-600" />
+          </div>
+          <div>
+            <label className="text-[10px] text-zinc-500 block mb-1">Prev Plank (per 1)</label>
+            <input type="number" min={0} placeholder="Market" value={customPrevPrice ?? ''} onChange={(e) => setCustomPrevPrice(e.target.value ? parseInt(e.target.value) : null)} className="w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 placeholder-zinc-600" />
+          </div>
+          <div>
+            <label className="text-[10px] text-zinc-500 block mb-1">Sell Price (per 1)</label>
+            <input type="number" min={0} placeholder="Market" value={customSellPrice ?? ''} onChange={(e) => setCustomSellPrice(e.target.value ? parseInt(e.target.value) : null)} className="w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 placeholder-zinc-600" />
+          </div>
         </div>
 
         {result && (
