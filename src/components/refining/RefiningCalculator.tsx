@@ -337,8 +337,12 @@ export default function RefiningCalculator() {
                           <span>Output w/ reinvest ({outPerCraft.toFixed(2)}×)</span>
                           <span className="tabular-nums">{outPerCraft.toFixed(2)} planks</span>
                         </div>
+                        <div className="flex justify-between text-zinc-500">
+                          <span>Per plank @ {r.bestSellCity}</span>
+                          <span className="tabular-nums">{formatSilver(r.sellPrice)}</span>
+                        </div>
                         <div className="flex justify-between text-zinc-300">
-                          <span>Sell @ {r.bestSellCity}</span>
+                          <span>Revenue ({outPerCraft.toFixed(2)} × {formatSilver(r.sellPrice)})</span>
                           <span className="tabular-nums font-semibold">{formatSilver(revenue)}</span>
                         </div>
                       </>
