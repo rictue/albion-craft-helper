@@ -57,6 +57,7 @@ export default function ManualRefineCalc() {
   const [customRawPrice, setCustomRawPrice] = useState<number | null>(null);
   const [customPrevPrice, setCustomPrevPrice] = useState<number | null>(null);
   const [customSellPrice, setCustomSellPrice] = useState<number | null>(null);
+  const [sameCity, setSameCity] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -75,35 +76,65 @@ export default function ManualRefineCalc() {
     const prices = await fetchPrices(ids);
 
     const cheapest = new Map<string, { price: number; city: string }>();
+    const cityPrices = new Map<string, Map<string, number>>(); // itemId → city → price
     const byCity = new Map<string, Array<{ price: number; city: string }>>();
     for (const p of prices) {
       if (p.sell_price_min <= 0 || p.city === 'Black Market') continue;
       const cur = cheapest.get(p.item_id);
       if (!cur || p.sell_price_min < cur.price) cheapest.set(p.item_id, { price: p.sell_price_min, city: p.city });
+      if (!cityPrices.has(p.item_id)) cityPrices.set(p.item_id, new Map());
+      cityPrices.get(p.item_id)!.set(p.city, p.sell_price_min);
       if (!byCity.has(p.item_id)) byCity.set(p.item_id, []);
       byCity.get(p.item_id)!.push({ price: p.sell_price_min, city: p.city });
     }
 
     let bestSell = { price: 0, city: '' };
-    const refinedList = byCity.get(recipe.refinedId) || [];
-    if (refinedList.length > 0) {
-      const sorted = [...refinedList].sort((a, b) => a.price - b.price);
-      const median = sorted[Math.floor(sorted.length / 2)].price;
-      const filtered = refinedList.filter(e => e.price <= median * 2);
-      if (filtered.length > 0) {
-        filtered.sort((a, b) => b.price - a.price);
-        bestSell = filtered[0];
+    if (sameCity) {
+      // Same city mode: buy and sell in the selected city
+      const sellPrice = cityPrices.get(recipe.refinedId)?.get(city) || 0;
+      bestSell = { price: sellPrice, city };
+    } else {
+      const refinedList = byCity.get(recipe.refinedId) || [];
+      if (refinedList.length > 0) {
+        const sorted = [...refinedList].sort((a, b) => a.price - b.price);
+        const median = sorted[Math.floor(sorted.length / 2)].price;
+        const filtered = refinedList.filter(e => e.price <= median * 2);
+        if (filtered.length > 0) {
+          filtered.sort((a, b) => b.price - a.price);
+          bestSell = filtered[0];
+        }
       }
     }
 
     const cheapRaw = cheapest.get(recipe.rawId);
     const cheapPrev = recipe.prevRefinedId ? cheapest.get(recipe.prevRefinedId) : undefined;
 
-    const finalRawPrice = customRawPrice ?? cheapRaw?.price ?? 0;
-    const finalRawCity = customRawPrice ? 'Custom' : (cheapRaw?.city || '');
-    const finalPrevPrice = customPrevPrice ?? cheapPrev?.price ?? 0;
-    const finalSellPrice = customSellPrice ?? bestSell.price;
-    const finalSellCity = customSellPrice ? 'Custom' : bestSell.city;
+    let finalRawPrice: number, finalRawCity: string;
+    let finalPrevPrice: number;
+    let finalSellPrice: number, finalSellCity: string;
+
+    if (customRawPrice != null) {
+      finalRawPrice = customRawPrice; finalRawCity = 'Custom';
+    } else if (sameCity) {
+      finalRawPrice = cityPrices.get(recipe.rawId)?.get(city) || cheapRaw?.price || 0;
+      finalRawCity = city;
+    } else {
+      finalRawPrice = cheapRaw?.price || 0; finalRawCity = cheapRaw?.city || '';
+    }
+
+    if (customPrevPrice != null) {
+      finalPrevPrice = customPrevPrice;
+    } else if (sameCity) {
+      finalPrevPrice = cityPrices.get(recipe.prevRefinedId)?.get(city) || cheapPrev?.price || 0;
+    } else {
+      finalPrevPrice = cheapPrev?.price || 0;
+    }
+
+    if (customSellPrice != null) {
+      finalSellPrice = customSellPrice; finalSellCity = 'Custom';
+    } else {
+      finalSellPrice = bestSell.price; finalSellCity = bestSell.city;
+    }
 
     if (finalRawPrice === 0 || finalSellPrice === 0) {
       setLoading(false);
@@ -175,7 +206,7 @@ export default function ManualRefineCalc() {
       totalCost, totalRevenue, profit, passes, stoppedBecause, leftoverRaw, leftoverPrev,
     });
     setLoading(false);
-  }, [resource, tier, enchant, rawCount, city, useFocus, customRawPrice, customPrevPrice, customSellPrice]);
+  }, [resource, tier, enchant, rawCount, city, useFocus, sameCity, customRawPrice, customPrevPrice, customSellPrice]);
 
   const bonusActive = (CITY_REFINE_BONUS[city] || []).includes(resource);
 
@@ -230,10 +261,14 @@ export default function ManualRefineCalc() {
               {CITIES.filter(c => c.id !== 'Black Market').map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </select>
           </div>
-          <div className="flex items-end gap-2">
-            <label className="flex items-center gap-2.5 cursor-pointer bg-zinc-800/60 border border-zinc-700/50 rounded-xl px-4 py-2.5 hover:bg-zinc-800 transition-all w-full">
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2.5 cursor-pointer bg-zinc-800/60 border border-zinc-700/50 rounded-xl px-4 py-2.5 hover:bg-zinc-800 transition-all">
               <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-purple-500 w-4 h-4" />
               <span className="text-sm text-zinc-200">Focus</span>
+            </label>
+            <label className="flex items-center gap-2.5 cursor-pointer bg-zinc-800/60 border border-zinc-700/50 rounded-xl px-4 py-2.5 hover:bg-zinc-800 transition-all">
+              <input type="checkbox" checked={sameCity} onChange={(e) => setSameCity(e.target.checked)} className="accent-purple-500 w-4 h-4" />
+              <span className="text-sm text-zinc-200">Same City</span>
             </label>
           </div>
           <div className="flex items-end">
