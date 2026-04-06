@@ -84,7 +84,6 @@ export default function ManualRefineCalc() {
       byCity.get(p.item_id)!.push({ price: p.sell_price_min, city: p.city });
     }
 
-    // Outlier-filtered max for sell
     let bestSell = { price: 0, city: '' };
     const refinedList = byCity.get(recipe.refinedId) || [];
     if (refinedList.length > 0) {
@@ -100,7 +99,6 @@ export default function ManualRefineCalc() {
     const cheapRaw = cheapest.get(recipe.rawId);
     const cheapPrev = recipe.prevRefinedId ? cheapest.get(recipe.prevRefinedId) : undefined;
 
-    // Use custom prices if provided, otherwise market prices
     const finalRawPrice = customRawPrice ?? cheapRaw?.price ?? 0;
     const finalRawCity = customRawPrice ? 'Custom' : (cheapRaw?.city || '');
     const finalPrevPrice = customPrevPrice ?? cheapPrev?.price ?? 0;
@@ -112,23 +110,15 @@ export default function ManualRefineCalc() {
       return;
     }
 
-    // LPB calculation
     let lpb = BASE_LPB;
-    const cityBonus = CITY_REFINE_BONUS[city] || [];
-    if (cityBonus.includes(resource)) lpb += CITY_LPB;
+    const cityBonusList = CITY_REFINE_BONUS[city] || [];
+    if (cityBonusList.includes(resource)) lpb += CITY_LPB;
     if (useFocus) lpb += FOCUS_LPB;
     const rr = lpbToReturnRate(lpb);
 
-    // EXPLICIT REINVEST SIMULATION
-    // User starts with `rawCount` raws + matching prev planks.
-    // Each pass: do as many crafts as possible with current stockpile,
-    // then add the proportional returned materials, loop until materials
-    // run out for one of the two inputs.
     const rawPerCraft = recipe.rawPerCraft;
     const prevPerCraft = recipe.prevPerCraft;
 
-    // Initial prev count matches max crafts the user would want to do
-    // with their raws (assume they bought exactly enough prev planks).
     const initialCrafts = Math.floor(rawCount / rawPerCraft);
     let raw = initialCrafts * rawPerCraft;
     let prev = initialCrafts * prevPerCraft;
@@ -152,7 +142,6 @@ export default function ManualRefineCalc() {
 
       const rawConsumed = crafts * rawPerCraft;
       const prevConsumed = crafts * prevPerCraft;
-      // Each resource independently rolls return at RR%. Use expected value.
       const rawReturned = rawConsumed * rr;
       const prevReturned = prevConsumed * rr;
 
@@ -162,16 +151,7 @@ export default function ManualRefineCalc() {
       totalCrafts += crafts;
       totalOutput += crafts;
 
-      passes.push({
-        pass: passNum,
-        crafts,
-        outputs: crafts,
-        rawConsumed,
-        prevConsumed,
-        rawReturned,
-        prevReturned,
-      });
-
+      passes.push({ pass: passNum, crafts, outputs: crafts, rawConsumed, prevConsumed, rawReturned, prevReturned });
       if (crafts < 1) break;
     }
 
@@ -185,206 +165,240 @@ export default function ManualRefineCalc() {
     const profit = totalRevenue - totalCost;
 
     setResult({
-      rawId: recipe.rawId,
-      refinedId: recipe.refinedId,
-      prevRefinedId: recipe.prevRefinedId,
-      rawName: recipe.rawName,
-      refinedName: recipe.refinedName,
-      tier, enchant,
+      rawId: recipe.rawId, refinedId: recipe.refinedId, prevRefinedId: recipe.prevRefinedId,
+      rawName: recipe.rawName, refinedName: recipe.refinedName, tier, enchant,
       rawPerCraft, prevPerCraft,
-      cheapRaw: finalRawPrice,
-      cheapRawCity: finalRawCity,
+      cheapRaw: finalRawPrice, cheapRawCity: finalRawCity,
       cheapPrev: finalPrevPrice,
-      bestSell: finalSellPrice,
-      bestSellCity: finalSellCity,
-      returnRate: rr,
-      initialRaw, initialPrev,
-      totalCrafts,
-      totalOutput,
-      totalCost,
-      totalRevenue,
-      profit,
-      passes,
-      stoppedBecause,
-      leftoverRaw,
-      leftoverPrev,
+      bestSell: finalSellPrice, bestSellCity: finalSellCity,
+      returnRate: rr, initialRaw, initialPrev, totalCrafts, totalOutput,
+      totalCost, totalRevenue, profit, passes, stoppedBecause, leftoverRaw, leftoverPrev,
     });
     setLoading(false);
-  }, [resource, tier, enchant, rawCount, city, useFocus]);
+  }, [resource, tier, enchant, rawCount, city, useFocus, customRawPrice, customPrevPrice, customSellPrice]);
 
   const bonusActive = (CITY_REFINE_BONUS[city] || []).includes(resource);
 
   return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-        <div>
-          <h3 className="text-xs uppercase tracking-wider text-purple-400 font-semibold">Manual Calculator</h3>
-          <div className="text-[10px] text-zinc-600">Pick exactly what you want to refine and see expected profit</div>
-        </div>
+    <div className="bg-gradient-to-br from-zinc-900 to-zinc-900/50 rounded-2xl border border-zinc-800 overflow-hidden">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-zinc-800 bg-gradient-to-r from-purple-500/5 to-transparent">
+        <h3 className="text-sm font-bold text-purple-400 tracking-wide">Manual Refine Calculator</h3>
+        <div className="text-[11px] text-zinc-500 mt-0.5">Full reinvest loop simulation with your exact prices</div>
       </div>
 
-      <div className="p-4 space-y-3">
-        <div className="flex flex-wrap items-end gap-3">
+      <div className="p-6 space-y-5">
+        {/* Row 1: Resource + Tier + Enchant */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 block mb-1">Resource</label>
-            <select value={resource} onChange={(e) => setResource(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40">
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Resource</label>
+            <select value={resource} onChange={(e) => setResource(e.target.value)} className="w-full bg-zinc-800/80 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all">
               {RESOURCE_TYPES.map(rt => (<option key={rt.id} value={rt.id}>{rt.name}</option>))}
             </select>
           </div>
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 block mb-1">Tier</label>
-            <div className="flex gap-1">
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Tier</label>
+            <div className="flex gap-1.5">
               {[4, 5, 6, 7, 8].map(t => (
-                <button key={t} onClick={() => setTier(t)} className={`w-10 h-9 rounded text-xs font-bold ${tier === t ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-zinc-800 text-zinc-500'}`}>T{t}</button>
+                <button key={t} onClick={() => setTier(t)} className={`flex-1 h-10 rounded-lg text-sm font-bold transition-all ${tier === t ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm shadow-purple-500/10' : 'bg-zinc-800/60 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-800'}`}>
+                  T{t}
+                </button>
               ))}
             </div>
           </div>
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 block mb-1">Enchant</label>
-            <div className="flex gap-1">
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Enchant</label>
+            <div className="flex gap-1.5">
               {[0, 1, 2, 3].map(e => (
-                <button key={e} onClick={() => setEnchant(e)} className={`w-9 h-9 rounded text-xs font-bold ${enchant === e ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-zinc-800 text-zinc-500'}`}>.{e}</button>
+                <button key={e} onClick={() => setEnchant(e)} className={`flex-1 h-10 rounded-lg text-sm font-bold transition-all ${enchant === e ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm shadow-purple-500/10' : 'bg-zinc-800/60 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-800'}`}>
+                  .{e}
+                </button>
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Row 2: Raw Count + City + Focus */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 block mb-1">Raw Count</label>
-            <input type="number" min={0} value={rawCount} onChange={(e) => setRawCount(parseInt(e.target.value) || 0)} className="w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40" />
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Raw Count</label>
+            <input type="number" min={0} value={rawCount} onChange={(e) => setRawCount(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800/80 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all" />
           </div>
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 block mb-1">City</label>
-            <select value={city} onChange={(e) => setCity(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40">
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">City</label>
+            <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full bg-zinc-800/80 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all">
               {CITIES.filter(c => c.id !== 'Black Market').map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </select>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2">
-            <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-purple-500" />
-            <span className="text-sm text-zinc-200">Focus</span>
-          </label>
-          {bonusActive && <span className="text-[10px] px-2 py-2 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20">★ City Bonus</span>}
-          <button onClick={calculate} disabled={loading} className="ml-auto px-6 py-2 rounded-lg text-sm font-semibold bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 disabled:opacity-50">
-            {loading ? 'Calculating...' : 'Calculate'}
-          </button>
-        </div>
-
-        {/* Custom price overrides */}
-        <div className="flex flex-wrap items-end gap-3 pt-2 border-t border-zinc-800">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-600 w-full">Custom Prices <span className="normal-case text-zinc-700">(leave empty to use market prices)</span></div>
-          <div>
-            <label className="text-[10px] text-zinc-500 block mb-1">Raw Price (per 1)</label>
-            <input type="number" min={0} placeholder="Market" value={customRawPrice ?? ''} onChange={(e) => setCustomRawPrice(e.target.value ? parseInt(e.target.value) : null)} className="w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 placeholder-zinc-600" />
+          <div className="flex items-end gap-2">
+            <label className="flex items-center gap-2.5 cursor-pointer bg-zinc-800/60 border border-zinc-700/50 rounded-xl px-4 py-2.5 hover:bg-zinc-800 transition-all w-full">
+              <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-purple-500 w-4 h-4" />
+              <span className="text-sm text-zinc-200">Focus</span>
+            </label>
           </div>
-          <div>
-            <label className="text-[10px] text-zinc-500 block mb-1">Prev Plank (per 1)</label>
-            <input type="number" min={0} placeholder="Market" value={customPrevPrice ?? ''} onChange={(e) => setCustomPrevPrice(e.target.value ? parseInt(e.target.value) : null)} className="w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 placeholder-zinc-600" />
-          </div>
-          <div>
-            <label className="text-[10px] text-zinc-500 block mb-1">Sell Price (per 1)</label>
-            <input type="number" min={0} placeholder="Market" value={customSellPrice ?? ''} onChange={(e) => setCustomSellPrice(e.target.value ? parseInt(e.target.value) : null)} className="w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 placeholder-zinc-600" />
+          <div className="flex items-end">
+            {bonusActive ? (
+              <div className="w-full flex items-center justify-center gap-1.5 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-2.5">
+                <span className="text-green-400 text-sm font-semibold">★ City Bonus</span>
+              </div>
+            ) : (
+              <div className="w-full flex items-center justify-center gap-1.5 bg-zinc-800/30 border border-zinc-800 rounded-xl px-4 py-2.5">
+                <span className="text-zinc-600 text-sm">No Bonus</span>
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Row 3: Custom prices */}
+        <div className="bg-zinc-950/40 border border-zinc-800/60 rounded-xl p-4">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-600 font-semibold mb-3">
+            Custom Prices <span className="normal-case text-zinc-700 font-normal">— leave empty to auto-fetch market prices</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[10px] text-zinc-500 block mb-1.5">Raw (per 1)</label>
+              <input type="number" min={0} placeholder="Auto" value={customRawPrice ?? ''} onChange={(e) => setCustomRawPrice(e.target.value ? parseInt(e.target.value) : null)} className="w-full bg-zinc-800/80 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 placeholder-zinc-600 transition-all" />
+            </div>
+            <div>
+              <label className="text-[10px] text-zinc-500 block mb-1.5">Prev Plank (per 1)</label>
+              <input type="number" min={0} placeholder="Auto" value={customPrevPrice ?? ''} onChange={(e) => setCustomPrevPrice(e.target.value ? parseInt(e.target.value) : null)} className="w-full bg-zinc-800/80 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 placeholder-zinc-600 transition-all" />
+            </div>
+            <div>
+              <label className="text-[10px] text-zinc-500 block mb-1.5">Sell (per 1)</label>
+              <input type="number" min={0} placeholder="Auto" value={customSellPrice ?? ''} onChange={(e) => setCustomSellPrice(e.target.value ? parseInt(e.target.value) : null)} className="w-full bg-zinc-800/80 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 placeholder-zinc-600 transition-all" />
+            </div>
+          </div>
+        </div>
+
+        {/* Calculate button */}
+        <button onClick={calculate} disabled={loading} className="w-full py-3 rounded-xl text-sm font-bold bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 disabled:opacity-50 transition-all">
+          {loading ? 'Calculating...' : 'Calculate Profit'}
+        </button>
+
+        {/* Result */}
         {result && (
-          <div className="mt-2 bg-zinc-950/60 border border-zinc-800 rounded-lg p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <ItemIcon itemId={result.refinedId} size={40} />
+          <div className="space-y-4 pt-2">
+            {/* Header + Profit badge */}
+            <div className="flex items-center justify-between bg-zinc-950/60 border border-zinc-800 rounded-xl px-5 py-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                  <ItemIcon itemId={result.refinedId} size={48} />
+                </div>
                 <div>
-                  <div className="text-sm font-bold text-zinc-200">{result.refinedName}</div>
-                  <div className="text-[10px] text-zinc-500">T{result.tier}{result.enchant > 0 && `.${result.enchant}`} · {formatPercent(result.returnRate * 100)} RR · {result.passes.length} passes · {result.totalCrafts} crafts</div>
+                  <div className="text-base font-bold text-zinc-100">{result.refinedName}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[10px] font-bold text-gold bg-gold/10 px-1.5 py-0.5 rounded">T{result.tier}{result.enchant > 0 && `.${result.enchant}`}</span>
+                    <span className="text-[10px] text-zinc-500">{formatPercent(result.returnRate * 100)} RR</span>
+                    <span className="text-[10px] text-zinc-600">·</span>
+                    <span className="text-[10px] text-zinc-500">{result.passes.length} passes</span>
+                    <span className="text-[10px] text-zinc-600">·</span>
+                    <span className="text-[10px] text-zinc-500">{result.totalCrafts} total crafts</span>
+                  </div>
                 </div>
               </div>
-              <div className={`text-right px-3 py-1.5 rounded-lg border ${result.profit > 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
-                <div className={`text-lg font-bold ${result.profit > 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <div className={`text-right px-4 py-2.5 rounded-xl border ${result.profit > 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                <div className={`text-xl font-black tabular-nums ${result.profit > 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {result.profit > 0 ? '+' : ''}{formatSilver(result.profit)}
                 </div>
-                <div className={`text-[10px] ${result.profit > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <div className={`text-[10px] font-semibold ${result.profit > 0 ? 'text-green-500/70' : 'text-red-500/70'}`}>
                   {formatPercent((result.profit / Math.max(1, result.totalCost)) * 100)} ROI
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-zinc-900 border border-zinc-800 rounded p-2">
-                <div className="text-[10px] uppercase text-zinc-600">Upfront buy</div>
-                <div className="text-zinc-300 font-semibold tabular-nums">{formatSilver(result.totalCost)}</div>
-                <div className="text-[10px] text-zinc-600">
-                  {result.initialRaw} raw × {formatSilver(result.cheapRaw)} @ {result.cheapRawCity}
-                  {result.prevPerCraft > 0 && ` + ${result.initialPrev} prev × ${formatSilver(result.cheapPrev)}`}
+            {/* 3-column stats */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-zinc-950/60 border border-zinc-800 rounded-xl p-4">
+                <div className="text-[9px] uppercase tracking-widest text-red-400/60 font-semibold">Buy</div>
+                <div className="text-lg font-black text-zinc-100 mt-1 tabular-nums">{formatSilver(result.totalCost)}</div>
+                <div className="text-[10px] text-zinc-600 mt-1 leading-relaxed">
+                  {result.initialRaw} raw × {formatSilver(result.cheapRaw)}
+                  {result.cheapRawCity !== 'Custom' && <span className="text-zinc-700"> ({result.cheapRawCity})</span>}
+                </div>
+                {result.prevPerCraft > 0 && (
+                  <div className="text-[10px] text-zinc-600 leading-relaxed">
+                    {result.initialPrev} prev × {formatSilver(result.cheapPrev)}
+                  </div>
+                )}
+              </div>
+              <div className="bg-zinc-950/60 border border-zinc-800 rounded-xl p-4">
+                <div className="text-[9px] uppercase tracking-widest text-cyan-400/60 font-semibold">Output</div>
+                <div className="text-lg font-black text-cyan-400 mt-1 tabular-nums">{result.totalOutput} <span className="text-sm text-zinc-500 font-normal">planks</span></div>
+                <div className="text-[10px] text-zinc-600 mt-1">
+                  ×{(result.totalOutput / Math.max(1, Math.floor(rawCount / result.rawPerCraft))).toFixed(2)} multiplier
+                </div>
+                <div className="text-[10px] text-zinc-700">
+                  {result.passes.length} reinvest passes
                 </div>
               </div>
-              <div className="bg-zinc-900 border border-zinc-800 rounded p-2">
-                <div className="text-[10px] uppercase text-zinc-600">Total output</div>
-                <div className="text-zinc-300 font-semibold tabular-nums">{result.totalOutput} planks</div>
-                <div className="text-[10px] text-zinc-600">after {result.passes.length} reinvest passes</div>
-              </div>
-              <div className="bg-zinc-900 border border-zinc-800 rounded p-2 col-span-2">
-                <div className="text-[10px] uppercase text-zinc-600">Revenue @ {result.bestSellCity}</div>
-                <div className="text-green-400 font-semibold tabular-nums">{formatSilver(result.totalRevenue)}</div>
-                <div className="text-[10px] text-zinc-600">{formatSilver(result.bestSell)} × {result.totalOutput} outputs</div>
+              <div className="bg-zinc-950/60 border border-zinc-800 rounded-xl p-4">
+                <div className="text-[9px] uppercase tracking-widest text-green-400/60 font-semibold">Sell</div>
+                <div className="text-lg font-black text-green-400 mt-1 tabular-nums">{formatSilver(result.totalRevenue)}</div>
+                <div className="text-[10px] text-zinc-600 mt-1">
+                  {result.totalOutput} × {formatSilver(result.bestSell)}
+                  {result.bestSellCity !== 'Custom' && <span className="text-zinc-700"> ({result.bestSellCity})</span>}
+                </div>
               </div>
             </div>
 
-            {/* Pass-by-pass breakdown */}
-            <details className="bg-zinc-900 border border-zinc-800 rounded">
-              <summary className="cursor-pointer px-3 py-2 text-[10px] uppercase tracking-wider text-zinc-500 hover:text-zinc-300">
-                Reinvest loop breakdown ({result.passes.length} passes)
+            {/* Reinvest loop breakdown */}
+            <details className="bg-zinc-950/40 border border-zinc-800 rounded-xl overflow-hidden">
+              <summary className="cursor-pointer px-5 py-3 text-[10px] uppercase tracking-wider text-zinc-500 hover:text-zinc-300 font-semibold transition-colors">
+                Reinvest Loop · {result.passes.length} passes · {result.totalCrafts} crafts
               </summary>
-              <div className="px-3 pb-3">
-                <table className="w-full text-[10px]">
-                  <thead>
-                    <tr className="text-zinc-600 border-b border-zinc-800">
-                      <th className="text-left py-1">Pass</th>
-                      <th className="text-right py-1">Crafts</th>
-                      <th className="text-right py-1">Raws used</th>
-                      <th className="text-right py-1">Prev used</th>
-                      <th className="text-right py-1">Raws ret.</th>
-                      <th className="text-right py-1">Prev ret.</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.passes.map(p => (
-                      <tr key={p.pass} className="border-b border-zinc-800/50">
-                        <td className="py-1 text-zinc-400">#{p.pass}</td>
-                        <td className="py-1 text-right text-zinc-300 tabular-nums">{p.crafts}</td>
-                        <td className="py-1 text-right text-zinc-500 tabular-nums">{Math.round(p.rawConsumed)}</td>
-                        <td className="py-1 text-right text-zinc-500 tabular-nums">{Math.round(p.prevConsumed)}</td>
-                        <td className="py-1 text-right text-cyan-400 tabular-nums">+{Math.round(p.rawReturned)}</td>
-                        <td className="py-1 text-right text-cyan-400 tabular-nums">+{Math.round(p.prevReturned)}</td>
+              <div className="px-5 pb-4 pt-1">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr className="text-zinc-600 border-b border-zinc-800">
+                        <th className="text-left py-1.5 pr-3">Pass</th>
+                        <th className="text-right py-1.5 px-3">Crafts</th>
+                        <th className="text-right py-1.5 px-3">Raw used</th>
+                        <th className="text-right py-1.5 px-3">Prev used</th>
+                        <th className="text-right py-1.5 px-3">Raw returned</th>
+                        <th className="text-right py-1.5 px-3">Prev returned</th>
+                        <th className="text-right py-1.5 pl-3">Cumulative output</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="text-[10px] text-zinc-600 mt-2">
-                  Stopped: <span className="text-amber-400">{result.stoppedBecause}</span> · Leftover: {result.leftoverRaw.toFixed(1)} raw, {result.leftoverPrev.toFixed(1)} prev
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        let cumOutput = 0;
+                        return result.passes.map(p => {
+                          cumOutput += p.crafts;
+                          return (
+                            <tr key={p.pass} className="border-b border-zinc-800/30 hover:bg-zinc-800/20">
+                              <td className="py-1.5 pr-3 text-zinc-400 font-semibold">#{p.pass}</td>
+                              <td className="py-1.5 px-3 text-right text-zinc-200 tabular-nums font-semibold">{p.crafts}</td>
+                              <td className="py-1.5 px-3 text-right text-zinc-500 tabular-nums">{Math.round(p.rawConsumed)}</td>
+                              <td className="py-1.5 px-3 text-right text-zinc-500 tabular-nums">{Math.round(p.prevConsumed)}</td>
+                              <td className="py-1.5 px-3 text-right text-cyan-400/80 tabular-nums">+{Math.round(p.rawReturned)}</td>
+                              <td className="py-1.5 px-3 text-right text-cyan-400/80 tabular-nums">+{Math.round(p.prevReturned)}</td>
+                              <td className="py-1.5 pl-3 text-right text-gold tabular-nums font-semibold">{cumOutput}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
                 </div>
 
-                {/* Loop totals */}
-                <div className="mt-3 pt-3 border-t border-zinc-800 grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px]">
-                  <div>
-                    <div className="uppercase text-zinc-600">Total planks</div>
-                    <div className="text-zinc-200 font-bold text-sm tabular-nums">{result.totalOutput}</div>
-                  </div>
-                  <div>
-                    <div className="uppercase text-zinc-600">Sell total</div>
-                    <div className="text-green-400 font-bold text-sm tabular-nums">{formatSilver(result.totalRevenue)}</div>
-                  </div>
-                  <div>
-                    <div className="uppercase text-zinc-600">Upfront cost</div>
-                    <div className="text-red-400 font-bold text-sm tabular-nums">-{formatSilver(result.totalCost)}</div>
-                  </div>
-                  <div>
-                    <div className="uppercase text-zinc-600">Net profit</div>
-                    <div className={`font-bold text-sm tabular-nums ${result.profit > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {result.profit > 0 ? '+' : ''}{formatSilver(result.profit)}
-                    </div>
-                  </div>
+                <div className="flex items-center gap-3 mt-3 pt-3 border-t border-zinc-800 text-[10px]">
+                  <span className="text-zinc-600">Stopped:</span>
+                  <span className="text-amber-400 font-medium">{result.stoppedBecause}</span>
+                  <span className="text-zinc-700">·</span>
+                  <span className="text-zinc-600">Leftover: <span className="text-zinc-400">{result.leftoverRaw.toFixed(1)} raw, {result.leftoverPrev.toFixed(1)} prev</span></span>
                 </div>
               </div>
             </details>
 
-            <div className="text-[10px] text-amber-400/70 italic">
-              Returns use expected values — actual runs will vary ±20–30% due to RNG. Run 30+ cycles for convergence.
+            {/* RNG warning */}
+            <div className="flex items-start gap-2.5 bg-amber-500/5 border border-amber-500/10 rounded-xl px-4 py-3">
+              <svg className="w-4 h-4 text-amber-500/50 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <div className="text-[11px] text-zinc-500">
+                <span className="text-amber-400/70 font-medium">Expected values</span> — actual results vary ±20-30% due to RNG. Run 30+ cycles for the average to converge.
+              </div>
             </div>
           </div>
         )}
