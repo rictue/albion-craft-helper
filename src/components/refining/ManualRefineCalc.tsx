@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { fetchPrices } from '../../services/api';
 import { RESOURCE_TYPES, CITY_REFINE_BONUS } from '../../data/refining';
 import { lpbToReturnRate } from '../../utils/returnRate';
@@ -57,7 +57,6 @@ export default function ManualRefineCalc() {
   const [customRawPrice, setCustomRawPrice] = useState<number | null>(null);
   const [customPrevPrice, setCustomPrevPrice] = useState<number | null>(null);
   const [customSellPrice, setCustomSellPrice] = useState<number | null>(null);
-  const [sameCity, setSameCity] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<{ raw: number; prev: number; sell: number } | null>(null);
@@ -78,62 +77,55 @@ export default function ManualRefineCalc() {
     const prices = await fetchPrices(ids);
 
     const cheapest = new Map<string, { price: number; city: string }>();
-    const cityPrices = new Map<string, Map<string, number>>(); // itemId → city → price
     const byCity = new Map<string, Array<{ price: number; city: string }>>();
     for (const p of prices) {
       if (p.sell_price_min <= 0 || p.city === 'Black Market') continue;
       const cur = cheapest.get(p.item_id);
       if (!cur || p.sell_price_min < cur.price) cheapest.set(p.item_id, { price: p.sell_price_min, city: p.city });
-      if (!cityPrices.has(p.item_id)) cityPrices.set(p.item_id, new Map());
-      cityPrices.get(p.item_id)!.set(p.city, p.sell_price_min);
       if (!byCity.has(p.item_id)) byCity.set(p.item_id, []);
       byCity.get(p.item_id)!.push({ price: p.sell_price_min, city: p.city });
     }
 
     let bestSell = { price: 0, city: '' };
-    if (sameCity) {
-      // Same city mode: buy and sell in the selected city
-      const sellPrice = cityPrices.get(recipe.refinedId)?.get(city) || 0;
-      bestSell = { price: sellPrice, city };
-    } else {
-      const refinedList = byCity.get(recipe.refinedId) || [];
-      if (refinedList.length > 0) {
-        const sorted = [...refinedList].sort((a, b) => a.price - b.price);
-        const median = sorted[Math.floor(sorted.length / 2)].price;
-        const filtered = refinedList.filter(e => e.price <= median * 2);
-        if (filtered.length > 0) {
-          filtered.sort((a, b) => b.price - a.price);
-          bestSell = filtered[0];
-        }
+    const refinedList = byCity.get(recipe.refinedId) || [];
+    if (refinedList.length > 0) {
+      const sorted = [...refinedList].sort((a, b) => a.price - b.price);
+      const median = sorted[Math.floor(sorted.length / 2)].price;
+      const filtered = refinedList.filter(e => e.price <= median * 2);
+      if (filtered.length > 0) {
+        filtered.sort((a, b) => b.price - a.price);
+        bestSell = filtered[0];
       }
     }
 
     const cheapRaw = cheapest.get(recipe.rawId);
     const cheapPrev = recipe.prevRefinedId ? cheapest.get(recipe.prevRefinedId) : undefined;
 
+    // Priority: custom > scanned city preview > cheapest/best across all cities
     let finalRawPrice: number, finalRawCity: string;
     let finalPrevPrice: number;
     let finalSellPrice: number, finalSellCity: string;
 
     if (customRawPrice != null) {
       finalRawPrice = customRawPrice; finalRawCity = 'Custom';
-    } else if (sameCity) {
-      finalRawPrice = cityPrices.get(recipe.rawId)?.get(city) || cheapRaw?.price || 0;
-      finalRawCity = city;
+    } else if (preview?.raw) {
+      finalRawPrice = preview.raw; finalRawCity = city;
     } else {
       finalRawPrice = cheapRaw?.price || 0; finalRawCity = cheapRaw?.city || '';
     }
 
     if (customPrevPrice != null) {
       finalPrevPrice = customPrevPrice;
-    } else if (sameCity) {
-      finalPrevPrice = cityPrices.get(recipe.prevRefinedId)?.get(city) || cheapPrev?.price || 0;
+    } else if (preview?.prev) {
+      finalPrevPrice = preview.prev;
     } else {
       finalPrevPrice = cheapPrev?.price || 0;
     }
 
     if (customSellPrice != null) {
       finalSellPrice = customSellPrice; finalSellCity = 'Custom';
+    } else if (preview?.sell) {
+      finalSellPrice = preview.sell; finalSellCity = city;
     } else {
       finalSellPrice = bestSell.price; finalSellCity = bestSell.city;
     }
@@ -208,36 +200,31 @@ export default function ManualRefineCalc() {
       totalCost, totalRevenue, profit, passes, stoppedBecause, leftoverRaw, leftoverPrev,
     });
     setLoading(false);
-  }, [resource, tier, enchant, rawCount, city, useFocus, sameCity, customRawPrice, customPrevPrice, customSellPrice]);
+  }, [resource, tier, enchant, rawCount, city, useFocus, customRawPrice, customPrevPrice, customSellPrice, preview]);
 
   const bonusActive = (CITY_REFINE_BONUS[city] || []).includes(resource);
 
-  // Auto-fetch city prices on config change for preview
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const rt = RESOURCE_TYPES.find(r => r.id === resource);
-      if (!rt) return;
-      const recipe = rt.recipes.find(r => r.tier === tier && r.enchant === enchant);
-      if (!recipe) return;
+  // Scan city prices on demand
+  const scanCityPrices = useCallback(async () => {
+    const rt = RESOURCE_TYPES.find(r => r.id === resource);
+    if (!rt) return;
+    const recipe = rt.recipes.find(r => r.tier === tier && r.enchant === enchant);
+    if (!recipe) return;
 
-      setPreviewLoading(true);
-      const ids = [recipe.rawId, recipe.refinedId];
-      if (recipe.prevRefinedId) ids.push(recipe.prevRefinedId);
+    setPreviewLoading(true);
+    const ids = [recipe.rawId, recipe.refinedId];
+    if (recipe.prevRefinedId) ids.push(recipe.prevRefinedId);
 
-      const data = await fetchPrices(ids, [city]);
-      if (cancelled) return;
-      let rawP = 0, prevP = 0, sellP = 0;
-      for (const p of data) {
-        if (p.sell_price_min <= 0 || p.city !== city) continue;
-        if (p.item_id === recipe.rawId && (rawP === 0 || p.sell_price_min < rawP)) rawP = p.sell_price_min;
-        if (recipe.prevRefinedId && p.item_id === recipe.prevRefinedId && (prevP === 0 || p.sell_price_min < prevP)) prevP = p.sell_price_min;
-        if (p.item_id === recipe.refinedId && p.sell_price_min > sellP) sellP = p.sell_price_min;
-      }
-      setPreview({ raw: rawP, prev: prevP, sell: sellP });
-      setPreviewLoading(false);
-    })();
-    return () => { cancelled = true; };
+    const data = await fetchPrices(ids, [city]);
+    let rawP = 0, prevP = 0, sellP = 0;
+    for (const p of data) {
+      if (p.sell_price_min <= 0 || p.city !== city) continue;
+      if (p.item_id === recipe.rawId && (rawP === 0 || p.sell_price_min < rawP)) rawP = p.sell_price_min;
+      if (recipe.prevRefinedId && p.item_id === recipe.prevRefinedId && (prevP === 0 || p.sell_price_min < prevP)) prevP = p.sell_price_min;
+      if (p.item_id === recipe.refinedId && p.sell_price_min > sellP) sellP = p.sell_price_min;
+    }
+    setPreview({ raw: rawP, prev: prevP, sell: sellP });
+    setPreviewLoading(false);
   }, [resource, tier, enchant, city]);
 
   return (
@@ -291,31 +278,28 @@ export default function ManualRefineCalc() {
               {CITIES.filter(c => c.id !== 'Black Market').map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </select>
           </div>
-          <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-2.5 cursor-pointer bg-zinc-800/60 border border-zinc-700/50 rounded-xl px-4 py-2.5 hover:bg-zinc-800 transition-all">
+          <div className="flex items-end">
+            <label className="flex items-center gap-2.5 cursor-pointer bg-zinc-800/60 border border-zinc-700/50 rounded-xl px-4 py-2.5 hover:bg-zinc-800 transition-all w-full">
               <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-purple-500 w-4 h-4" />
               <span className="text-sm text-zinc-200">Focus</span>
             </label>
-            <label className="flex items-center gap-2.5 cursor-pointer bg-zinc-800/60 border border-zinc-700/50 rounded-xl px-4 py-2.5 hover:bg-zinc-800 transition-all">
-              <input type="checkbox" checked={sameCity} onChange={(e) => setSameCity(e.target.checked)} className="accent-purple-500 w-4 h-4" />
-              <span className="text-sm text-zinc-200">Same City</span>
-            </label>
           </div>
           <div className="flex flex-col gap-2">
-            {/* Live city prices */}
-            <div className="bg-zinc-950/60 border border-zinc-800 rounded-xl px-4 py-2.5">
-              {previewLoading ? (
-                <div className="text-[10px] text-zinc-600">Loading prices...</div>
-              ) : preview ? (
-                <div className="flex items-center gap-4">
-                  <div className="text-[10px] text-zinc-500 font-semibold uppercase">{city.split(' ')[0]}</div>
-                  <div className="flex items-center gap-3 text-[11px]">
-                    <span className="text-zinc-500">Raw: <span className={`font-semibold ${preview.raw > 0 ? 'text-zinc-300' : 'text-zinc-700'}`}>{preview.raw > 0 ? formatSilver(preview.raw) : '—'}</span></span>
-                    <span className="text-zinc-500">Prev: <span className={`font-semibold ${preview.prev > 0 ? 'text-zinc-300' : 'text-zinc-700'}`}>{preview.prev > 0 ? formatSilver(preview.prev) : '—'}</span></span>
-                    <span className="text-zinc-500">Sell: <span className={`font-semibold ${preview.sell > 0 ? 'text-green-400' : 'text-zinc-700'}`}>{preview.sell > 0 ? formatSilver(preview.sell) : '—'}</span></span>
-                  </div>
+            {/* City prices scan */}
+            <div className="bg-zinc-950/60 border border-zinc-800 rounded-xl px-4 py-2.5 flex items-center gap-3">
+              {preview ? (
+                <div className="flex items-center gap-3 flex-1 text-[11px]">
+                  <div className="text-[10px] text-zinc-600 font-semibold uppercase shrink-0">{city.split(' ')[0]}</div>
+                  <span className="text-zinc-500">Raw: <span className={`font-semibold ${preview.raw > 0 ? 'text-zinc-300' : 'text-zinc-700'}`}>{preview.raw > 0 ? formatSilver(preview.raw) : '—'}</span></span>
+                  <span className="text-zinc-500">Prev: <span className={`font-semibold ${preview.prev > 0 ? 'text-zinc-300' : 'text-zinc-700'}`}>{preview.prev > 0 ? formatSilver(preview.prev) : '—'}</span></span>
+                  <span className="text-zinc-500">Sell: <span className={`font-semibold ${preview.sell > 0 ? 'text-green-400' : 'text-zinc-700'}`}>{preview.sell > 0 ? formatSilver(preview.sell) : '—'}</span></span>
                 </div>
-              ) : null}
+              ) : (
+                <div className="flex-1 text-[10px] text-zinc-600">Click scan to see {city} prices</div>
+              )}
+              <button onClick={scanCityPrices} disabled={previewLoading} className="shrink-0 px-3 py-1 rounded-lg text-[10px] font-semibold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-400 border border-cyan-500/20 disabled:opacity-50 transition-all">
+                {previewLoading ? '...' : 'Scan'}
+              </button>
             </div>
 
             {/* City bonus */}
