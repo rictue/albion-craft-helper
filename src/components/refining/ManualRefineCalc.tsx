@@ -210,7 +210,7 @@ export default function ManualRefineCalc() {
 
   const bonusActive = (CITY_REFINE_BONUS[city] || []).includes(resource);
 
-  // Scan city prices on demand
+  // Scan city prices on demand — fetch ALL cities, prefer selected city, fallback to cheapest
   const scanCityPrices = useCallback(async () => {
     const rt = RESOURCE_TYPES.find(r => r.id === resource);
     if (!rt) return;
@@ -221,15 +221,40 @@ export default function ManualRefineCalc() {
     const ids = [recipe.rawId, recipe.refinedId];
     if (recipe.prevRefinedId) ids.push(recipe.prevRefinedId);
 
-    const data = await fetchPrices(ids, [city]);
-    let rawP = 0, prevP = 0, sellP = 0;
+    // Fetch from ALL cities so we have fallback if selected city has no listings
+    const data = await fetchPrices(ids);
+
+    // City-specific prices
+    let cityRaw = 0, cityPrev = 0, citySell = 0;
+    // Cheapest across all cities (fallback)
+    let cheapRaw = 0, cheapPrev = 0, bestSell = 0;
+
     for (const p of data) {
-      if (p.sell_price_min <= 0 || p.city !== city) continue;
-      if (p.item_id === recipe.rawId && (rawP === 0 || p.sell_price_min < rawP)) rawP = p.sell_price_min;
-      if (recipe.prevRefinedId && p.item_id === recipe.prevRefinedId && (prevP === 0 || p.sell_price_min < prevP)) prevP = p.sell_price_min;
-      if (p.item_id === recipe.refinedId && p.sell_price_min > sellP) sellP = p.sell_price_min;
+      if (p.sell_price_min <= 0 || p.city === 'Black Market') continue;
+
+      // Raw: cheapest
+      if (p.item_id === recipe.rawId) {
+        if (p.city === city && (cityRaw === 0 || p.sell_price_min < cityRaw)) cityRaw = p.sell_price_min;
+        if (cheapRaw === 0 || p.sell_price_min < cheapRaw) cheapRaw = p.sell_price_min;
+      }
+      // Prev: cheapest
+      if (recipe.prevRefinedId && p.item_id === recipe.prevRefinedId) {
+        if (p.city === city && (cityPrev === 0 || p.sell_price_min < cityPrev)) cityPrev = p.sell_price_min;
+        if (cheapPrev === 0 || p.sell_price_min < cheapPrev) cheapPrev = p.sell_price_min;
+      }
+      // Sell: highest in selected city, fallback to highest anywhere
+      if (p.item_id === recipe.refinedId) {
+        if (p.city === city && p.sell_price_min > citySell) citySell = p.sell_price_min;
+        if (p.sell_price_min > bestSell) bestSell = p.sell_price_min;
+      }
     }
-    setPreview({ raw: rawP, prev: prevP, sell: sellP });
+
+    // Use city price if available, otherwise fallback to cheapest/best
+    setPreview({
+      raw: cityRaw || cheapRaw,
+      prev: cityPrev || cheapPrev,
+      sell: citySell || bestSell,
+    });
     setPreviewLoading(false);
   }, [resource, tier, enchant, city]);
 
