@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { fetchPrices } from '../../services/api';
 import { RESOURCE_TYPES, CITY_REFINE_BONUS } from '../../data/refining';
 import { lpbToReturnRate } from '../../utils/returnRate';
@@ -60,6 +60,8 @@ export default function ManualRefineCalc() {
   const [sameCity, setSameCity] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState<{ raw: number; prev: number; sell: number } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const calculate = useCallback(async () => {
     setLoading(true);
@@ -210,6 +212,34 @@ export default function ManualRefineCalc() {
 
   const bonusActive = (CITY_REFINE_BONUS[city] || []).includes(resource);
 
+  // Auto-fetch city prices on config change for preview
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const rt = RESOURCE_TYPES.find(r => r.id === resource);
+      if (!rt) return;
+      const recipe = rt.recipes.find(r => r.tier === tier && r.enchant === enchant);
+      if (!recipe) return;
+
+      setPreviewLoading(true);
+      const ids = [recipe.rawId, recipe.refinedId];
+      if (recipe.prevRefinedId) ids.push(recipe.prevRefinedId);
+
+      const data = await fetchPrices(ids, [city]);
+      if (cancelled) return;
+      let rawP = 0, prevP = 0, sellP = 0;
+      for (const p of data) {
+        if (p.sell_price_min <= 0 || p.city !== city) continue;
+        if (p.item_id === recipe.rawId && (rawP === 0 || p.sell_price_min < rawP)) rawP = p.sell_price_min;
+        if (recipe.prevRefinedId && p.item_id === recipe.prevRefinedId && (prevP === 0 || p.sell_price_min < prevP)) prevP = p.sell_price_min;
+        if (p.item_id === recipe.refinedId && p.sell_price_min > sellP) sellP = p.sell_price_min;
+      }
+      setPreview({ raw: rawP, prev: prevP, sell: sellP });
+      setPreviewLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [resource, tier, enchant, city]);
+
   return (
     <div className="bg-gradient-to-br from-zinc-900 to-zinc-900/50 rounded-2xl border border-zinc-800 overflow-hidden">
       {/* Header */}
@@ -271,13 +301,30 @@ export default function ManualRefineCalc() {
               <span className="text-sm text-zinc-200">Same City</span>
             </label>
           </div>
-          <div className="flex items-end">
+          <div className="flex flex-col gap-2">
+            {/* Live city prices */}
+            <div className="bg-zinc-950/60 border border-zinc-800 rounded-xl px-4 py-2.5">
+              {previewLoading ? (
+                <div className="text-[10px] text-zinc-600">Loading prices...</div>
+              ) : preview ? (
+                <div className="flex items-center gap-4">
+                  <div className="text-[10px] text-zinc-500 font-semibold uppercase">{city.split(' ')[0]}</div>
+                  <div className="flex items-center gap-3 text-[11px]">
+                    <span className="text-zinc-500">Raw: <span className={`font-semibold ${preview.raw > 0 ? 'text-zinc-300' : 'text-zinc-700'}`}>{preview.raw > 0 ? formatSilver(preview.raw) : '—'}</span></span>
+                    <span className="text-zinc-500">Prev: <span className={`font-semibold ${preview.prev > 0 ? 'text-zinc-300' : 'text-zinc-700'}`}>{preview.prev > 0 ? formatSilver(preview.prev) : '—'}</span></span>
+                    <span className="text-zinc-500">Sell: <span className={`font-semibold ${preview.sell > 0 ? 'text-green-400' : 'text-zinc-700'}`}>{preview.sell > 0 ? formatSilver(preview.sell) : '—'}</span></span>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            {/* City bonus */}
             {bonusActive ? (
-              <div className="w-full flex items-center justify-center gap-1.5 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-2.5">
+              <div className="flex items-center justify-center gap-1.5 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-2.5">
                 <span className="text-green-400 text-sm font-semibold">★ City Bonus</span>
               </div>
             ) : (
-              <div className="w-full flex items-center justify-center gap-1.5 bg-zinc-800/30 border border-zinc-800 rounded-xl px-4 py-2.5">
+              <div className="flex items-center justify-center gap-1.5 bg-zinc-800/30 border border-zinc-800 rounded-xl px-4 py-2.5">
                 <span className="text-zinc-600 text-sm">No Bonus</span>
               </div>
             )}
