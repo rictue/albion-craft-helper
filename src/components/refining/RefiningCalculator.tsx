@@ -17,10 +17,19 @@ const BASE_REFINE_LPB = 18;
 const CITY_REFINE_LPB = 40;
 const FOCUS_REFINE_LPB = 59;
 
-// Base focus cost per refine (before spec reduction). Approximate values.
+// Base focus cost per refine (from game data _craftingfocus values).
 const FOCUS_COST_PER_TIER: Record<number, number> = {
-  2: 10, 3: 23, 4: 45, 5: 90, 6: 180, 7: 360, 8: 540,
+  2: 6, 3: 18, 4: 48, 5: 101, 6: 201, 7: 402, 8: 604,
 };
+
+// Focus cost with mastery/spec reduction (exponential decay from albiononline2d).
+// Formula: baseFocus × 0.5^((specBonus + masteryBonus) / 100)
+// For refining: specialty = specLevel × 2.5, baseMasteries = sum of all tier specs × 0.3
+// Simplified: we only use the specific tier's spec level as specialty
+function calcFocusCost(baseFocus: number, specLevel: number): number {
+  const specialty = specLevel * 2.5;
+  return Math.round(baseFocus * Math.pow(0.5, specialty / 100));
+}
 
 const ENCHANT_COLORS: Record<number, string> = {
   0: 'text-zinc-300',
@@ -178,7 +187,7 @@ export default function RefiningCalculator() {
             cheapestPrevPrice: prevPrice,
             rawPerCraft: recipe.rawPerCraft,
             prevPerCraft: recipe.prevPerCraft,
-            focusCostPerCraft: Math.round((FOCUS_COST_PER_TIER[recipe.tier] || 45) * (1 - specLevel * 0.005)),
+            focusCostPerCraft: Math.round(calcFocusCost(FOCUS_COST_PER_TIER[recipe.tier] || 48, specLevel)),
           });
         }
       }

@@ -34,25 +34,25 @@ const MATERIAL_NAMES: Record<string, string> = {
   STONEBLOCK: 'Stone Block',
 };
 
-// Albion Item Value per resource tier (used for station nutrition/setup fee).
-// These are the fixed game-defined values, NOT market prices.
+// Albion Item Value per resource tier (from albiononline2d source / game data).
+// Used for station nutrition/setup fee calculation.
 const RESOURCE_ITEM_VALUE: Record<number, number> = {
-  2: 2,
-  3: 6,
-  4: 14,
-  5: 30,
-  6: 62,
-  7: 126,
-  8: 254,
+  2: 4,
+  3: 8,
+  4: 16,
+  5: 32,
+  6: 64,
+  7: 128,
+  8: 256,
 };
 
-// Enchanted resources add to base item value. Approx multipliers from wiki.
+// Enchant multiplier for item value (from game data)
 const ENCHANT_IV_MULT: Record<number, number> = {
   0: 1,
   1: 2,
-  2: 6,
-  3: 14,
-  4: 30,
+  2: 4,
+  3: 8,
+  4: 16,
 };
 
 function getResourceItemValue(tier: number, enchant: number): number {
