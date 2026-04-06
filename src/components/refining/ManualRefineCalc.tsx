@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { fetchPrices } from '../../services/api';
 import { RESOURCE_TYPES, CITY_REFINE_BONUS } from '../../data/refining';
 import { lpbToReturnRate } from '../../utils/returnRate';
@@ -61,6 +61,12 @@ export default function ManualRefineCalc() {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<{ raw: number; prev: number; sell: number } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Clear preview + result when config changes so stale prices aren't reused
+  useEffect(() => {
+    setPreview(null);
+    setResult(null);
+  }, [resource, tier, enchant, city]);
 
   const calculate = useCallback(async () => {
     setLoading(true);
