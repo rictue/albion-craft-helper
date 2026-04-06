@@ -54,13 +54,17 @@ function generateRecipes(
     });
 
     // Enchanted (1-3) only for T4+
+    // T4 enchanted uses T3 BASE planks (no T3 enchanted in recipes).
+    // T5+ enchanted uses matching enchant prev: T5.2 needs T4.2, T6.1 needs T5.1, etc.
     if (tier >= 4) {
       for (let e = 1; e <= 3; e++) {
-        const prevEnchRef = `T${tier - 1}_${refinedPrefix}_LEVEL${e}@${e}`;
+        const prevEnch = tier === 4
+          ? prevRefined  // T4.X → T3 base
+          : `T${tier - 1}_${refinedPrefix}_LEVEL${e}@${e}`; // T5+ → prev enchanted
         recipes.push({
           rawId: `T${tier}_${rawPrefix}_LEVEL${e}@${e}`,
           refinedId: `T${tier}_${refinedPrefix}_LEVEL${e}@${e}`,
-          prevRefinedId: prevEnchRef,
+          prevRefinedId: prevEnch,
           rawName: `${enchantNames[e]} ${names.raw}`,
           refinedName: `${enchantNames[e]} ${names.refined}`,
           tier, enchant: e,
