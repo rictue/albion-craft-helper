@@ -27,7 +27,7 @@ interface CityPriceData {
   refinedDate: string;
 }
 
-type SellMode = 'market' | 'discord' | 'bm';
+type SellMode = 'market' | 'discord';
 
 export default function SimpleRefine() {
   const [resource, setResource] = useState('wood');
@@ -387,15 +387,12 @@ export default function SimpleRefine() {
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Sell Mode</label>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               <button onClick={() => setSellMode('market')} className={`h-9 rounded-lg text-xs font-semibold transition-all ${sellMode === 'market' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50'}`}>
                 Market ({premium ? '−6.5%' : '−10.5%'} tax)
               </button>
               <button onClick={() => setSellMode('discord')} className={`h-9 rounded-lg text-xs font-semibold transition-all ${sellMode === 'discord' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50'}`}>
                 Discord (−5%)
-              </button>
-              <button onClick={() => setSellMode('bm')} className={`h-9 rounded-lg text-xs font-semibold transition-all ${sellMode === 'bm' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50'}`}>
-                BM (no tax)
               </button>
             </div>
           </div>
@@ -468,7 +465,7 @@ export default function SimpleRefine() {
               <div className="text-[11px] text-zinc-500 mt-2 space-y-0.5">
                 <div>{simulation.totalOutput} × {formatSilver(result.effectiveSellPrice)}</div>
                 <div>{sellPriceCity && <span className="text-zinc-700">@ {sellPriceCity}</span>}</div>
-                <div className="text-zinc-700 text-[10px]">{sellMode === 'market' ? `${premium ? '6.5%' : '10.5%'} tax` : sellMode === 'discord' ? '5% Discord discount' : 'BM no tax'}</div>
+                <div className="text-zinc-700 text-[10px]">{sellMode === 'market' ? `${premium ? '6.5%' : '10.5%'} tax` : '5% Discord discount'}</div>
               </div>
             </div>
           </div>
