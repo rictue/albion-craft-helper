@@ -23,7 +23,7 @@ function getApiBase(): string {
   return SERVER_URLS[getServer()];
 }
 
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 30 * 1000; // 30 seconds for near-live mode
 const LS_CACHE_KEY = 'albion-price-cache-v2';
 const LS_CACHE_MAX_ENTRIES = 40; // cap to avoid localStorage quota issues
 

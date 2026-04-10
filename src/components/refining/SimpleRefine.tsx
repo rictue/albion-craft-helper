@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { fetchPrices } from '../../services/api';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { fetchPrices, clearPriceCache } from '../../services/api';
 import { RESOURCE_TYPES, CITY_REFINE_BONUS } from '../../data/refining';
 import { lpbToReturnRate } from '../../utils/returnRate';
 import { formatSilver, formatPercent } from '../../utils/formatters';
@@ -46,6 +46,8 @@ export default function SimpleRefine() {
   const [feePerCraft, setFeePerCraft] = useState(300);
   const [prices, setPrices] = useState<CityPriceData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [liveMode, setLiveMode] = useState(false);
+  const [lastFetchAt, setLastFetchAt] = useState<number | null>(null);
 
   // Get current recipe
   const recipe = useMemo(() => {
@@ -71,43 +73,59 @@ export default function SimpleRefine() {
     if (rt) setRefineSpec(rt.refinedPrefix, tier, v);
   };
 
-  // Auto-fetch prices when config changes
-  useEffect(() => {
+  // Fetch function (shared by auto + manual + live)
+  const doFetch = useCallback(async (force: boolean = false): Promise<void> => {
     if (!recipe) return;
-    let cancelled = false;
     setLoading(true);
-    (async () => {
-      const ids = [recipe.rawId, recipe.refinedId];
-      if (recipe.prevRefinedId) ids.push(recipe.prevRefinedId);
-      const data = await fetchPrices(ids);
-      if (cancelled) return;
+    if (force) clearPriceCache();
+    const ids = [recipe.rawId, recipe.refinedId];
+    if (recipe.prevRefinedId) ids.push(recipe.prevRefinedId);
+    const data = await fetchPrices(ids, undefined, false, force);
 
-      const rawMap = new Map<string, number>();
-      const prevMap = new Map<string, number>();
-      const refinedMap = new Map<string, number>();
-      let rawDate = '', prevDate = '', refinedDate = '';
+    const rawMap = new Map<string, number>();
+    const prevMap = new Map<string, number>();
+    const refinedMap = new Map<string, number>();
+    let rawDate = '', prevDate = '', refinedDate = '';
 
-      for (const p of data) {
-        if (p.sell_price_min <= 0 || p.city === 'Black Market') continue;
-        if (p.item_id === recipe.rawId) {
-          rawMap.set(p.city, p.sell_price_min);
-          if (!rawDate || p.sell_price_min_date > rawDate) rawDate = p.sell_price_min_date;
-        }
-        if (recipe.prevRefinedId && p.item_id === recipe.prevRefinedId) {
-          prevMap.set(p.city, p.sell_price_min);
-          if (!prevDate || p.sell_price_min_date > prevDate) prevDate = p.sell_price_min_date;
-        }
-        if (p.item_id === recipe.refinedId) {
-          refinedMap.set(p.city, p.sell_price_min);
-          if (!refinedDate || p.sell_price_min_date > refinedDate) refinedDate = p.sell_price_min_date;
-        }
+    for (const p of data) {
+      if (p.sell_price_min <= 0 || p.city === 'Black Market') continue;
+      if (p.item_id === recipe.rawId) {
+        rawMap.set(p.city, p.sell_price_min);
+        if (!rawDate || p.sell_price_min_date > rawDate) rawDate = p.sell_price_min_date;
       }
+      if (recipe.prevRefinedId && p.item_id === recipe.prevRefinedId) {
+        prevMap.set(p.city, p.sell_price_min);
+        if (!prevDate || p.sell_price_min_date > prevDate) prevDate = p.sell_price_min_date;
+      }
+      if (p.item_id === recipe.refinedId) {
+        refinedMap.set(p.city, p.sell_price_min);
+        if (!refinedDate || p.sell_price_min_date > refinedDate) refinedDate = p.sell_price_min_date;
+      }
+    }
 
-      setPrices({ raw: rawMap, prev: prevMap, refined: refinedMap, rawDate, prevDate, refinedDate });
-      setLoading(false);
+    setPrices({ raw: rawMap, prev: prevMap, refined: refinedMap, rawDate, prevDate, refinedDate });
+    setLastFetchAt(Date.now());
+    setLoading(false);
+  }, [recipe]);
+
+  // Auto-fetch on config change
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (cancelled) return;
+      await doFetch(false);
     })();
     return () => { cancelled = true; };
-  }, [recipe]);
+  }, [doFetch]);
+
+  // LIVE MODE: poll every 15 seconds with force refresh
+  useEffect(() => {
+    if (!liveMode) return;
+    const interval = setInterval(() => {
+      doFetch(true);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [liveMode, doFetch]);
 
   // Clear custom overrides when config changes
   useEffect(() => {
@@ -332,12 +350,33 @@ export default function SimpleRefine() {
               Focus/craft: {focusCostPerCraft}
             </div>
           )}
-          {loading && <span className="text-[10px] text-zinc-500">Loading prices...</span>}
-          {staleWarning && (
+          {loading && <span className="text-[10px] text-zinc-500">Loading...</span>}
+          {staleWarning && !liveMode && (
             <div className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px]">
-              ⚠ Prices &gt;6h old — verify in-game
+              ⚠ Prices &gt;6h old — open ADP Client + AH in-game
             </div>
           )}
+
+          <div className="ml-auto flex items-center gap-2">
+            {lastFetchAt && (
+              <span className="text-[10px] text-zinc-600">
+                Updated {Math.max(0, Math.floor((Date.now() - lastFetchAt) / 1000))}s ago
+              </span>
+            )}
+            <button
+              onClick={() => doFetch(true)}
+              disabled={loading}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 disabled:opacity-50 transition-colors"
+              title="Force refresh prices from AODP"
+            >
+              ↻ Refresh
+            </button>
+            <label className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${liveMode ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'}`}>
+              <input type="checkbox" checked={liveMode} onChange={(e) => setLiveMode(e.target.checked)} className="accent-green-500" />
+              {liveMode && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />}
+              LIVE
+            </label>
+          </div>
         </div>
       </div>
 
