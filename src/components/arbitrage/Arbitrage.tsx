@@ -169,15 +169,18 @@ export default function Arbitrage() {
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={r.itemId} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                    <td className="px-3 py-2 text-zinc-600">{i + 1}</td>
-                    <td className="px-3 py-2"><ItemIcon itemId={r.itemId} size={24} /></td>
-                    <td className="px-3 py-2 text-zinc-200">{r.itemName}</td>
-                    <td className="px-3 py-2 text-green-400">{r.buyCity}</td>
+                    <td className="px-3 py-2 text-zinc-600 font-semibold">{i + 1}</td>
+                    <td className="px-3 py-2"><ItemIcon itemId={r.itemId} size={40} /></td>
+                    <td className="px-3 py-2">
+                      <div className="text-zinc-200 font-medium">{r.itemName}</div>
+                      <div className="text-[10px] text-gold font-bold">T{tier}{enchant > 0 && `.${enchant}`}</div>
+                    </td>
+                    <td className="px-3 py-2 text-green-400 font-semibold">{r.buyCity}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-zinc-400">{formatSilver(r.buyPrice)}</td>
-                    <td className="px-3 py-2 text-red-400">{r.sellCity}</td>
+                    <td className="px-3 py-2 text-red-400 font-semibold">{r.sellCity}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-zinc-400">{formatSilver(r.sellPrice)}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-bold text-green-400">+{formatSilver(r.profit)}</td>
-                    <td className="px-3 py-2 text-right text-green-400">{formatPercent(r.marginPct)}</td>
+                    <td className="px-3 py-2 text-right text-green-400 font-bold">{formatPercent(r.marginPct)}</td>
                   </tr>
                 ))}
               </tbody>

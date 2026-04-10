@@ -220,8 +220,11 @@ export default function MarketFlipper() {
                 {sortedRows.map((r, i) => (
                   <tr key={r.itemId} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
                     <td className="px-3 py-2.5 text-zinc-600 font-semibold">{i + 1}</td>
-                    <td className="px-3 py-2.5"><ItemIcon itemId={r.itemId} size={28} /></td>
-                    <td className="px-3 py-2.5 text-zinc-200 font-medium">{r.itemName}</td>
+                    <td className="px-3 py-2.5"><ItemIcon itemId={r.itemId} size={40} /></td>
+                    <td className="px-3 py-2.5">
+                      <div className="text-zinc-200 font-medium">{r.itemName}</div>
+                      <div className="text-[10px] text-gold font-bold">T{tier}{enchant > 0 && `.${enchant}`}</div>
+                    </td>
                     <td className="px-3 py-2.5 text-green-400 font-semibold">{r.buyCity}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-zinc-400">{formatSilver(r.buyPrice)}</td>
                     <td className="px-3 py-2.5 text-red-400 font-semibold">{r.sellCity}</td>
