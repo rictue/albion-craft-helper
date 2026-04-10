@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/common/Header';
 import CraftingCalculator from './components/calculator/CraftingCalculator';
 import CraftingPlanner from './components/planner/CraftingPlanner';
@@ -15,13 +15,13 @@ import PricesBrowser from './components/prices/PricesBrowser';
 import Cooking from './components/cooking/Cooking';
 import Butcher from './components/butcher/Butcher';
 import TopKillFame from './components/killboard/TopKillFame';
-import Arbitrage from './components/arbitrage/Arbitrage';
 import FocusEfficiency from './components/focus/FocusEfficiency';
 import PriceHistory from './components/history/PriceHistory';
 import CraftingFame from './components/fame/CraftingFame';
 import Transmutation from './components/transmute/Transmutation';
 import Farming from './components/farming/Farming';
 import MarketFlipper from './components/flipper/MarketFlipper';
+// Arbitrage page removed - redirects to MarketFlipper
 import JournalsCalculator from './components/journals/JournalsCalculator';
 import FarmBreed from './components/farmbreed/FarmBreed';
 
@@ -45,7 +45,7 @@ export default function App() {
           <Route path="/guilds" element={<Guilds />} />
           <Route path="/killboard" element={<Killboard />} />
           <Route path="/top-fame" element={<TopKillFame />} />
-          <Route path="/arbitrage" element={<Arbitrage />} />
+          <Route path="/arbitrage" element={<Navigate to="/flipper" replace />} />
           <Route path="/focus" element={<FocusEfficiency />} />
           <Route path="/history" element={<PriceHistory />} />
           <Route path="/fame" element={<CraftingFame />} />

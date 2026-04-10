@@ -205,7 +205,7 @@ export default function MarketFlipper() {
               <thead>
                 <tr className="border-b border-zinc-800 text-zinc-500 uppercase tracking-wider">
                   <th className="text-left px-3 py-3 w-10">#</th>
-                  <th className="text-left px-3 py-3 w-10"></th>
+                  <th className="text-left px-3 py-3 w-[68px]"></th>
                   <th className="text-left px-3 py-3">Item</th>
                   <th className="text-left px-3 py-3">Buy From</th>
                   <th className="text-right px-3 py-3">Buy Price</th>
@@ -219,9 +219,13 @@ export default function MarketFlipper() {
               <tbody>
                 {sortedRows.map((r, i) => (
                   <tr key={r.itemId} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                    <td className="px-3 py-2.5 text-zinc-600 font-semibold">{i + 1}</td>
-                    <td className="px-3 py-2.5"><ItemIcon itemId={r.itemId} size={40} /></td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-3 text-zinc-600 font-semibold">{i + 1}</td>
+                    <td className="px-3 py-3">
+                      <div className="w-14 h-14 flex items-center justify-center">
+                        <ItemIcon itemId={r.itemId} size={56} />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
                       <div className="text-zinc-200 font-medium">{r.itemName}</div>
                       <div className="text-[10px] text-gold font-bold">T{tier}{enchant > 0 && `.${enchant}`}</div>
                     </td>
