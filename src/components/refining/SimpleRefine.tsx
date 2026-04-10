@@ -134,9 +134,14 @@ export default function SimpleRefine() {
     setCustomSell(null);
   }, [resource, tier, enchant]);
 
-  // Compute cheapest buy city and highest sell city (outlier-filtered)
+  // Buy prices: default from refine city if available, otherwise cheapest
   const bestBuy = useMemo(() => {
     if (!prices) return null;
+    // Prefer refine city price for both raw and prev
+    const rawFromRefineCity = prices.raw.get(refineCity);
+    const prevFromRefineCity = prices.prev.get(refineCity);
+
+    // Fallback: cheapest across all cities
     let cheapestRaw = { city: '', price: Infinity };
     for (const [city, price] of prices.raw.entries()) {
       if (price < cheapestRaw.price) cheapestRaw = { city, price };
@@ -145,11 +150,16 @@ export default function SimpleRefine() {
     for (const [city, price] of prices.prev.entries()) {
       if (price < cheapestPrev.price) cheapestPrev = { city, price };
     }
+
     return {
-      raw: cheapestRaw.price === Infinity ? null : cheapestRaw,
-      prev: cheapestPrev.price === Infinity ? null : cheapestPrev,
+      raw: rawFromRefineCity != null
+        ? { city: refineCity, price: rawFromRefineCity }
+        : (cheapestRaw.price === Infinity ? null : cheapestRaw),
+      prev: prevFromRefineCity != null
+        ? { city: refineCity, price: prevFromRefineCity }
+        : (cheapestPrev.price === Infinity ? null : cheapestPrev),
     };
-  }, [prices]);
+  }, [prices, refineCity]);
 
   const bestSell = useMemo(() => {
     if (!prices || prices.refined.size === 0) return null;
