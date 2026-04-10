@@ -591,6 +591,8 @@ interface PriceInputProps {
 
 function PriceInput({ label, itemId, auto, autoCity, value, onChange, allCities, accent }: PriceInputProps) {
   const color = accent === 'green' ? 'text-green-400' : 'text-zinc-200';
+  // The currently effective price (either user override or auto-filled)
+  const effectivePrice = value ?? auto;
   return (
     <div className="bg-zinc-950/40 border border-zinc-800 rounded-xl p-3">
       <div className="flex items-center gap-2 mb-2">
@@ -606,18 +608,35 @@ function PriceInput({ label, itemId, auto, autoCity, value, onChange, allCities,
         className={`w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm ${color} placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/40`}
       />
       {auto > 0 && autoCity && (
-        <div className="text-[10px] text-zinc-600 mt-1.5">
-          Auto: {formatSilver(auto)} @ {autoCity}
+        <div className="text-[10px] text-zinc-600 mt-1.5 flex items-center justify-between">
+          <span>Default: {formatSilver(auto)} @ {autoCity}</span>
+          {value != null && (
+            <button onClick={() => onChange(null)} className="text-cyan-500 hover:text-cyan-400 text-[9px] underline">reset</button>
+          )}
         </div>
       )}
       {allCities && allCities.size > 0 && (
         <div className="mt-2 pt-2 border-t border-zinc-800 space-y-0.5">
-          {[...allCities.entries()].sort((a, b) => a[1] - b[1]).slice(0, 5).map(([city, price]) => (
-            <div key={city} className="flex justify-between text-[10px] text-zinc-600">
-              <span>{city.substring(0, 10)}</span>
-              <span className="tabular-nums">{formatSilver(price)}</span>
-            </div>
-          ))}
+          {[...allCities.entries()].sort((a, b) => a[1] - b[1]).map(([city, price]) => {
+            const isSelected = Math.abs(effectivePrice - price) < 0.5;
+            return (
+              <button
+                key={city}
+                onClick={() => onChange(price)}
+                className={`w-full flex items-center justify-between px-1.5 py-1 rounded text-[10px] transition-colors ${
+                  isSelected
+                    ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                    : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300 border border-transparent'
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  {isSelected && <span className="text-cyan-400">✓</span>}
+                  {city}
+                </span>
+                <span className="tabular-nums">{formatSilver(price)}</span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
