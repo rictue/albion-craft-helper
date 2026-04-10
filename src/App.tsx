@@ -5,7 +5,7 @@ import CraftingPlanner from './components/planner/CraftingPlanner';
 import CustomDatabase from './components/database/CustomDatabase';
 import SuggestedCrafts from './components/suggester/SuggestedCrafts';
 import IslandPlanner from './components/island/IslandPlanner';
-import RefiningCalculator from './components/refining/RefiningCalculator';
+import SimpleRefine from './components/refining/SimpleRefine';
 import Profile from './components/profile/Profile';
 import Players from './components/players/Players';
 import Guilds from './components/guilds/Guilds';
@@ -31,7 +31,7 @@ export default function App() {
           <Route path="/" element={<CraftingCalculator />} />
           <Route path="/suggested" element={<SuggestedCrafts />} />
           <Route path="/blackmarket" element={<SuggestedCrafts blackMarketOnly />} />
-          <Route path="/refining" element={<RefiningCalculator />} />
+          <Route path="/refining" element={<SimpleRefine />} />
           <Route path="/cooking" element={<Cooking />} />
           <Route path="/butcher" element={<Butcher />} />
           <Route path="/island" element={<IslandPlanner />} />
