@@ -11,8 +11,11 @@ interface FlipRow {
   itemName: string;
   buyCity: string;
   buyPrice: number;
+  buyAgeHours: number;
   sellCity: string;
   sellPrice: number;
+  sellAgeHours: number;
+  maxAgeHours: number;
   netRevenue: number;
   profit: number;
   marginPct: number;
@@ -22,6 +25,16 @@ interface FlipRow {
 const PREMIUM_TAX = 0.065;
 const NON_PREMIUM_TAX = 0.105;
 
+// Max acceptable data age in hours. Older than this is considered stale and filtered out.
+const MAX_DATA_AGE_HOURS = 4;
+
+function ageHours(dateStr: string | undefined): number {
+  if (!dateStr) return Infinity;
+  const t = new Date(dateStr).getTime();
+  if (!t) return Infinity;
+  return (Date.now() - t) / (1000 * 60 * 60);
+}
+
 export default function MarketFlipper() {
   const [tier, setTier] = useState<Tier>(6);
   const [enchant, setEnchant] = useState<Enchantment>(1);
@@ -29,7 +42,9 @@ export default function MarketFlipper() {
   const [minMargin, setMinMargin] = useState(15);
   const [premium, setPremium] = useState(true);
   const [sellMode, setSellMode] = useState<'market' | 'discord'>('market');
+  const [maxAgeHours, setMaxAgeHours] = useState(MAX_DATA_AGE_HOURS);
   const [rows, setRows] = useState<FlipRow[]>([]);
+  const [skippedStale, setSkippedStale] = useState(0);
   const [loading, setLoading] = useState(false);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'profit' | 'margin' | 'per1m'>('profit');
@@ -37,18 +52,22 @@ export default function MarketFlipper() {
   const scan = useCallback(async () => {
     setLoading(true);
     setRows([]);
+    setSkippedStale(0);
 
     const ids = ALL_ITEMS.map(i => resolveItemId(i.baseId, tier, enchant));
-    const prices: MarketPrice[] = await fetchPrices(ids);
+    const prices: MarketPrice[] = await fetchPrices(ids, undefined, false, true); // force fresh
 
-    // Group by item
+    // Group by item — drop stale (>maxAge) listings entirely so they can't become buy/sell candidates
     const byItem = new Map<string, MarketPrice[]>();
+    let staleDropped = 0;
     for (const p of prices) {
       if (p.sell_price_min <= 0) continue;
       if (p.city === 'Black Market') continue;
+      if (ageHours(p.sell_price_min_date) > maxAgeHours) { staleDropped++; continue; }
       if (!byItem.has(p.item_id)) byItem.set(p.item_id, []);
       byItem.get(p.item_id)!.push(p);
     }
+    setSkippedStale(staleDropped);
 
     const taxRate = sellMode === 'discord' ? 0 : (premium ? PREMIUM_TAX : NON_PREMIUM_TAX);
     const sellMultiplier = sellMode === 'discord' ? 0.95 : (1 - taxRate);
@@ -76,6 +95,9 @@ export default function MarketFlipper() {
 
       const buyPrice = cheapest.sell_price_min;
       const sellPrice = highest.sell_price_min;
+      const buyAgeHours = ageHours(cheapest.sell_price_min_date);
+      const sellAgeHours = ageHours(highest.sell_price_min_date);
+      const maxAge = Math.max(buyAgeHours, sellAgeHours);
       const netRevenue = sellPrice * sellMultiplier;
       const profit = Math.round(netRevenue - buyPrice);
       const marginPct = (profit / buyPrice) * 100;
@@ -88,8 +110,11 @@ export default function MarketFlipper() {
         itemName: item.name,
         buyCity: cheapest.city,
         buyPrice,
+        buyAgeHours,
         sellCity: highest.city,
         sellPrice,
+        sellAgeHours,
+        maxAgeHours: maxAge,
         netRevenue,
         profit,
         marginPct,
@@ -144,7 +169,7 @@ export default function MarketFlipper() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div>
             <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Min Profit</label>
             <input type="number" min={0} value={minProfit} onChange={(e) => setMinProfit(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40" />
@@ -152,6 +177,10 @@ export default function MarketFlipper() {
           <div>
             <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Min Margin %</label>
             <input type="number" min={0} value={minMargin} onChange={(e) => setMinMargin(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40" />
+          </div>
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Max Data Age (hrs)</label>
+            <input type="number" min={0.5} step={0.5} value={maxAgeHours} onChange={(e) => setMaxAgeHours(parseFloat(e.target.value) || 4)} className="w-full bg-zinc-800 border border-amber-500/30 rounded-lg px-3 py-2.5 text-sm text-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500/40" />
           </div>
           <div>
             <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Sell Mode</label>
@@ -173,11 +202,22 @@ export default function MarketFlipper() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button onClick={scan} disabled={loading} className="px-6 py-2.5 rounded-lg text-sm font-bold bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 disabled:opacity-50 transition-colors">
             {loading ? 'Scanning...' : '🔍 Scan All Items'}
           </button>
-          {scannedAt && <span className="text-[10px] text-zinc-600">Found {rows.length} opportunities · Scanned at {scannedAt}</span>}
+          {scannedAt && (
+            <>
+              <span className="text-[11px] text-zinc-400">
+                <span className="text-green-400 font-semibold">{rows.length}</span> opportunities · Scanned at {scannedAt}
+              </span>
+              {skippedStale > 0 && (
+                <span className="text-[11px] text-amber-400/80 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20">
+                  {skippedStale} stale listings dropped (&gt;{maxAgeHours}h old)
+                </span>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -214,6 +254,7 @@ export default function MarketFlipper() {
                   <th className="text-right px-3 py-3">Net Revenue</th>
                   <th className="text-right px-3 py-3">Profit</th>
                   <th className="text-right px-3 py-3">Margin</th>
+                  <th className="text-right px-3 py-3">Data Age</th>
                 </tr>
               </thead>
               <tbody>
@@ -236,6 +277,14 @@ export default function MarketFlipper() {
                     <td className="px-3 py-2.5 text-right tabular-nums text-zinc-300">{formatSilver(r.netRevenue)}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums font-bold text-green-400">+{formatSilver(r.profit)}</td>
                     <td className="px-3 py-2.5 text-right font-bold text-green-400">{formatPercent(r.marginPct)}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      {(() => {
+                        const ageMin = Math.round(r.maxAgeHours * 60);
+                        const txt = ageMin < 60 ? `${ageMin}m` : `${r.maxAgeHours.toFixed(1)}h`;
+                        const color = r.maxAgeHours < 0.5 ? 'text-green-400' : r.maxAgeHours < 2 ? 'text-lime-400' : r.maxAgeHours < 4 ? 'text-amber-400' : 'text-red-400';
+                        return <span className={`text-[10px] font-semibold ${color}`}>{txt}</span>;
+                      })()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
