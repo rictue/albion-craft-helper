@@ -24,6 +24,10 @@ import MarketFlipper from './components/flipper/MarketFlipper';
 // Arbitrage page removed - redirects to MarketFlipper
 import JournalsCalculator from './components/journals/JournalsCalculator';
 import FarmBreed from './components/farmbreed/FarmBreed';
+import CompareMode from './components/compare/CompareMode';
+import Portfolio from './components/portfolio/Portfolio';
+import CraftHistory from './components/history/CraftHistory';
+import MountBreeding from './components/mounts/MountBreeding';
 
 export default function App() {
   return (
@@ -54,6 +58,10 @@ export default function App() {
           <Route path="/flipper" element={<MarketFlipper />} />
           <Route path="/journals" element={<JournalsCalculator />} />
           <Route path="/farmbreed" element={<FarmBreed />} />
+          <Route path="/compare" element={<CompareMode />} />
+          <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/craft-history" element={<CraftHistory />} />
+          <Route path="/mounts" element={<MountBreeding />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/database" element={<CustomDatabase />} />
         </Routes>

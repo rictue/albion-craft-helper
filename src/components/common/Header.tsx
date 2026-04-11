@@ -88,6 +88,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
       title: 'Market',
       links: [
         { to: '/flipper', label: 'Market Flipper' },
+        { to: '/portfolio', label: 'Portfolio' },
         { to: '/suggested', label: 'Suggested' },
         { to: '/blackmarket', label: 'Black Market' },
         { to: '/prices', label: 'Prices' },
@@ -101,11 +102,14 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
       links: [
         { to: '/', label: 'Craft Calculator' },
         { to: '/refining', label: 'Refining' },
+        { to: '/compare', label: 'Compare Tiers' },
         { to: '/cooking', label: 'Cooking' },
         { to: '/butcher', label: 'Butcher' },
+        { to: '/mounts', label: 'Mount Breeding' },
         { to: '/farmbreed', label: 'Farm & Breed' },
         { to: '/island', label: 'Island' },
         { to: '/planner', label: 'Planner' },
+        { to: '/craft-history', label: 'Craft History' },
         { to: '/fame', label: 'Crafting Fame' },
         { to: '/journals', label: 'Journals' },
         { to: '/focus', label: 'Focus Efficiency' },
@@ -254,6 +258,7 @@ export default function Header() {
                   { to: '/suggested', label: 'Suggested Crafts' },
                   { to: '/blackmarket', label: 'Black Market' },
                   { to: '/transmute', label: 'Transmutation' },
+                  { to: '/portfolio', label: 'Portfolio' },
                 ],
               },
               {
@@ -271,8 +276,10 @@ export default function Header() {
                 items: [
                   { to: '/', label: 'Craft Calculator' },
                   { to: '/refining', label: 'Refining' },
+                  { to: '/compare', label: 'Compare Tiers' },
                   { to: '/cooking', label: 'Cooking' },
                   { to: '/butcher', label: 'Butcher' },
+                  { to: '/mounts', label: 'Mount Breeding' },
                   { to: '/farmbreed', label: 'Farm & Breed' },
                 ],
               },
@@ -280,6 +287,7 @@ export default function Header() {
                 title: 'Tools',
                 items: [
                   { to: '/planner', label: 'Craft Planner' },
+                  { to: '/craft-history', label: 'Craft History' },
                   { to: '/island', label: 'Island Planner' },
                   { to: '/fame', label: 'Crafting Fame' },
                   { to: '/journals', label: 'Journals' },
