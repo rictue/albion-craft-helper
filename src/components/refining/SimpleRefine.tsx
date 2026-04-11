@@ -44,6 +44,10 @@ export default function SimpleRefine() {
   const [customRaw, setCustomRaw] = useState<number | null>(null);
   const [customPrev, setCustomPrev] = useState<number | null>(null);
   const [customSell, setCustomSell] = useState<number | null>(null);
+  // Sticky city selections — persist across tier/enchant changes
+  const [rawCitySel, setRawCitySel] = useState<string | null>(null);
+  const [prevCitySel, setPrevCitySel] = useState<string | null>(null);
+  const [sellCitySel, setSellCitySel] = useState<string | null>(null);
   const [feePerCraft, setFeePerCraft] = useState(300);
   const [prices, setPrices] = useState<CityPriceData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -128,12 +132,23 @@ export default function SimpleRefine() {
     return () => clearInterval(interval);
   }, [liveMode, doFetch]);
 
-  // Clear custom overrides when config changes
+  // Clear custom price overrides AND sticky cities only when resource changes
+  // (tier/enchant keeps sticky city selection so user doesn't have to re-pick)
   useEffect(() => {
     setCustomRaw(null);
     setCustomPrev(null);
     setCustomSell(null);
-  }, [resource, tier, enchant]);
+    setRawCitySel(null);
+    setPrevCitySel(null);
+    setSellCitySel(null);
+  }, [resource]);
+
+  // Also clear typed custom number on tier/enchant change, but KEEP city selection
+  useEffect(() => {
+    setCustomRaw(null);
+    setCustomPrev(null);
+    setCustomSell(null);
+  }, [tier, enchant]);
 
   // Buy prices: default from refine city if available, otherwise cheapest
   const bestBuy = useMemo(() => {
@@ -175,11 +190,33 @@ export default function SimpleRefine() {
   }, [prices]);
 
   // Resolved prices
-  const rawPrice = customRaw ?? (buyCity === 'auto' ? bestBuy?.raw?.price ?? 0 : prices?.raw.get(buyCity) ?? 0);
-  const rawPriceCity = customRaw ? 'Custom' : (buyCity === 'auto' ? bestBuy?.raw?.city ?? '' : buyCity);
-  const prevPrice = customPrev ?? (buyCity === 'auto' ? bestBuy?.prev?.price ?? 0 : prices?.prev.get(buyCity) ?? 0);
-  const sellPrice = customSell ?? (sellCity === 'auto' ? bestSell?.price ?? 0 : prices?.refined.get(sellCity) ?? 0);
-  const sellPriceCity = customSell ? 'Custom' : (sellCity === 'auto' ? bestSell?.city ?? '' : sellCity);
+  // Priority: typed custom number > sticky city selection's current price > default (refine city)
+  const resolveRaw = (): { price: number; city: string } => {
+    if (customRaw != null) return { price: customRaw, city: 'Custom' };
+    if (rawCitySel && prices?.raw.has(rawCitySel)) return { price: prices.raw.get(rawCitySel) || 0, city: rawCitySel };
+    if (buyCity === 'auto') return { price: bestBuy?.raw?.price ?? 0, city: bestBuy?.raw?.city ?? '' };
+    return { price: prices?.raw.get(buyCity) ?? 0, city: buyCity };
+  };
+  const resolvePrev = (): { price: number; city: string } => {
+    if (customPrev != null) return { price: customPrev, city: 'Custom' };
+    if (prevCitySel && prices?.prev.has(prevCitySel)) return { price: prices.prev.get(prevCitySel) || 0, city: prevCitySel };
+    if (buyCity === 'auto') return { price: bestBuy?.prev?.price ?? 0, city: bestBuy?.prev?.city ?? '' };
+    return { price: prices?.prev.get(buyCity) ?? 0, city: buyCity };
+  };
+  const resolveSell = (): { price: number; city: string } => {
+    if (customSell != null) return { price: customSell, city: 'Custom' };
+    if (sellCitySel && prices?.refined.has(sellCitySel)) return { price: prices.refined.get(sellCitySel) || 0, city: sellCitySel };
+    if (sellCity === 'auto') return { price: bestSell?.price ?? 0, city: bestSell?.city ?? '' };
+    return { price: prices?.refined.get(sellCity) ?? 0, city: sellCity };
+  };
+  const rawResolved = resolveRaw();
+  const prevResolved = resolvePrev();
+  const sellResolved = resolveSell();
+  const rawPrice = rawResolved.price;
+  const rawPriceCity = rawResolved.city;
+  const prevPrice = prevResolved.price;
+  const sellPrice = sellResolved.price;
+  const sellPriceCity = sellResolved.city;
 
   // LPB + RR: two variants for split focus/no-focus
   const cityBonusActive = (CITY_REFINE_BONUS[refineCity] || []).includes(resource);
@@ -474,30 +511,45 @@ export default function SimpleRefine() {
           <PriceInput
             label="Raw Price"
             itemId={recipe.rawId}
-            auto={bestBuy?.raw?.price ?? 0}
-            autoCity={bestBuy?.raw?.city ?? ''}
-            value={customRaw}
-            onChange={setCustomRaw}
+            effectivePrice={rawPrice}
+            effectiveCity={rawPriceCity}
+            defaultPrice={bestBuy?.raw?.price ?? 0}
+            defaultCity={bestBuy?.raw?.city ?? ''}
+            customValue={customRaw}
+            stickyCity={rawCitySel}
+            onTypeNumber={(v) => { setCustomRaw(v); if (v != null) setRawCitySel(null); }}
+            onPickCity={(city) => { setRawCitySel(city); setCustomRaw(null); }}
+            onReset={() => { setCustomRaw(null); setRawCitySel(null); }}
             allCities={prices?.raw}
           />
           {recipe.prevPerCraft > 0 && (
             <PriceInput
               label="Prev Tier Price"
               itemId={recipe.prevRefinedId}
-              auto={bestBuy?.prev?.price ?? 0}
-              autoCity={bestBuy?.prev?.city ?? ''}
-              value={customPrev}
-              onChange={setCustomPrev}
+              effectivePrice={prevPrice}
+              effectiveCity={prevResolved.city}
+              defaultPrice={bestBuy?.prev?.price ?? 0}
+              defaultCity={bestBuy?.prev?.city ?? ''}
+              customValue={customPrev}
+              stickyCity={prevCitySel}
+              onTypeNumber={(v) => { setCustomPrev(v); if (v != null) setPrevCitySel(null); }}
+              onPickCity={(city) => { setPrevCitySel(city); setCustomPrev(null); }}
+              onReset={() => { setCustomPrev(null); setPrevCitySel(null); }}
               allCities={prices?.prev}
             />
           )}
           <PriceInput
             label="Sell Price"
             itemId={recipe.refinedId}
-            auto={bestSell?.price ?? 0}
-            autoCity={bestSell?.city ?? ''}
-            value={customSell}
-            onChange={setCustomSell}
+            effectivePrice={sellPrice}
+            effectiveCity={sellPriceCity}
+            defaultPrice={bestSell?.price ?? 0}
+            defaultCity={bestSell?.city ?? ''}
+            customValue={customSell}
+            stickyCity={sellCitySel}
+            onTypeNumber={(v) => { setCustomSell(v); if (v != null) setSellCitySel(null); }}
+            onPickCity={(city) => { setSellCitySel(city); setCustomSell(null); }}
+            onReset={() => { setCustomSell(null); setSellCitySel(null); }}
             allCities={prices?.refined}
             accent="green"
           />
@@ -652,18 +704,22 @@ export default function SimpleRefine() {
 interface PriceInputProps {
   label: string;
   itemId: string;
-  auto: number;
-  autoCity: string;
-  value: number | null;
-  onChange: (v: number | null) => void;
+  effectivePrice: number;
+  effectiveCity: string;
+  defaultPrice: number;
+  defaultCity: string;
+  customValue: number | null;
+  stickyCity: string | null;
+  onTypeNumber: (v: number | null) => void;
+  onPickCity: (city: string) => void;
+  onReset: () => void;
   allCities?: Map<string, number>;
   accent?: 'green';
 }
 
-function PriceInput({ label, itemId, auto, autoCity, value, onChange, allCities, accent }: PriceInputProps) {
+function PriceInput({ label, itemId, effectivePrice, effectiveCity, defaultPrice, defaultCity, customValue, stickyCity, onTypeNumber, onPickCity, onReset, allCities, accent }: PriceInputProps) {
   const color = accent === 'green' ? 'text-green-400' : 'text-zinc-200';
-  // The currently effective price (either user override or auto-filled)
-  const effectivePrice = value ?? auto;
+  const hasOverride = customValue != null || stickyCity != null;
   return (
     <div className="bg-zinc-950/40 border border-zinc-800 rounded-xl p-3">
       <div className="flex items-center gap-2 mb-2">
@@ -673,27 +729,30 @@ function PriceInput({ label, itemId, auto, autoCity, value, onChange, allCities,
       <input
         type="number"
         min={0}
-        placeholder={auto > 0 ? auto.toString() : 'N/A'}
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value ? parseInt(e.target.value) : null)}
+        placeholder={effectivePrice > 0 ? effectivePrice.toString() : 'N/A'}
+        value={customValue ?? ''}
+        onChange={(e) => onTypeNumber(e.target.value ? parseInt(e.target.value) : null)}
         className={`w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm ${color} placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/40`}
       />
-      {auto > 0 && autoCity && (
-        <div className="text-[10px] text-zinc-600 mt-1.5 flex items-center justify-between">
-          <span>Default: {formatSilver(auto)} @ {autoCity}</span>
-          {value != null && (
-            <button onClick={() => onChange(null)} className="text-cyan-500 hover:text-cyan-400 text-[9px] underline">reset</button>
-          )}
-        </div>
-      )}
+      <div className="text-[10px] text-zinc-600 mt-1.5 flex items-center justify-between">
+        <span>
+          {hasOverride
+            ? <span className="text-cyan-400">Using: {formatSilver(effectivePrice)} @ {effectiveCity}</span>
+            : <>Default: {defaultPrice > 0 ? `${formatSilver(defaultPrice)} @ ${defaultCity}` : 'N/A'}</>
+          }
+        </span>
+        {hasOverride && (
+          <button onClick={onReset} className="text-cyan-500 hover:text-cyan-400 text-[9px] underline">reset</button>
+        )}
+      </div>
       {allCities && allCities.size > 0 && (
         <div className="mt-2 pt-2 border-t border-zinc-800 space-y-0.5">
           {[...allCities.entries()].sort((a, b) => a[1] - b[1]).map(([city, price]) => {
-            const isSelected = Math.abs(effectivePrice - price) < 0.5;
+            const isSelected = stickyCity === city || (stickyCity == null && customValue == null && effectiveCity === city);
             return (
               <button
                 key={city}
-                onClick={() => onChange(price)}
+                onClick={() => onPickCity(city)}
                 className={`w-full flex items-center justify-between px-1.5 py-1 rounded text-[10px] transition-colors ${
                   isSelected
                     ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
