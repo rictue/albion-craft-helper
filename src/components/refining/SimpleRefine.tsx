@@ -17,6 +17,21 @@ const BASE_FOCUS: Record<number, number> = {
   2: 6, 3: 18, 4: 48, 5: 101, 6: 201, 7: 402, 8: 604,
 };
 
+// Raw resources + refined materials weight (Albion: all raw 0.1 kg, refined 0.2 kg)
+const RAW_WEIGHT_KG = 0.1;
+const REFINED_WEIGHT_KG = 0.2;
+
+// Transport mount carry capacity in kg
+const MOUNTS = [
+  { id: 't4ox', name: 'T4 Transport Ox', capacity: 2500 },
+  { id: 't5ox', name: 'T5 Transport Ox', capacity: 3000 },
+  { id: 't6ox', name: 'T6 Transport Ox', capacity: 3500 },
+  { id: 't7ox', name: 'T7 Transport Ox', capacity: 4000 },
+  { id: 't8ox', name: 'T8 Transport Ox', capacity: 4500 },
+  { id: 't5mam', name: 'T5 Transport Mammoth', capacity: 9000 },
+  { id: 't8mam', name: 'T8 Transport Mammoth', capacity: 16000 },
+];
+
 
 interface CityPriceData {
   raw: Map<string, number>; // city → price
@@ -48,6 +63,8 @@ export default function SimpleRefine() {
   const [rawCitySel, setRawCitySel] = useState<string | null>(null);
   const [prevCitySel, setPrevCitySel] = useState<string | null>(null);
   const [sellCitySel, setSellCitySel] = useState<string | null>(null);
+  // Transport mount for weight calculation
+  const [mount, setMount] = useState('t8ox');
   const [feePerCraft, setFeePerCraft] = useState(300);
   const [prices, setPrices] = useState<CityPriceData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -641,6 +658,62 @@ export default function SimpleRefine() {
               </div>
             </div>
           </div>
+
+          {/* Transport / Weight card */}
+          {(() => {
+            const rawWeightTotal = result.initialRaw * RAW_WEIGHT_KG;
+            const prevWeightTotal = result.initialPrev * REFINED_WEIGHT_KG;
+            const outputWeightTotal = simulation.totalOutput * REFINED_WEIGHT_KG;
+            // Transport planning: need to carry buy materials TO refine city, AND output FROM refine city to sell city
+            const buyTripWeight = rawWeightTotal + prevWeightTotal;
+            const sellTripWeight = outputWeightTotal;
+            const mountCap = MOUNTS.find(m => m.id === mount)?.capacity ?? 4500;
+            const buyTrips = Math.ceil(buyTripWeight / mountCap);
+            const sellTrips = Math.ceil(sellTripWeight / mountCap);
+            const buyColor = buyTrips === 1 ? 'text-green-400' : buyTrips <= 3 ? 'text-amber-400' : 'text-red-400';
+            const sellColor = sellTrips === 1 ? 'text-green-400' : sellTrips <= 3 ? 'text-amber-400' : 'text-red-400';
+
+            return (
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-[10px] uppercase tracking-widest text-orange-400/80 font-semibold">🐂 Transport</div>
+                  <select value={mount} onChange={(e) => setMount(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-[11px] text-zinc-200 focus:outline-none focus:ring-2 focus:ring-orange-500/40">
+                    {MOUNTS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.capacity.toLocaleString()} kg)</option>)}
+                  </select>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3">
+                    <div className="text-[10px] uppercase text-zinc-600">Buy trip (to refine city)</div>
+                    <div className="text-sm text-zinc-300 font-semibold tabular-nums">{buyTripWeight.toFixed(0)} kg</div>
+                    <div className="text-[10px] text-zinc-600 leading-tight">
+                      {result.initialRaw} raw × {RAW_WEIGHT_KG} kg = {rawWeightTotal.toFixed(0)} kg
+                      {result.initialPrev > 0 && <><br/>{result.initialPrev} prev × {REFINED_WEIGHT_KG} kg = {prevWeightTotal.toFixed(0)} kg</>}
+                    </div>
+                    <div className="text-xs mt-1.5">
+                      <span className={`font-bold ${buyColor}`}>{buyTrips}</span>
+                      <span className="text-zinc-500"> trip{buyTrips > 1 ? 's' : ''} needed</span>
+                    </div>
+                  </div>
+                  <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3">
+                    <div className="text-[10px] uppercase text-zinc-600">Sell trip (to sell city)</div>
+                    <div className="text-sm text-zinc-300 font-semibold tabular-nums">{sellTripWeight.toFixed(0)} kg</div>
+                    <div className="text-[10px] text-zinc-600 leading-tight">
+                      {simulation.totalOutput} planks × {REFINED_WEIGHT_KG} kg = {outputWeightTotal.toFixed(0)} kg
+                    </div>
+                    <div className="text-xs mt-1.5">
+                      <span className={`font-bold ${sellColor}`}>{sellTrips}</span>
+                      <span className="text-zinc-500"> trip{sellTrips > 1 ? 's' : ''} needed</span>
+                    </div>
+                  </div>
+                </div>
+                {(buyTrips > 1 || sellTrips > 1) && (
+                  <div className="mt-3 text-[10px] text-amber-400/80 bg-amber-500/5 border border-amber-500/10 rounded-lg px-3 py-2">
+                    ⚠ Multiple trips needed. Upgrade to a bigger mount or split the batch.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Reinvest breakdown (collapsible) */}
           <details className="bg-zinc-900 rounded-xl border border-zinc-800">
