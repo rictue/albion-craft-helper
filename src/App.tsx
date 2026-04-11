@@ -21,6 +21,7 @@ import CraftingFame from './components/fame/CraftingFame';
 import Transmutation from './components/transmute/Transmutation';
 import Farming from './components/farming/Farming';
 import MarketFlipper from './components/flipper/MarketFlipper';
+import BMRunner from './components/bmrunner/BMRunner';
 // Arbitrage page removed - redirects to MarketFlipper
 import JournalsCalculator from './components/journals/JournalsCalculator';
 import FarmBreed from './components/farmbreed/FarmBreed';
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/transmute" element={<Transmutation />} />
           <Route path="/farming" element={<Farming />} />
           <Route path="/flipper" element={<MarketFlipper />} />
+          <Route path="/bm-runner" element={<BMRunner />} />
           <Route path="/journals" element={<JournalsCalculator />} />
           <Route path="/farmbreed" element={<FarmBreed />} />
           <Route path="/compare" element={<CompareMode />} />

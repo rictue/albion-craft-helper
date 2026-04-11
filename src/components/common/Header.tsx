@@ -88,6 +88,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
       title: 'Market',
       links: [
         { to: '/flipper', label: 'Market Flipper' },
+        { to: '/bm-runner', label: 'BM Runner' },
         { to: '/portfolio', label: 'Portfolio' },
         { to: '/suggested', label: 'Suggested' },
         { to: '/blackmarket', label: 'Black Market' },
@@ -255,6 +256,7 @@ export default function Header() {
                 title: 'Trading',
                 items: [
                   { to: '/flipper', label: 'Market Flipper' },
+                  { to: '/bm-runner', label: 'BM Runner' },
                   { to: '/suggested', label: 'Suggested Crafts' },
                   { to: '/blackmarket', label: 'Black Market' },
                   { to: '/transmute', label: 'Transmutation' },
