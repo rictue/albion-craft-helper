@@ -4,130 +4,112 @@ import { formatSilver } from '../../utils/formatters';
 import ItemIcon from '../common/ItemIcon';
 
 /**
- * Island Planner — realistic crop/herb/animal profit analysis
+ * Island Planner — realistic crop profit analysis
  *
- * Instead of "plant bean earn 3.5M", this now gives:
- *   - 1-day vs 7-day vs 30-day projected profit (with market saturation penalty)
- *   - Market depth warning (daily sell volume)
- *   - Plot allocation suggestion (diversify instead of one crop)
- *   - Net profit after seed return + tax
- *   - Clear ranking of top 3 recommendations
+ * Crops + seeds are rarely traded on AH (API data empty), so we use:
+ *   - NPC seed prices (fixed by game)
+ *   - User-editable crop sell prices (hardcoded defaults based on common in-game values)
+ *   - Live API fallback if data exists
+ *
+ * Outputs 1/7/30-day projections accounting for market saturation.
  */
 
-// Crop data — seed NPC prices, yield per seed with premium watered/unwatered
+// Crop data — NPC seed prices + typical in-game crop sell prices (user can override)
 const CROPS = [
-  { tier: 2, name: 'Carrot', seedId: 'T2_FARM_CARROT_SEED', outputId: 'T2_CARROT', npcSeed: 48, yieldWatered: 4.5, yieldUnwatered: 2.7, cycleHours: 22 },
-  { tier: 3, name: 'Bean', seedId: 'T3_FARM_BEAN_SEED', outputId: 'T3_BEAN', npcSeed: 120, yieldWatered: 5.1, yieldUnwatered: 3.1, cycleHours: 22 },
-  { tier: 4, name: 'Wheat', seedId: 'T4_FARM_WHEAT_SEED', outputId: 'T4_WHEAT', npcSeed: 480, yieldWatered: 5.7, yieldUnwatered: 3.5, cycleHours: 22 },
-  { tier: 5, name: 'Turnip', seedId: 'T5_FARM_TURNIP_SEED', outputId: 'T5_TURNIP', npcSeed: 1920, yieldWatered: 6.3, yieldUnwatered: 3.9, cycleHours: 22 },
-  { tier: 6, name: 'Cabbage', seedId: 'T6_FARM_CABBAGE_SEED', outputId: 'T6_CABBAGE', npcSeed: 7680, yieldWatered: 6.9, yieldUnwatered: 4.3, cycleHours: 22 },
-  { tier: 7, name: 'Potato', seedId: 'T7_FARM_POTATO_SEED', outputId: 'T7_POTATO', npcSeed: 30720, yieldWatered: 7.5, yieldUnwatered: 4.7, cycleHours: 22 },
-  { tier: 8, name: 'Corn', seedId: 'T8_FARM_CORN_SEED', outputId: 'T8_CORN', npcSeed: 122880, yieldWatered: 8.1, yieldUnwatered: 5.1, cycleHours: 22 },
+  { tier: 2, name: 'Carrot',  seedId: 'T2_FARM_CARROT_SEED',  outputId: 'T2_CARROT',  npcSeed: 48,     defaultCropPrice: 15,    yieldWatered: 4.5, yieldUnwatered: 2.7 },
+  { tier: 3, name: 'Bean',    seedId: 'T3_FARM_BEAN_SEED',    outputId: 'T3_BEAN',    npcSeed: 120,    defaultCropPrice: 50,    yieldWatered: 5.1, yieldUnwatered: 3.1 },
+  { tier: 4, name: 'Wheat',   seedId: 'T4_FARM_WHEAT_SEED',   outputId: 'T4_WHEAT',   npcSeed: 480,    defaultCropPrice: 140,   yieldWatered: 5.7, yieldUnwatered: 3.5 },
+  { tier: 5, name: 'Turnip',  seedId: 'T5_FARM_TURNIP_SEED',  outputId: 'T5_TURNIP',  npcSeed: 1920,   defaultCropPrice: 400,   yieldWatered: 6.3, yieldUnwatered: 3.9 },
+  { tier: 6, name: 'Cabbage', seedId: 'T6_FARM_CABBAGE_SEED', outputId: 'T6_CABBAGE', npcSeed: 7680,   defaultCropPrice: 1200,  yieldWatered: 6.9, yieldUnwatered: 4.3 },
+  { tier: 7, name: 'Potato',  seedId: 'T7_FARM_POTATO_SEED',  outputId: 'T7_POTATO',  npcSeed: 30720,  defaultCropPrice: 3500,  yieldWatered: 7.5, yieldUnwatered: 4.7 },
+  { tier: 8, name: 'Corn',    seedId: 'T8_FARM_CORN_SEED',    outputId: 'T8_CORN',    npcSeed: 122880, defaultCropPrice: 10000, yieldWatered: 8.1, yieldUnwatered: 5.1 },
 ];
 
 const SEEDS_PER_PLOT = 9;
 const PREMIUM_TAX = 0.065;
 
-interface Result {
-  tier: number;
-  name: string;
-  seedId: string;
-  outputId: string;
-  seedPrice: number;
-  seedSource: 'NPC' | 'Market';
-  cropPrice: number;
-  cropCity: string;
-  totalYieldPerPlot: number;
-  revenuePerPlot: number;
-  costPerPlot: number;
-  profitPerPlot: number;
-  profitPerDay: number;
-  profitPer1Day: number;  // 79 plots × 1 cycle
-  profitPer7Days: number; // 79 plots × 7 cycles with market saturation
-  profitPer30Days: number; // 79 plots × 30 cycles with heavy saturation
-  marginPct: number;
-  marketDepth: 'thin' | 'moderate' | 'healthy';
-  dailySoldEstimate: number;
-}
-
-// Heuristic: each crop's daily absorb rate at Lymhurst/major market
-// Based on typical Albion trade volumes. Over this, supply floods drop price
-const CROP_DAILY_MARKET_CAPACITY: Record<number, number> = {
+// Rough daily market absorb capacity per tier (crops are thinly traded)
+const CROP_DAILY_CAP: Record<number, number> = {
   2: 8000, 3: 6000, 4: 5000, 5: 4000, 6: 3000, 7: 2500, 8: 2000,
 };
+
+interface Row {
+  tier: number;
+  name: string;
+  outputId: string;
+  seedPrice: number;
+  cropPrice: number;
+  hasLiveData: boolean;
+  totalYieldPerPlot: number;
+  revenuePerPlot: number;
+  netSeedCostPerPlot: number;
+  profitPerPlot: number;
+  marginPct: number;
+  profit1Day: number;
+  profit7Days: number;
+  profit30Days: number;
+  depth: 'thin' | 'moderate' | 'healthy';
+}
 
 export default function IslandPlanner() {
   const [plots, setPlots] = useState(79);
   const [watered, setWatered] = useState(true);
   const [premium, setPremium] = useState(true);
-  const [results, setResults] = useState<Result[]>([]);
+  const [customPrices, setCustomPrices] = useState<Record<number, number>>({});
+  const [livePrices, setLivePrices] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
 
-  const scan = useCallback(async () => {
+  const analyze = useCallback(async () => {
     setLoading(true);
-    setResults([]);
 
-    const ids: string[] = [];
-    for (const c of CROPS) {
-      ids.push(c.seedId, c.outputId);
-    }
-
+    // Try to fetch live crop prices (rare but possible)
+    const ids = CROPS.map(c => c.outputId);
     const data = await fetchPrices(ids);
 
-    const cheapestBuy = new Map<string, { price: number; city: string }>();
-    const byCityList = new Map<string, Array<{ city: string; price: number }>>();
+    const best = new Map<number, number>();
     for (const p of data) {
       if (p.sell_price_min <= 0 || p.city === 'Black Market') continue;
-      const cur = cheapestBuy.get(p.item_id);
-      if (!cur || p.sell_price_min < cur.price) cheapestBuy.set(p.item_id, { price: p.sell_price_min, city: p.city });
-      if (!byCityList.has(p.item_id)) byCityList.set(p.item_id, []);
-      byCityList.get(p.item_id)!.push({ city: p.city, price: p.sell_price_min });
+      const crop = CROPS.find(c => c.outputId === p.item_id);
+      if (!crop) continue;
+      const cur = best.get(crop.tier) ?? 0;
+      if (p.sell_price_min > cur) best.set(crop.tier, p.sell_price_min);
     }
+    const liveMap: Record<number, number> = {};
+    best.forEach((v, k) => { liveMap[k] = v; });
+    setLivePrices(liveMap);
+    setScannedAt(new Date().toLocaleTimeString());
+    setLoading(false);
+  }, []);
 
-    const out: Result[] = [];
+  const results = useMemo((): Row[] => {
+    const out: Row[] = [];
     for (const c of CROPS) {
-      const npcSeed = c.npcSeed;
-      const marketSeed = cheapestBuy.get(c.seedId);
-      const effectiveSeedPrice = marketSeed && marketSeed.price < npcSeed ? marketSeed.price : npcSeed;
-      const seedSource: 'NPC' | 'Market' = marketSeed && marketSeed.price < npcSeed ? 'Market' : 'NPC';
+      // Priority: user custom > live API > hardcoded default
+      const cropPrice = customPrices[c.tier] ?? livePrices[c.tier] ?? c.defaultCropPrice;
+      const hasLiveData = livePrices[c.tier] != null && customPrices[c.tier] == null;
 
-      // Outlier-filtered best sell
-      const cropList = byCityList.get(c.outputId) || [];
-      if (cropList.length === 0) continue;
-      const sortedByPrice = [...cropList].sort((a, b) => a.price - b.price);
-      const median = sortedByPrice[Math.floor(sortedByPrice.length / 2)].price;
-      const filtered = cropList.filter(e => e.price <= median * 2);
-      if (filtered.length === 0) continue;
-      filtered.sort((a, b) => b.price - a.price);
-      const bestSell = filtered[0];
-
-      // Yield: base yield with premium multiplier (×2 planted) and watered/unwatered
       const baseYield = watered ? c.yieldWatered : c.yieldUnwatered;
       const yieldPerSeed = premium ? baseYield * 2 : baseYield;
       const totalYieldPerPlot = SEEDS_PER_PLOT * yieldPerSeed;
 
-      // Seed return: watered 100%, unwatered ~80%
       const seedReturnRate = watered ? 1.0 : 0.8;
-      // Net seed cost per plot = seeds × price × (1 - return rate)
-      const netSeedCostPerPlot = SEEDS_PER_PLOT * effectiveSeedPrice * (1 - seedReturnRate);
+      const netSeedCostPerPlot = SEEDS_PER_PLOT * c.npcSeed * (1 - seedReturnRate);
 
-      const revenuePerPlot = totalYieldPerPlot * bestSell.price * (1 - PREMIUM_TAX);
+      const revenuePerPlot = totalYieldPerPlot * cropPrice * (1 - PREMIUM_TAX);
       const profitPerPlot = revenuePerPlot - netSeedCostPerPlot;
-      const marginPct = netSeedCostPerPlot > 0 ? (profitPerPlot / netSeedCostPerPlot) * 100 : (profitPerPlot > 0 ? 9999 : 0);
+      const marginPct = netSeedCostPerPlot > 0
+        ? (profitPerPlot / netSeedCostPerPlot) * 100
+        : (profitPerPlot > 0 ? 9999 : 0);
 
-      // Market depth analysis: at X plots, how much does user produce per day?
-      const dailyProduction = totalYieldPerPlot * plots; // per 22h cycle ≈ per day
-      const dailyCap = CROP_DAILY_MARKET_CAPACITY[c.tier];
-      const saturationRatio = dailyProduction / dailyCap;
+      // Market depth
+      const dailyProduction = totalYieldPerPlot * plots;
+      const dailyCap = CROP_DAILY_CAP[c.tier];
+      const saturation = dailyProduction / dailyCap;
       let depth: 'thin' | 'moderate' | 'healthy' = 'healthy';
-      if (saturationRatio > 1.5) depth = 'thin';
-      else if (saturationRatio > 0.7) depth = 'moderate';
+      if (saturation > 1.5) depth = 'thin';
+      else if (saturation > 0.7) depth = 'moderate';
 
-      // Projected profit with saturation penalty
-      // Day 1: full profit (market absorbs first batch)
-      // Day 2-7: moderate penalty (20-40%) if thin/moderate
-      // Day 8-30: heavy penalty (50-70%) if thin/moderate
       const day1 = profitPerPlot * plots;
       let weekMult = 7;
       let monthMult = 30;
@@ -137,33 +119,34 @@ export default function IslandPlanner() {
       out.push({
         tier: c.tier,
         name: c.name,
-        seedId: c.seedId,
         outputId: c.outputId,
-        seedPrice: effectiveSeedPrice,
-        seedSource,
-        cropPrice: bestSell.price,
-        cropCity: bestSell.city,
+        seedPrice: c.npcSeed,
+        cropPrice,
+        hasLiveData,
         totalYieldPerPlot,
         revenuePerPlot,
-        costPerPlot: netSeedCostPerPlot,
+        netSeedCostPerPlot,
         profitPerPlot,
-        profitPerDay: profitPerPlot * plots,
-        profitPer1Day: day1,
-        profitPer7Days: day1 * weekMult,
-        profitPer30Days: day1 * monthMult,
         marginPct,
-        marketDepth: depth,
-        dailySoldEstimate: dailyCap,
+        profit1Day: day1,
+        profit7Days: day1 * weekMult,
+        profit30Days: day1 * monthMult,
+        depth,
       });
     }
+    out.sort((a, b) => b.profit7Days - a.profit7Days);
+    return out;
+  }, [plots, watered, premium, customPrices, livePrices]);
 
-    out.sort((a, b) => b.profitPer7Days - a.profitPer7Days);
-    setResults(out);
-    setScannedAt(new Date().toLocaleTimeString());
-    setLoading(false);
-  }, [plots, watered, premium]);
-
-  const topThree = useMemo(() => results.slice(0, 3), [results]);
+  const topThree = results.slice(0, 3);
+  const updateCustom = (tier: number, val: number | null) => {
+    setCustomPrices(prev => {
+      const next = { ...prev };
+      if (val == null || val <= 0) delete next[tier];
+      else next[tier] = val;
+      return next;
+    });
+  };
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-6 space-y-4">
@@ -171,8 +154,9 @@ export default function IslandPlanner() {
       <div className="bg-gradient-to-r from-lime-500/10 via-green-500/5 to-transparent rounded-xl border border-lime-500/20 px-4 py-3">
         <div className="text-zinc-100 font-bold text-base">🌾 Island Planner</div>
         <div className="text-xs text-zinc-400 mt-1 space-y-0.5">
-          <div>Calculates <strong className="text-lime-400">realistic</strong> crop profit — not just "best per plot" but what actually works over time.</div>
-          <div>Factors in: <strong className="text-lime-400">market depth</strong> (can AH absorb your supply?), <strong className="text-lime-400">seed return rate</strong>, <strong className="text-lime-400">yield per plot</strong>, <strong className="text-lime-400">tax</strong>, <strong className="text-lime-400">1/7/30 day projections</strong>.</div>
+          <div>Realistic crop profit analysis — not "plant bean earn 3.5M/day" but what actually holds up over time.</div>
+          <div>Factors: <strong className="text-lime-400">market depth</strong> · <strong className="text-lime-400">seed return</strong> · <strong className="text-lime-400">yield per plot</strong> · <strong className="text-lime-400">tax</strong> · <strong className="text-lime-400">1/7/30 day projections</strong></div>
+          <div className="text-amber-400/80 mt-1">⚠ Crops are rarely traded on AH. Sell prices below are in-game estimates — override with your actual selling prices for accurate results.</div>
         </div>
       </div>
 
@@ -196,16 +180,15 @@ export default function IslandPlanner() {
             </label>
           </div>
           <div className="col-span-2 flex items-end">
-            <button onClick={scan} disabled={loading} className="w-full px-6 py-2.5 rounded-lg text-sm font-bold bg-lime-500/20 hover:bg-lime-500/30 text-lime-300 border border-lime-500/30 disabled:opacity-50 transition-colors">
-              {loading ? 'Scanning...' : '🔍 Analyze Crops'}
+            <button onClick={analyze} disabled={loading} className="w-full px-6 py-2.5 rounded-lg text-sm font-bold bg-lime-500/20 hover:bg-lime-500/30 text-lime-300 border border-lime-500/30 disabled:opacity-50 transition-colors">
+              {loading ? 'Loading...' : '🔍 Refresh Prices'}
             </button>
           </div>
         </div>
-
-        {scannedAt && <div className="mt-3 text-[10px] text-zinc-600">Scanned at {scannedAt} · {results.length} crops</div>}
+        {scannedAt && <div className="mt-3 text-[10px] text-zinc-600">Live price check at {scannedAt} · {Object.keys(livePrices).length} crops had market data</div>}
       </div>
 
-      {/* Top 3 recommendations */}
+      {/* Top 3 */}
       {topThree.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {topThree.map((r, i) => {
@@ -226,25 +209,22 @@ export default function IslandPlanner() {
                 <div className="space-y-1.5 text-xs">
                   <div className="flex justify-between">
                     <span className="text-zinc-500">1 day:</span>
-                    <span className="text-green-400 font-semibold tabular-nums">+{formatSilver(r.profitPer1Day)}</span>
+                    <span className={`font-semibold tabular-nums ${r.profit1Day > 0 ? 'text-green-400' : 'text-red-400'}`}>{r.profit1Day > 0 ? '+' : ''}{formatSilver(r.profit1Day)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-500">7 days:</span>
-                    <span className="text-green-300 font-semibold tabular-nums">+{formatSilver(r.profitPer7Days)}</span>
+                    <span className={`font-semibold tabular-nums ${r.profit7Days > 0 ? 'text-green-300' : 'text-red-400'}`}>{r.profit7Days > 0 ? '+' : ''}{formatSilver(r.profit7Days)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-500">30 days:</span>
-                    <span className="text-green-200 font-bold tabular-nums">+{formatSilver(r.profitPer30Days)}</span>
+                    <span className={`font-bold tabular-nums ${r.profit30Days > 0 ? 'text-green-200' : 'text-red-400'}`}>{r.profit30Days > 0 ? '+' : ''}{formatSilver(r.profit30Days)}</span>
                   </div>
                   <div className="pt-2 border-t border-zinc-800/60 mt-2">
                     <div className="flex items-center gap-1.5 text-[10px]">
-                      <span className={`w-2 h-2 rounded-full ${r.marketDepth === 'healthy' ? 'bg-green-400' : r.marketDepth === 'moderate' ? 'bg-amber-400' : 'bg-red-400'}`} />
-                      <span className={`font-semibold ${r.marketDepth === 'healthy' ? 'text-green-400' : r.marketDepth === 'moderate' ? 'text-amber-400' : 'text-red-400'}`}>
-                        {r.marketDepth === 'healthy' ? 'Market absorbs easily' : r.marketDepth === 'moderate' ? 'Market may saturate' : 'Market will flood'}
+                      <span className={`w-2 h-2 rounded-full ${r.depth === 'healthy' ? 'bg-green-400' : r.depth === 'moderate' ? 'bg-amber-400' : 'bg-red-400'}`} />
+                      <span className={`font-semibold ${r.depth === 'healthy' ? 'text-green-400' : r.depth === 'moderate' ? 'text-amber-400' : 'text-red-400'}`}>
+                        {r.depth === 'healthy' ? 'Market absorbs easily' : r.depth === 'moderate' ? 'Market may saturate' : 'Market will flood'}
                       </span>
-                    </div>
-                    <div className="text-[9px] text-zinc-600 mt-0.5">
-                      Daily cap: {r.dailySoldEstimate} · Your supply: {Math.round(r.totalYieldPerPlot * plots)}
                     </div>
                   </div>
                 </div>
@@ -254,83 +234,85 @@ export default function IslandPlanner() {
         </div>
       )}
 
-      {/* Full table */}
-      {results.length > 0 && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <div className="px-4 py-3 border-b border-zinc-800">
-            <h3 className="text-xs uppercase tracking-wider text-lime-400 font-semibold">All Crops (sorted by 7-day profit)</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-zinc-800 text-zinc-500 uppercase tracking-wider">
-                  <th className="text-left px-3 py-2.5 w-10"></th>
-                  <th className="text-left px-3 py-2.5">Crop</th>
-                  <th className="text-right px-3 py-2.5">Seed</th>
-                  <th className="text-right px-3 py-2.5">Crop Price</th>
-                  <th className="text-left px-3 py-2.5">Best At</th>
-                  <th className="text-right px-3 py-2.5">Per Plot</th>
-                  <th className="text-right px-3 py-2.5">1 day ({plots})</th>
-                  <th className="text-right px-3 py-2.5">7 days</th>
-                  <th className="text-right px-3 py-2.5">30 days</th>
-                  <th className="text-center px-3 py-2.5">Market</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map(r => (
-                  <tr key={r.tier} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                    <td className="px-3 py-2"><ItemIcon itemId={r.outputId} size={32} /></td>
-                    <td className="px-3 py-2">
-                      <div className="text-zinc-200 font-medium">T{r.tier} {r.name}</div>
-                      <div className="text-[10px] text-zinc-600">{r.marginPct.toFixed(0)}% margin</div>
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-zinc-400">
-                      {formatSilver(r.seedPrice)}
-                      <div className="text-[9px] text-zinc-600">{r.seedSource}</div>
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-zinc-400">{formatSilver(r.cropPrice)}</td>
-                    <td className="px-3 py-2 text-green-400 text-[10px]">{r.cropCity}</td>
-                    <td className={`px-3 py-2 text-right tabular-nums font-semibold ${r.profitPerPlot > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {r.profitPerPlot > 0 ? '+' : ''}{formatSilver(r.profitPerPlot)}
-                    </td>
-                    <td className={`px-3 py-2 text-right tabular-nums font-bold ${r.profitPer1Day > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {formatSilver(r.profitPer1Day)}
-                    </td>
-                    <td className={`px-3 py-2 text-right tabular-nums font-bold ${r.profitPer7Days > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {formatSilver(r.profitPer7Days)}
-                    </td>
-                    <td className={`px-3 py-2 text-right tabular-nums font-bold ${r.profitPer30Days > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {formatSilver(r.profitPer30Days)}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <span className={`inline-block w-2 h-2 rounded-full ${r.marketDepth === 'healthy' ? 'bg-green-400' : r.marketDepth === 'moderate' ? 'bg-amber-400' : 'bg-red-400'}`} title={r.marketDepth} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* Full table with editable prices */}
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="px-4 py-3 border-b border-zinc-800">
+          <h3 className="text-xs uppercase tracking-wider text-lime-400 font-semibold">All Crops</h3>
+          <div className="text-[10px] text-zinc-600 mt-0.5">Click the price cells to override with your actual selling prices</div>
         </div>
-      )}
-
-      {/* Explanation */}
-      <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4 space-y-2">
-        <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Nasıl çalışıyor?</div>
-        <div className="text-xs text-zinc-400 space-y-1.5">
-          <div>• <strong className="text-lime-400">1 day</strong>: ilk hasatta alırsın — market tam absorbe eder, teorik max kâr</div>
-          <div>• <strong className="text-lime-400">7 days</strong>: market biraz doyar, fiyatlar %10-20 düşer, kâr azalır</div>
-          <div>• <strong className="text-lime-400">30 days</strong>: uzun vadeli sürdürülebilir kâr, market saturation ciddi penalty (özellikle "Market will flood" olanlarda %40'a kadar düşüş)</div>
-          <div>• <strong className="text-lime-400">Market depth</strong>: <span className="text-green-400">yeşil</span> = rahat sat, <span className="text-amber-400">sarı</span> = kısmen doyar, <span className="text-red-400">kırmızı</span> = dökülür fiyat düşer</div>
-          <div>• <strong className="text-amber-400">Tavsiye</strong>: tek ürüne bağlanma, top 2-3'ü karıştır. 79 plot → 30 bean + 25 cabbage + 24 corn gibi</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-zinc-800 text-zinc-500 uppercase tracking-wider">
+                <th className="text-left px-3 py-2.5 w-10"></th>
+                <th className="text-left px-3 py-2.5">Crop</th>
+                <th className="text-right px-3 py-2.5">Seed (NPC)</th>
+                <th className="text-right px-3 py-2.5">Crop Sell</th>
+                <th className="text-right px-3 py-2.5">Yield/Plot</th>
+                <th className="text-right px-3 py-2.5">Per Plot</th>
+                <th className="text-right px-3 py-2.5">1 day ({plots})</th>
+                <th className="text-right px-3 py-2.5">7 days</th>
+                <th className="text-right px-3 py-2.5">30 days</th>
+                <th className="text-center px-3 py-2.5">Market</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map(r => (
+                <tr key={r.tier} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                  <td className="px-3 py-2"><ItemIcon itemId={r.outputId} size={32} /></td>
+                  <td className="px-3 py-2">
+                    <div className="text-zinc-200 font-medium">T{r.tier} {r.name}</div>
+                    <div className="text-[10px] text-zinc-600">{r.marginPct < 9999 ? r.marginPct.toFixed(0) : '∞'}% margin</div>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-zinc-400">{formatSilver(r.seedPrice)}</td>
+                  <td className="px-3 py-2 text-right">
+                    <input
+                      type="number"
+                      min={0}
+                      value={customPrices[r.tier] ?? ''}
+                      placeholder={r.cropPrice.toString()}
+                      onChange={(e) => updateCustom(r.tier, e.target.value ? parseInt(e.target.value) : null)}
+                      className={`w-20 text-right bg-zinc-800/60 border border-zinc-700/50 rounded px-1.5 py-0.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-lime-500/40 ${customPrices[r.tier] != null ? 'text-lime-300' : r.hasLiveData ? 'text-cyan-300' : 'text-zinc-500'}`}
+                    />
+                    <div className="text-[9px] text-zinc-600 mt-0.5">
+                      {customPrices[r.tier] != null ? 'custom' : r.hasLiveData ? 'live' : 'default'}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-right text-lime-400 tabular-nums">{r.totalYieldPerPlot.toFixed(0)}</td>
+                  <td className={`px-3 py-2 text-right tabular-nums font-semibold ${r.profitPerPlot > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {r.profitPerPlot > 0 ? '+' : ''}{formatSilver(r.profitPerPlot)}
+                  </td>
+                  <td className={`px-3 py-2 text-right tabular-nums font-bold ${r.profit1Day > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {formatSilver(r.profit1Day)}
+                  </td>
+                  <td className={`px-3 py-2 text-right tabular-nums font-bold ${r.profit7Days > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {formatSilver(r.profit7Days)}
+                  </td>
+                  <td className={`px-3 py-2 text-right tabular-nums font-bold ${r.profit30Days > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {formatSilver(r.profit30Days)}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <span className={`inline-block w-2 h-2 rounded-full ${r.depth === 'healthy' ? 'bg-green-400' : r.depth === 'moderate' ? 'bg-amber-400' : 'bg-red-400'}`} title={r.depth} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {!loading && results.length === 0 && !scannedAt && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-12 text-center">
-          <div className="text-5xl mb-4 opacity-30">🌱</div>
-          <p className="text-sm text-zinc-500">Analyze'a bas — her crop için gerçekçi 1/7/30 günlük kâr projeksiyonu gör.</p>
+      {/* Legend */}
+      <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4 space-y-2">
+        <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">How it works</div>
+        <div className="text-xs text-zinc-400 space-y-1.5">
+          <div>• <strong className="text-lime-400">1 day</strong>: first harvest — market absorbs it fully, theoretical maximum</div>
+          <div>• <strong className="text-lime-400">7 days</strong>: market partially saturated, prices drop 10-20%, profit decreases</div>
+          <div>• <strong className="text-lime-400">30 days</strong>: sustainable long-run profit, heavy saturation penalty (up to 40% drop for "flooded" markets)</div>
+          <div>• <strong className="text-lime-400">Market depth</strong>: <span className="text-green-400">green</span> = easy to sell, <span className="text-amber-400">yellow</span> = partial saturation, <span className="text-red-400">red</span> = price crashes</div>
+          <div>• <strong className="text-amber-400">Crop prices</strong>: Auction House rarely lists crops. Default prices are estimates — click a price cell to enter your actual in-game selling price</div>
+          <div>• <strong className="text-amber-400">Tip</strong>: Don't commit all plots to one crop. Mix top 2-3 to avoid flooding the market with one type</div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

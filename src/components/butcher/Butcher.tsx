@@ -143,9 +143,9 @@ export default function Butcher() {
         <div className="text-xs text-zinc-400">
           <div className="text-zinc-200 font-semibold mb-1">Butcher Calculator</div>
           <div className="space-y-0.5">
-            <div><strong className="text-red-400">Ne işe yarar:</strong> Ada/market'ten grown animal (büyütülmüş hayvan) al, Butcher station'da kes, et (meat) çıkar, market'te sat.</div>
-            <div><strong className="text-red-400">Nasıl çalışır:</strong> 1 hayvan → <strong>18 et</strong> (return rate ile extra), Martlock'ta butcher bonusu var.</div>
-            <div><strong className="text-red-400">Sana ne gösterir:</strong> Her hayvanın kesim kârı — en ucuz nerden al, en pahalı nerde sat.</div>
+            <div><strong className="text-red-400">What it does:</strong> Buy a grown animal from an island/market, butcher it at the Butcher station, get meat, sell on market.</div>
+            <div><strong className="text-red-400">How it works:</strong> 1 animal → <strong>18 meat</strong> (with return rate extras), Martlock has a butcher city bonus.</div>
+            <div><strong className="text-red-400">Shows you:</strong> Per-animal profit — where to buy cheapest and sell highest.</div>
           </div>
         </div>
       </div>
