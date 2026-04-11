@@ -3,6 +3,7 @@ import { fetchPrices } from '../../services/api';
 import { ALL_ITEMS } from '../../data/items';
 import { resolveItemId } from '../../utils/itemIdParser';
 import { formatSilver, formatPercent } from '../../utils/formatters';
+import { TRANSPORT_MOUNTS, getItemWeight, getMountCapacity } from '../../utils/transport';
 import ItemIcon from '../common/ItemIcon';
 import type { MarketPrice, Tier, Enchantment } from '../../types';
 
@@ -35,30 +36,6 @@ function ageHours(dateStr: string | undefined): number {
   if (!t) return Infinity;
   return (Date.now() - t) / (1000 * 60 * 60);
 }
-
-// Estimated item weight in kg (Albion game data approximation)
-function getItemWeight(itemId: string): number {
-  if (itemId.includes('_2H_')) return 11.5;
-  if (itemId.includes('_MAIN_')) return 5;
-  if (itemId.includes('_OFF_')) return 3;
-  if (itemId.includes('_ARMOR_')) return 7;
-  if (itemId.includes('_HEAD_')) return 3;
-  if (itemId.includes('_SHOES_')) return 3;
-  if (itemId.includes('_BAG')) return 3;
-  if (itemId.includes('_CAPE')) return 2;
-  return 1;
-}
-
-// Mount carry capacity in kg (Transport variants)
-const MOUNTS = [
-  { id: 't4ox', name: 'T4 Transport Ox', capacity: 2500 },
-  { id: 't5ox', name: 'T5 Transport Ox', capacity: 3000 },
-  { id: 't6ox', name: 'T6 Transport Ox', capacity: 3500 },
-  { id: 't7ox', name: 'T7 Transport Ox', capacity: 4000 },
-  { id: 't8ox', name: 'T8 Transport Ox', capacity: 4500 },
-  { id: 't5mam', name: 'T5 Transport Mammoth', capacity: 9000 },
-  { id: 't8mam', name: 'T8 Transport Mammoth', capacity: 16000 },
-];
 
 export default function BMRunner() {
   const [tier, setTier] = useState<Tier>(6);
@@ -149,10 +126,7 @@ export default function BMRunner() {
     setLoading(false);
   }, [tier, enchant, sourceCity, minProfit, minMargin, premium, maxAgeHours]);
 
-  const mountCap = useMemo(
-    () => MOUNTS.find(m => m.id === mount)?.capacity ?? 4500,
-    [mount]
-  );
+  const mountCap = useMemo(() => getMountCapacity(mount), [mount]);
 
   const sortedRows = useMemo(() => {
     const copy = [...rows];
@@ -233,7 +207,7 @@ export default function BMRunner() {
               onChange={(e) => setMount(e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-red-500/40"
             >
-              {MOUNTS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.capacity.toLocaleString()} kg)</option>)}
+              {TRANSPORT_MOUNTS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.capacity.toLocaleString()} kg)</option>)}
             </select>
           </div>
         </div>

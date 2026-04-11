@@ -18,4 +18,28 @@ export default defineConfig({
       }
     }
   ],
+  build: {
+    // Lift the 500kb warning slightly — the root index + biggest lazy chunks can be ~550kb.
+    chunkSizeWarningLimit: 600,
+    rolldownOptions: {
+      output: {
+        // Rolldown wants a function form of manualChunks.
+        manualChunks(id: string) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@supabase')) return 'supabase'
+            if (id.includes('fuse.js')) return 'fuse'
+            if (id.includes('zustand')) return 'zustand'
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/react-router') ||
+              id.includes('/scheduler/')
+            ) {
+              return 'react-vendor'
+            }
+          }
+        },
+      },
+    },
+  },
 })

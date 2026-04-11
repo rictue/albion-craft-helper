@@ -3,6 +3,7 @@ import { fetchPrices } from '../../services/api';
 import { ALL_ITEMS } from '../../data/items';
 import { resolveItemId } from '../../utils/itemIdParser';
 import { formatSilver, formatPercent } from '../../utils/formatters';
+import { TRANSPORT_MOUNTS, getItemWeight, getMountCapacity } from '../../utils/transport';
 import ItemIcon from '../common/ItemIcon';
 import type { MarketPrice, Tier, Enchantment } from '../../types';
 
@@ -34,42 +35,6 @@ function ageHours(dateStr: string | undefined): number {
   if (!t) return Infinity;
   return (Date.now() - t) / (1000 * 60 * 60);
 }
-
-// Estimated item weight in kg (Albion game data approximation)
-function getItemWeight(itemId: string): number {
-  // Raw resources: 0.1 kg
-  if (/T\d+_(WOOD|ORE|HIDE|FIBER|ROCK)(_|$)/.test(itemId)) return 0.1;
-  // Refined materials: 0.2 kg
-  if (/T\d+_(PLANKS|METALBAR|LEATHER|CLOTH|STONEBLOCK)(_|$)/.test(itemId)) return 0.2;
-  // 2H weapons: heavy
-  if (itemId.includes('_2H_')) return 11.5;
-  // Main hand: medium
-  if (itemId.includes('_MAIN_')) return 5;
-  // Off hand
-  if (itemId.includes('_OFF_')) return 3;
-  // Armor torso
-  if (itemId.includes('_ARMOR_')) return 7;
-  // Head
-  if (itemId.includes('_HEAD_')) return 3;
-  // Shoes
-  if (itemId.includes('_SHOES_')) return 3;
-  // Bags
-  if (itemId.includes('_BAG')) return 3;
-  // Capes
-  if (itemId.includes('_CAPE')) return 2;
-  return 1; // default
-}
-
-// Mount carry capacity in kg (Transport variants, approximate)
-const MOUNTS = [
-  { id: 't4ox', name: 'T4 Transport Ox', capacity: 2500 },
-  { id: 't5ox', name: 'T5 Transport Ox', capacity: 3000 },
-  { id: 't6ox', name: 'T6 Transport Ox', capacity: 3500 },
-  { id: 't7ox', name: 'T7 Transport Ox', capacity: 4000 },
-  { id: 't8ox', name: 'T8 Transport Ox', capacity: 4500 },
-  { id: 't5mam', name: 'T5 Transport Mammoth', capacity: 9000 },
-  { id: 't8mam', name: 'T8 Transport Mammoth', capacity: 16000 },
-];
 
 export default function MarketFlipper() {
   const [tier, setTier] = useState<Tier>(6);
@@ -244,7 +209,7 @@ export default function MarketFlipper() {
           <div>
             <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Your Mount (transport capacity)</label>
             <select value={mount} onChange={(e) => setMount(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40">
-              {MOUNTS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.capacity.toLocaleString()} kg)</option>)}
+              {TRANSPORT_MOUNTS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.capacity.toLocaleString()} kg)</option>)}
             </select>
           </div>
           <div>
@@ -312,8 +277,7 @@ export default function MarketFlipper() {
                 {sortedRows.map((r, i) => {
                   const unitWeight = getItemWeight(r.itemId);
                   const totalWeight = unitWeight * qtyPerFlip;
-                  const mountCap = MOUNTS.find(m => m.id === mount)?.capacity ?? 4500;
-                  const trips = Math.ceil(totalWeight / mountCap);
+                  const trips = Math.ceil(totalWeight / getMountCapacity(mount));
                   const totalProfit = r.profit * qtyPerFlip;
                   return (
                     <tr key={r.itemId} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
