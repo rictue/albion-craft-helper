@@ -51,6 +51,8 @@ interface ButcherResult {
   revenue: number;
   profit: number;
   margin: number;
+  hasData: boolean;
+  missing: string | null;
 }
 
 export default function Butcher() {
@@ -88,26 +90,15 @@ export default function Butcher() {
     for (const a of ANIMALS) {
       const raw = cheapest.get(a.rawId);
       const meatList = byCity.get(a.meatId) || [];
-      if (!raw || meatList.length === 0) continue;
-
-      // Outlier-filtered best sell price for meat
-      const sortedByPrice = [...meatList].sort((x, y) => x.price - y.price);
-      const median = sortedByPrice[Math.floor(sortedByPrice.length / 2)].price;
-      const filtered = meatList.filter(m => m.price <= median * 2);
-      if (filtered.length === 0) continue;
-      filtered.sort((x, y) => y.price - x.price);
-      const bestMeat = filtered[0];
 
       // Determine which city to butcher in (auto picks the best-bonus city for this animal)
       let cityUsed: string;
       if (butcherCity === 'Auto') {
-        // Find the city that gives bonus to THIS animal
         const bonusCity = Object.entries(CITY_MEAT_BONUS).find(([, name]) => name === a.name)?.[0];
         cityUsed = bonusCity || 'Martlock';
       } else {
         cityUsed = butcherCity;
       }
-
       const cityBonusActive = CITY_MEAT_BONUS[cityUsed] === a.name;
 
       // Compute RR based on spec-independent formula
@@ -115,13 +106,53 @@ export default function Butcher() {
       if (cityBonusActive) lpb += CITY_LPB;
       if (useFocus) lpb += FOCUS_LPB;
       const rr = rrFromLpb(lpb);
-
-      // Output with reinvest loop
       const outputMult = 1 / (1 - rr);
       const effectiveOutput = MEAT_PER_CRAFT * outputMult;
-      const grossRevenue = effectiveOutput * bestMeat.price;
 
-      // Tax / Discord mode
+      // Missing data cases — always emit a row so the user sees the animal
+      if (!raw && meatList.length === 0) {
+        out.push({
+          tier: a.tier, name: a.name, rawId: a.rawId, meatId: a.meatId,
+          rawPrice: 0, rawCity: '—', meatPrice: 0, meatCity: '—',
+          butcherCity: cityUsed, cityBonusActive, effectiveRR: rr, effectiveOutput,
+          revenue: 0, profit: 0, margin: 0,
+          hasData: false, missing: 'no market data',
+        });
+        continue;
+      }
+      if (!raw) {
+        // meat exists but no raw grown animals for sale
+        out.push({
+          tier: a.tier, name: a.name, rawId: a.rawId, meatId: a.meatId,
+          rawPrice: 0, rawCity: '—',
+          meatPrice: meatList[0].price, meatCity: meatList[0].city,
+          butcherCity: cityUsed, cityBonusActive, effectiveRR: rr, effectiveOutput,
+          revenue: 0, profit: 0, margin: 0,
+          hasData: false, missing: 'grown animal not listed on AH',
+        });
+        continue;
+      }
+      if (meatList.length === 0) {
+        // grown animal exists but no meat market
+        out.push({
+          tier: a.tier, name: a.name, rawId: a.rawId, meatId: a.meatId,
+          rawPrice: raw.price, rawCity: raw.city,
+          meatPrice: 0, meatCity: '—',
+          butcherCity: cityUsed, cityBonusActive, effectiveRR: rr, effectiveOutput,
+          revenue: 0, profit: 0, margin: 0,
+          hasData: false, missing: 'no meat market data',
+        });
+        continue;
+      }
+
+      // Outlier-filtered best sell price for meat
+      const sortedByPrice = [...meatList].sort((x, y) => x.price - y.price);
+      const median = sortedByPrice[Math.floor(sortedByPrice.length / 2)].price;
+      const filtered = meatList.filter(m => m.price <= median * 2);
+      filtered.sort((x, y) => y.price - x.price);
+      const bestMeat = filtered[0] ?? sortedByPrice[sortedByPrice.length - 1];
+
+      const grossRevenue = effectiveOutput * bestMeat.price;
       let netRevenue = grossRevenue;
       if (sellMode === 'market') netRevenue = grossRevenue * (1 - TAX);
       else netRevenue = grossRevenue * 0.95;
@@ -146,10 +177,17 @@ export default function Butcher() {
         revenue: netRevenue,
         profit,
         margin,
+        hasData: true,
+        missing: null,
       });
     }
 
-    out.sort((a, b) => b.profit - a.profit);
+    // Sort: profitable rows first (by profit desc), then rows with missing data at the bottom by tier
+    out.sort((a, b) => {
+      if (a.hasData !== b.hasData) return a.hasData ? -1 : 1;
+      if (a.hasData) return b.profit - a.profit;
+      return a.tier - b.tier;
+    });
     setResults(out);
     setScannedAt(new Date().toLocaleTimeString());
     setLoading(false);
@@ -238,8 +276,9 @@ export default function Butcher() {
           {results.map(r => {
             const profitColor = r.profit > 0 ? 'text-green-400' : 'text-red-400';
             const profitBg = r.profit > 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20';
+            const dimClass = r.hasData ? '' : 'opacity-60';
             return (
-              <div key={r.tier} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden hover:border-zinc-700 transition-colors">
+              <div key={r.tier} className={`bg-zinc-900 rounded-xl border ${r.hasData ? 'border-zinc-800 hover:border-zinc-700' : 'border-zinc-800/50 border-dashed'} overflow-hidden transition-colors ${dimClass}`}>
                 <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <ItemIcon itemId={r.rawId} size={44} />
@@ -251,26 +290,48 @@ export default function Butcher() {
                       </div>
                     </div>
                   </div>
-                  <div className={`text-right px-2 py-1 rounded-lg border ${profitBg}`}>
-                    <div className={`text-sm font-bold ${profitColor}`}>
-                      {r.profit > 0 ? '+' : ''}{formatSilver(r.profit)}
+                  {r.hasData ? (
+                    <div className={`text-right px-2 py-1 rounded-lg border ${profitBg}`}>
+                      <div className={`text-sm font-bold ${profitColor}`}>
+                        {r.profit > 0 ? '+' : ''}{formatSilver(r.profit)}
+                      </div>
+                      <div className={`text-[10px] ${profitColor}`}>{formatPercent(r.margin)}</div>
                     </div>
-                    <div className={`text-[10px] ${profitColor}`}>{formatPercent(r.margin)}</div>
-                  </div>
+                  ) : (
+                    <div className="text-right px-2 py-1 rounded-lg border border-zinc-700/40 bg-zinc-800/30">
+                      <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">No data</div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="px-4 py-3 space-y-1.5 border-b border-zinc-800 text-xs">
-                  <div className="flex items-center gap-2">
-                    <ItemIcon itemId={r.rawId} size={20} />
-                    <span className="text-zinc-400 flex-1">Buy @ {r.rawCity}</span>
-                    <span className="text-red-400 tabular-nums">-{formatSilver(r.rawPrice)}</span>
+                {r.hasData ? (
+                  <div className="px-4 py-3 space-y-1.5 border-b border-zinc-800 text-xs">
+                    <div className="flex items-center gap-2">
+                      <ItemIcon itemId={r.rawId} size={20} />
+                      <span className="text-zinc-400 flex-1">Buy @ {r.rawCity}</span>
+                      <span className="text-red-400 tabular-nums">-{formatSilver(r.rawPrice)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ItemIcon itemId={r.meatId} size={20} />
+                      <span className="text-zinc-400 flex-1">Sell {Math.floor(r.effectiveOutput)} @ {r.meatCity}</span>
+                      <span className="text-green-400 tabular-nums">+{formatSilver(r.revenue)}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <ItemIcon itemId={r.meatId} size={20} />
-                    <span className="text-zinc-400 flex-1">Sell {Math.floor(r.effectiveOutput)} @ {r.meatCity}</span>
-                    <span className="text-green-400 tabular-nums">+{formatSilver(r.revenue)}</span>
+                ) : (
+                  <div className="px-4 py-3 space-y-1.5 border-b border-zinc-800 text-xs">
+                    <div className="flex items-center gap-2">
+                      <ItemIcon itemId={r.rawId} size={20} />
+                      <span className="text-zinc-500 flex-1">Buy @ {r.rawCity}</span>
+                      <span className="text-zinc-600 tabular-nums">{r.rawPrice > 0 ? `-${formatSilver(r.rawPrice)}` : '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ItemIcon itemId={r.meatId} size={20} />
+                      <span className="text-zinc-500 flex-1">Sell @ {r.meatCity}</span>
+                      <span className="text-zinc-600 tabular-nums">{r.meatPrice > 0 ? `+${formatSilver(r.meatPrice)}` : '—'}</span>
+                    </div>
+                    <div className="text-[10px] text-amber-400/70 pt-1">⚠ {r.missing}</div>
                   </div>
-                </div>
+                )}
 
                 <div className="px-4 py-2 text-[10px] text-zinc-600 flex items-center justify-between">
                   <span>Butcher @ {r.butcherCity}</span>
