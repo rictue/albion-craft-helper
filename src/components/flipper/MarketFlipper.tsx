@@ -35,6 +35,42 @@ function ageHours(dateStr: string | undefined): number {
   return (Date.now() - t) / (1000 * 60 * 60);
 }
 
+// Estimated item weight in kg (Albion game data approximation)
+function getItemWeight(itemId: string): number {
+  // Raw resources: 0.1 kg
+  if (/T\d+_(WOOD|ORE|HIDE|FIBER|ROCK)(_|$)/.test(itemId)) return 0.1;
+  // Refined materials: 0.2 kg
+  if (/T\d+_(PLANKS|METALBAR|LEATHER|CLOTH|STONEBLOCK)(_|$)/.test(itemId)) return 0.2;
+  // 2H weapons: heavy
+  if (itemId.includes('_2H_')) return 11.5;
+  // Main hand: medium
+  if (itemId.includes('_MAIN_')) return 5;
+  // Off hand
+  if (itemId.includes('_OFF_')) return 3;
+  // Armor torso
+  if (itemId.includes('_ARMOR_')) return 7;
+  // Head
+  if (itemId.includes('_HEAD_')) return 3;
+  // Shoes
+  if (itemId.includes('_SHOES_')) return 3;
+  // Bags
+  if (itemId.includes('_BAG')) return 3;
+  // Capes
+  if (itemId.includes('_CAPE')) return 2;
+  return 1; // default
+}
+
+// Mount carry capacity in kg (Transport variants, approximate)
+const MOUNTS = [
+  { id: 't4ox', name: 'T4 Transport Ox', capacity: 2500 },
+  { id: 't5ox', name: 'T5 Transport Ox', capacity: 3000 },
+  { id: 't6ox', name: 'T6 Transport Ox', capacity: 3500 },
+  { id: 't7ox', name: 'T7 Transport Ox', capacity: 4000 },
+  { id: 't8ox', name: 'T8 Transport Ox', capacity: 4500 },
+  { id: 't5mam', name: 'T5 Transport Mammoth', capacity: 9000 },
+  { id: 't8mam', name: 'T8 Transport Mammoth', capacity: 16000 },
+];
+
 export default function MarketFlipper() {
   const [tier, setTier] = useState<Tier>(6);
   const [enchant, setEnchant] = useState<Enchantment>(1);
@@ -48,6 +84,8 @@ export default function MarketFlipper() {
   const [loading, setLoading] = useState(false);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'profit' | 'margin' | 'per1m'>('profit');
+  const [mount, setMount] = useState('t8ox');
+  const [qtyPerFlip, setQtyPerFlip] = useState(100);
 
   const scan = useCallback(async () => {
     setLoading(true);
@@ -202,6 +240,19 @@ export default function MarketFlipper() {
           </div>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Your Mount (transport capacity)</label>
+            <select value={mount} onChange={(e) => setMount(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40">
+              {MOUNTS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.capacity.toLocaleString()} kg)</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Qty Per Flip (units)</label>
+            <input type="number" min={1} value={qtyPerFlip} onChange={(e) => setQtyPerFlip(parseInt(e.target.value) || 1)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40" />
+          </div>
+        </div>
+
         <div className="flex items-center gap-3 flex-wrap">
           <button onClick={scan} disabled={loading} className="px-6 py-2.5 rounded-lg text-sm font-bold bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 disabled:opacity-50 transition-colors">
             {loading ? 'Scanning...' : '🔍 Scan All Items'}
@@ -247,46 +298,66 @@ export default function MarketFlipper() {
                   <th className="text-left px-3 py-3 w-10">#</th>
                   <th className="text-left px-3 py-3 w-[68px]"></th>
                   <th className="text-left px-3 py-3">Item</th>
-                  <th className="text-left px-3 py-3">Buy From</th>
-                  <th className="text-right px-3 py-3">Buy Price</th>
-                  <th className="text-left px-3 py-3">Sell At</th>
-                  <th className="text-right px-3 py-3">Sell Price</th>
-                  <th className="text-right px-3 py-3">Net Revenue</th>
-                  <th className="text-right px-3 py-3">Profit</th>
+                  <th className="text-left px-3 py-3">Buy</th>
+                  <th className="text-left px-3 py-3">Sell</th>
+                  <th className="text-right px-3 py-3">Profit/Unit</th>
+                  <th className="text-right px-3 py-3">Total ({qtyPerFlip})</th>
                   <th className="text-right px-3 py-3">Margin</th>
-                  <th className="text-right px-3 py-3">Data Age</th>
+                  <th className="text-right px-3 py-3">Weight</th>
+                  <th className="text-right px-3 py-3">Trips</th>
+                  <th className="text-right px-3 py-3">Age</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map((r, i) => (
-                  <tr key={r.itemId} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                    <td className="px-3 py-3 text-zinc-600 font-semibold">{i + 1}</td>
-                    <td className="px-3 py-3">
-                      <div className="w-14 h-14 flex items-center justify-center">
-                        <ItemIcon itemId={r.itemId} size={56} />
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="text-zinc-200 font-medium">{r.itemName}</div>
-                      <div className="text-[10px] text-gold font-bold">T{tier}{enchant > 0 && `.${enchant}`}</div>
-                    </td>
-                    <td className="px-3 py-2.5 text-green-400 font-semibold">{r.buyCity}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-zinc-400">{formatSilver(r.buyPrice)}</td>
-                    <td className="px-3 py-2.5 text-red-400 font-semibold">{r.sellCity}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-zinc-400">{formatSilver(r.sellPrice)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-zinc-300">{formatSilver(r.netRevenue)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums font-bold text-green-400">+{formatSilver(r.profit)}</td>
-                    <td className="px-3 py-2.5 text-right font-bold text-green-400">{formatPercent(r.marginPct)}</td>
-                    <td className="px-3 py-2.5 text-right">
-                      {(() => {
-                        const ageMin = Math.round(r.maxAgeHours * 60);
-                        const txt = ageMin < 60 ? `${ageMin}m` : `${r.maxAgeHours.toFixed(1)}h`;
-                        const color = r.maxAgeHours < 0.5 ? 'text-green-400' : r.maxAgeHours < 2 ? 'text-lime-400' : r.maxAgeHours < 4 ? 'text-amber-400' : 'text-red-400';
-                        return <span className={`text-[10px] font-semibold ${color}`}>{txt}</span>;
-                      })()}
-                    </td>
-                  </tr>
-                ))}
+                {sortedRows.map((r, i) => {
+                  const unitWeight = getItemWeight(r.itemId);
+                  const totalWeight = unitWeight * qtyPerFlip;
+                  const mountCap = MOUNTS.find(m => m.id === mount)?.capacity ?? 4500;
+                  const trips = Math.ceil(totalWeight / mountCap);
+                  const totalProfit = r.profit * qtyPerFlip;
+                  return (
+                    <tr key={r.itemId} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+                      <td className="px-3 py-3 text-zinc-600 font-semibold">{i + 1}</td>
+                      <td className="px-3 py-3">
+                        <div className="w-14 h-14 flex items-center justify-center">
+                          <ItemIcon itemId={r.itemId} size={56} />
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="text-zinc-200 font-medium">{r.itemName}</div>
+                        <div className="text-[10px] text-gold font-bold">T{tier}{enchant > 0 && `.${enchant}`}</div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="text-green-400 font-semibold">{r.buyCity}</div>
+                        <div className="text-[10px] text-zinc-500 tabular-nums">{formatSilver(r.buyPrice)}</div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="text-red-400 font-semibold">{r.sellCity}</div>
+                        <div className="text-[10px] text-zinc-500 tabular-nums">{formatSilver(r.sellPrice)}</div>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums font-bold text-green-400">+{formatSilver(r.profit)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums font-bold text-green-300">+{formatSilver(totalProfit)}</td>
+                      <td className="px-3 py-3 text-right font-bold text-green-400">{formatPercent(r.marginPct)}</td>
+                      <td className="px-3 py-3 text-right">
+                        <div className="text-[11px] text-zinc-300 tabular-nums">{totalWeight.toFixed(0)} kg</div>
+                        <div className="text-[9px] text-zinc-600 tabular-nums">{unitWeight} kg/unit</div>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <span className={`text-sm font-bold ${trips === 1 ? 'text-green-400' : trips <= 3 ? 'text-amber-400' : 'text-red-400'}`}>
+                          {trips}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        {(() => {
+                          const ageMin = Math.round(r.maxAgeHours * 60);
+                          const txt = ageMin < 60 ? `${ageMin}m` : `${r.maxAgeHours.toFixed(1)}h`;
+                          const color = r.maxAgeHours < 0.5 ? 'text-green-400' : r.maxAgeHours < 2 ? 'text-lime-400' : r.maxAgeHours < 4 ? 'text-amber-400' : 'text-red-400';
+                          return <span className={`text-[10px] font-semibold ${color}`}>{txt}</span>;
+                        })()}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

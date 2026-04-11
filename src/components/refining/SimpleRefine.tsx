@@ -39,6 +39,7 @@ export default function SimpleRefine() {
   const [sellCity] = useState('auto');
   const [sellMode, setSellMode] = useState<SellMode>('market');
   const [useFocus, setUseFocus] = useState(false);
+  const [focusBudget, setFocusBudget] = useState(30000);
   const [premium, setPremium] = useState(true);
   const [customRaw, setCustomRaw] = useState<number | null>(null);
   const [customPrev, setCustomPrev] = useState<number | null>(null);
@@ -180,52 +181,95 @@ export default function SimpleRefine() {
   const sellPrice = customSell ?? (sellCity === 'auto' ? bestSell?.price ?? 0 : prices?.refined.get(sellCity) ?? 0);
   const sellPriceCity = customSell ? 'Custom' : (sellCity === 'auto' ? bestSell?.city ?? '' : sellCity);
 
-  // Compute LPB + RR
+  // LPB + RR: two variants for split focus/no-focus
   const cityBonusActive = (CITY_REFINE_BONUS[refineCity] || []).includes(resource);
-  const lpb = BASE_LPB + (cityBonusActive ? CITY_LPB : 0) + (useFocus ? FOCUS_LPB : 0);
-  const rr = lpbToReturnRate(lpb);
+  const lpbNoFocus = BASE_LPB + (cityBonusActive ? CITY_LPB : 0);
+  const lpbFocus = lpbNoFocus + FOCUS_LPB;
+  const rrNoFocus = lpbToReturnRate(lpbNoFocus);
+  const rrFocus = lpbToReturnRate(lpbFocus);
+  // Effective RR shown in UI (if focus used AND budget > 0, show focus rate; else no-focus)
+  const lpb = useFocus ? lpbFocus : lpbNoFocus;
+  const rr = useFocus ? rrFocus : rrNoFocus;
 
   // Focus cost per craft
   const focusCostPerCraft = useMemo(() => {
-    if (!useFocus || !recipe) return 0;
+    if (!recipe) return 0;
     const base = BASE_FOCUS[tier] || 0;
     return Math.round(base * Math.pow(0.5, (specInput * 2.5) / 100));
-  }, [useFocus, tier, specInput, recipe]);
+  }, [tier, specInput, recipe]);
 
-  // Reinvest loop simulation
+  // Split crafts into focus-eligible and no-focus segments based on budget
+  const focusSplit = useMemo(() => {
+    if (!recipe) return { focusCrafts: 0, noFocusCrafts: 0, usedFocus: 0 };
+    const initialCrafts = Math.floor(rawCount / recipe.rawPerCraft);
+    if (!useFocus || focusCostPerCraft <= 0) {
+      return { focusCrafts: 0, noFocusCrafts: initialCrafts, usedFocus: 0 };
+    }
+    const maxFocusCrafts = Math.floor(focusBudget / focusCostPerCraft);
+    const focusCrafts = Math.min(initialCrafts, maxFocusCrafts);
+    const noFocusCrafts = initialCrafts - focusCrafts;
+    const usedFocus = focusCrafts * focusCostPerCraft;
+    return { focusCrafts, noFocusCrafts, usedFocus };
+  }, [recipe, rawCount, useFocus, focusCostPerCraft, focusBudget]);
+
+  // Reinvest loop simulation — runs two separate chains (focus + no-focus) and combines
   const simulation = useMemo(() => {
     if (!recipe) return null;
     const rawPerCraft = recipe.rawPerCraft;
     const prevPerCraft = recipe.prevPerCraft;
 
-    const initialCrafts = Math.floor(rawCount / rawPerCraft);
-    let raw = initialCrafts * rawPerCraft;
-    let prev = initialCrafts * prevPerCraft;
+    function runChain(initialCrafts: number, rate: number) {
+      if (initialCrafts <= 0) return { total: 0, passes: [] as Array<{ pass: number; crafts: number; rawUsed: number; prevUsed: number; rawBack: number; prevBack: number }>, leftoverRaw: 0, leftoverPrev: 0 };
+      let raw = initialCrafts * rawPerCraft;
+      let prev = initialCrafts * prevPerCraft;
+      let total = 0;
+      const passes: Array<{ pass: number; crafts: number; rawUsed: number; prevUsed: number; rawBack: number; prevBack: number }> = [];
 
-    let totalCrafts = 0;
-    const passes: Array<{ pass: number; crafts: number; rawUsed: number; prevUsed: number; rawBack: number; prevBack: number }> = [];
+      for (let pass = 1; pass <= 30; pass++) {
+        const fromRaw = Math.floor(raw / rawPerCraft);
+        const fromPrev = prevPerCraft > 0 ? Math.floor(prev / prevPerCraft) : Infinity;
+        const crafts = Math.min(fromRaw, fromPrev);
+        if (crafts <= 0) break;
 
-    for (let pass = 1; pass <= 30; pass++) {
-      const fromRaw = Math.floor(raw / rawPerCraft);
-      const fromPrev = prevPerCraft > 0 ? Math.floor(prev / prevPerCraft) : Infinity;
-      const crafts = Math.min(fromRaw, fromPrev);
-      if (crafts <= 0) break;
+        const rawUsed = crafts * rawPerCraft;
+        const prevUsed = crafts * prevPerCraft;
+        const rawBack = rawUsed * rate;
+        const prevBack = prevUsed * rate;
 
-      const rawUsed = crafts * rawPerCraft;
-      const prevUsed = crafts * prevPerCraft;
-      const rawBack = rawUsed * rr;
-      const prevBack = prevUsed * rr;
+        raw = raw - rawUsed + rawBack;
+        prev = prev - prevUsed + prevBack;
+        total += crafts;
 
-      raw = raw - rawUsed + rawBack;
-      prev = prev - prevUsed + prevBack;
-      totalCrafts += crafts;
+        passes.push({ pass, crafts, rawUsed, prevUsed, rawBack, prevBack });
+        if (crafts < 1) break;
+      }
 
-      passes.push({ pass, crafts, rawUsed, prevUsed, rawBack, prevBack });
-      if (crafts < 1) break;
+      return { total, passes, leftoverRaw: raw, leftoverPrev: prev };
     }
 
-    return { initialCrafts, totalOutput: totalCrafts, passes, leftoverRaw: raw, leftoverPrev: prev };
-  }, [recipe, rawCount, rr]);
+    const focusChain = runChain(focusSplit.focusCrafts, rrFocus);
+    const noFocusChain = runChain(focusSplit.noFocusCrafts, rrNoFocus);
+
+    const initialCrafts = focusSplit.focusCrafts + focusSplit.noFocusCrafts;
+    const totalOutput = focusChain.total + noFocusChain.total;
+    // Combine passes for breakdown (label focus vs no-focus)
+    const passes = [
+      ...focusChain.passes.map(p => ({ ...p, mode: 'focus' as const })),
+      ...noFocusChain.passes.map(p => ({ ...p, mode: 'normal' as const })),
+    ];
+
+    return {
+      initialCrafts,
+      focusCrafts: focusSplit.focusCrafts,
+      noFocusCrafts: focusSplit.noFocusCrafts,
+      focusOutput: focusChain.total,
+      noFocusOutput: noFocusChain.total,
+      totalOutput,
+      passes,
+      leftoverRaw: focusChain.leftoverRaw + noFocusChain.leftoverRaw,
+      leftoverPrev: focusChain.leftoverPrev + noFocusChain.leftoverPrev,
+    };
+  }, [recipe, focusSplit, rrFocus, rrNoFocus]);
 
   // Financial results
   const result = useMemo(() => {
@@ -249,7 +293,7 @@ export default function SimpleRefine() {
     const profit = revenue - totalCost;
     const roi = totalCost > 0 ? (profit / totalCost) * 100 : 0;
 
-    const totalFocus = useFocus ? simulation.initialCrafts * focusCostPerCraft : 0;
+    const totalFocus = focusSplit.usedFocus;
 
     return {
       initialRaw, initialPrev,
@@ -257,7 +301,7 @@ export default function SimpleRefine() {
       effectiveSellPrice, revenue, profit, roi,
       totalFocus,
     };
-  }, [recipe, simulation, rawPrice, prevPrice, sellPrice, feePerCraft, sellMode, premium, useFocus, focusCostPerCraft]);
+  }, [recipe, simulation, rawPrice, prevPrice, sellPrice, feePerCraft, sellMode, premium, focusSplit]);
 
   // Stale price warning (>6h old)
   const priceAge = (dateStr: string): number => {
@@ -343,6 +387,33 @@ export default function SimpleRefine() {
             </div>
           </div>
         </div>
+
+        {/* Focus budget row — only when focus enabled */}
+        {useFocus && (
+          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-zinc-800/60">
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Focus Budget</label>
+              <input type="number" min={0} step={1000} value={focusBudget} onChange={(e) => setFocusBudget(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
+              <div className="text-[9px] text-zinc-600 mt-1">Max focus you can spend (cap 30K daily)</div>
+            </div>
+            <div className="col-span-1 md:col-span-3 flex items-end">
+              <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg px-4 py-2.5 w-full">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Focus Split</div>
+                <div className="text-xs text-zinc-300">
+                  <span className="text-cyan-400 font-bold">{focusSplit.focusCrafts}</span> crafts with focus
+                  <span className="text-zinc-600"> (RR {formatPercent(rrFocus * 100)})</span>
+                  <span className="text-zinc-600 mx-2">·</span>
+                  <span className="text-amber-400 font-bold">{focusSplit.noFocusCrafts}</span> crafts without
+                  <span className="text-zinc-600"> (RR {formatPercent(rrNoFocus * 100)})</span>
+                </div>
+                <div className="text-[10px] text-zinc-600 mt-0.5">
+                  Using <span className="text-cyan-400">{focusSplit.usedFocus.toLocaleString()}</span> / {focusBudget.toLocaleString()} focus
+                  {focusSplit.noFocusCrafts > 0 && <span className="text-amber-400 ml-2">⚠ Budget exceeded, remainder runs without focus</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Status row */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
