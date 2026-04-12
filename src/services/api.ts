@@ -85,7 +85,11 @@ const inFlight = new Map<string, Promise<MarketPrice[]>>();
 export async function fetchPrices(
   itemIds: string[],
   locations: string[] = ['Bridgewatch', 'Fort Sterling', 'Lymhurst', 'Martlock', 'Thetford', 'Black Market'],
-  allQualities = false,
+  // Fetch ALL quality levels by default. Albion's real liquid market is
+  // quality 2-3 (Good / Outstanding). With the old default of false the
+  // API returned only quality 1 (Normal), which often has zero listings or
+  // a single absurd 300K ask while the real item trades at 27K Outstanding.
+  allQualities = true,
   forceRefresh = false,
 ): Promise<MarketPrice[]> {
   if (itemIds.length === 0) return [];

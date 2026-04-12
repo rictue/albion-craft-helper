@@ -81,9 +81,12 @@ export default function CraftingCalculator() {
         itemIds.push(resolveArtifactId(selectedItem.artifactId, tier));
       }
 
-      // Pass `force` through to bypass the 30-second price cache when the
-      // user explicitly asks for fresh data via the Refresh button.
-      const data = await fetchPrices(itemIds, undefined, false, force);
+      // Fetch ALL qualities. The old quality=1 filter only returned Normal
+      // quality listings — but in Albion the real liquid market is quality
+      // 2-3 (Good/Outstanding). Quality 1 often has zero or one absurdly
+      // overpriced listing, which is why the user was seeing 300K for an
+      // item that actually costs 27K at Outstanding quality.
+      const data = await fetchPrices(itemIds, undefined, true, force);
       setPrices(data);
       setFetchedAt(Date.now());
     } catch (err) {
