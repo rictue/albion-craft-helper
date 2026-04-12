@@ -22,6 +22,38 @@ interface CityPrice {
   price: number;
   profit: number;
   isBuy: boolean;
+  /** true when we actually found market data for this city */
+  hasData: boolean;
+  /** true when this is the city the user is currently crafting in */
+  isCraftCity: boolean;
+  /** Age of the underlying price record in hours. Infinity when unknown. */
+  ageHours: number;
+  /** True if this entry was flagged as an outlier (>2x median of others). */
+  isOutlier: boolean;
+}
+
+function ageHoursOf(dateStr: string | undefined): number {
+  if (!dateStr) return Infinity;
+  const t = new Date(dateStr).getTime();
+  if (!t || t <= 0) return Infinity;
+  const h = (Date.now() - t) / 3_600_000;
+  return h < 0 ? Infinity : h;
+}
+
+function formatAge(h: number): string {
+  if (!Number.isFinite(h)) return '—';
+  if (h < 1 / 60) return 'just now';
+  if (h < 1) return `${Math.round(h * 60)}m`;
+  if (h < 24) return `${h.toFixed(1)}h`;
+  return `${Math.round(h / 24)}d`;
+}
+
+function ageColor(h: number): string {
+  if (!Number.isFinite(h)) return 'text-zinc-600';
+  if (h < 1) return 'text-green-400';
+  if (h < 4) return 'text-lime-400';
+  if (h < 12) return 'text-amber-400';
+  return 'text-red-400';
 }
 
 export default function ProfitSummary({ result, onAddToPlan, prices, itemId, altItemId, journalNet = 0 }: Props) {
@@ -30,13 +62,18 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
   const qty = settings.quantity || 1;
   const taxRate = settings.hasPremium ? 0.065 : 0.105;
 
-  // All city prices for this item
+  // All city prices for this item. Unlike the old version which dropped
+  // cities that had no listings, this one always emits a row for every
+  // royal city plus the Black Market, captures the age of each price so
+  // the user can see why a high number is really a stale listing, and
+  // sorts so the currently-selected crafting city is pinned at #1.
   const cityPrices = useMemo(() => {
     const results: CityPrice[] = [];
 
     for (const city of CITIES) {
-      if (city.id === 'Caerleon') continue; // skip risky city
+      if (city.id === 'Caerleon') continue; // Caerleon AH is no-op for crafts
       let bestSell = 0;
+      let bestDate: string | undefined;
       let isBuy = false;
 
       for (const p of prices) {
@@ -44,37 +81,85 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
         if (p.item_id !== itemId && p.item_id !== altItemId) continue;
 
         if (city.id === 'Black Market') {
-          if (p.buy_price_max > bestSell) { bestSell = p.buy_price_max; isBuy = true; }
+          if (p.buy_price_max > bestSell) {
+            bestSell = p.buy_price_max;
+            bestDate = p.buy_price_max_date;
+            isBuy = true;
+          }
         } else {
           if (p.sell_price_min > 0 && (bestSell === 0 || p.sell_price_min < bestSell)) {
-            bestSell = p.sell_price_min; isBuy = false;
+            bestSell = p.sell_price_min;
+            bestDate = p.sell_price_min_date;
+            isBuy = false;
           }
         }
       }
 
-      if (bestSell <= 0) continue;
-
+      const hasData = bestSell > 0;
       const totalSell = bestSell * qty;
-      const profit = totalSell * (1 - taxRate) - result.investment;
-      results.push({ city: city.name, price: bestSell, profit, isBuy });
+      const profit = hasData ? totalSell * (1 - taxRate) - result.investment : 0;
+      results.push({
+        city: city.name,
+        price: bestSell,
+        profit,
+        isBuy,
+        hasData,
+        isCraftCity: city.id === settings.craftingCity,
+        ageHours: ageHoursOf(bestDate),
+        isOutlier: false,
+      });
     }
 
-    // Filter outliers on royal-city sell prices (2x median). Leave Black Market
-    // buy orders alone — they operate on a different scale by design.
-    const royal = results.filter(r => !r.isBuy);
-    if (royal.length >= 2) {
-      const sorted = [...royal].sort((a, b) => a.price - b.price);
+    // Outlier detection on royal-city sell prices (2x median). We no longer
+    // hide the outliers — the user explicitly wants to see why a city has
+    // an absurd price so they can read the age and dismiss it themselves.
+    // We only mark them with isOutlier = true so the row renders dimly.
+    const royalWithData = results.filter(r => !r.isBuy && r.hasData);
+    if (royalWithData.length >= 2) {
+      const sorted = [...royalWithData].sort((a, b) => a.price - b.price);
       const median = sorted[Math.floor(sorted.length / 2)].price;
       const cutoff = median * 2;
-      return results
-        .filter(r => r.isBuy || r.price <= cutoff)
-        .sort((a, b) => b.profit - a.profit);
+      for (const r of results) {
+        if (!r.isBuy && r.hasData && r.price > cutoff) {
+          r.isOutlier = true;
+        }
+      }
     }
 
-    return results.sort((a, b) => b.profit - a.profit);
-  }, [prices, itemId, altItemId, result.investment, taxRate, qty]);
+    // Sort order:
+    //   1. The currently-selected craft city ALWAYS first (whether or not it
+    //      has data — user explicitly wants to see where they are even if the
+    //      market is empty there).
+    //   2. Remaining cities with real data, sorted by profit descending.
+    //   3. Outlier rows.
+    //   4. No-data rows.
+    return results.sort((a, b) => {
+      if (a.isCraftCity !== b.isCraftCity) return a.isCraftCity ? -1 : 1;
+      // group: realData (0) < outlier (1) < noData (2)
+      const rank = (r: CityPrice) => !r.hasData ? 2 : r.isOutlier ? 1 : 0;
+      const ra = rank(a); const rb = rank(b);
+      if (ra !== rb) return ra - rb;
+      if (!a.hasData && !b.hasData) return 0;
+      return b.profit - a.profit;
+    });
+  }, [prices, itemId, altItemId, result.investment, taxRate, qty, settings.craftingCity]);
 
-  const bestCity = cityPrices[0];
+  // For the headline "Total Profit" card we want the best *actual* profit,
+  // not the pinned craft city — otherwise the header would flash red when
+  // the craft city has no data even though other cities are profitable.
+  // Outliers are excluded from the headline so a 400k-on-one-stale-listing
+  // row can't inflate the "best profit" number.
+  const bestRealCity = useMemo(
+    () => cityPrices
+      .filter(c => c.hasData && !c.isOutlier)
+      .sort((a, b) => b.profit - a.profit)[0],
+    [cityPrices],
+  );
+
+  // Use the real best city (highest profit) for the headline card, not the
+  // pinned craft city — otherwise the header would go red even when the
+  // craft city has no market data and another city would be profitable.
+  const bestCity = bestRealCity ?? cityPrices[0];
   const bestProfit = bestCity?.profit || 0;
   const bestPrice = bestCity?.price || 0;
   const totalProfit = bestProfit + journalNet;
@@ -153,33 +238,60 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
       {/* All cities */}
       {cityPrices.length > 0 && (
         <div className="bg-bg-raised rounded-xl border border-border p-3">
-          <div className="text-xs text-zinc-500 uppercase tracking-wider font-medium mb-2">Sell Prices by City</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Sell Prices by City</div>
+            <div className="text-[9px] text-zinc-600 uppercase tracking-wider">age</div>
+          </div>
           <div className="space-y-1">
-            {cityPrices.map((cp, i) => {
-              const barMax = cityPrices[0]?.price || 1;
-              const barW = Math.max(5, (cp.price / barMax) * 100);
-              return (
-                <div key={cp.city} className="flex items-center gap-2">
-                  <span className={`text-[11px] font-bold w-3 ${i === 0 ? 'text-gold' : 'text-zinc-600'}`}>{i + 1}</span>
-                  <span className="text-xs text-zinc-400 w-20 shrink-0">{cp.city}</span>
-                  <div className="flex-1 h-6 bg-zinc-800/50 rounded relative overflow-hidden">
-                    <div
-                      className={`h-full rounded ${cp.profit > 0 ? 'bg-green-900/40' : 'bg-red-900/30'}`}
-                      style={{ width: `${barW}%` }}
-                    />
-                    <div className="absolute inset-0 flex items-center justify-between px-2">
-                      <span className="text-[11px] text-zinc-200 font-medium">
-                        {formatSilver(cp.price)}
-                        {cp.isBuy && <span className="text-blue-400 ml-1">(buy)</span>}
-                      </span>
-                      <span className={`text-[11px] font-medium ${cp.profit > 0 ? 'text-profit' : 'text-loss'}`}>
-                        {cp.profit > 0 ? '+' : ''}{formatSilver(cp.profit)}
-                      </span>
+            {(() => {
+              const maxPrice = Math.max(1, ...cityPrices.filter(c => c.hasData && !c.isOutlier).map(c => c.price));
+              return cityPrices.map((cp, i) => {
+                const barW = cp.hasData ? Math.max(4, (cp.price / maxPrice) * 100) : 0;
+                const dimClass = !cp.hasData || cp.isOutlier ? 'opacity-50' : '';
+                return (
+                  <div
+                    key={cp.city}
+                    className={`flex items-center gap-2 ${cp.isCraftCity ? 'ring-1 ring-gold/40 rounded' : ''}`}
+                    title={cp.isOutlier ? 'Flagged as outlier: price > 2x median of the other royal cities' : cp.isCraftCity ? 'Your current crafting city' : undefined}
+                  >
+                    <span className={`text-[11px] font-bold w-3 ${cp.isCraftCity ? 'text-gold' : i === 0 ? 'text-gold' : 'text-zinc-600'}`}>{i + 1}</span>
+                    <span className={`text-xs w-20 shrink-0 flex items-center gap-1 ${cp.isCraftCity ? 'text-gold font-semibold' : 'text-zinc-400'}`}>
+                      {cp.isCraftCity && <span className="text-[9px]">●</span>}
+                      {cp.city}
+                    </span>
+                    <div className={`flex-1 h-6 bg-zinc-800/50 rounded relative overflow-hidden ${dimClass}`}>
+                      {cp.hasData && (
+                        <div
+                          className={`h-full rounded ${cp.isOutlier ? 'bg-amber-900/40' : cp.profit > 0 ? 'bg-green-900/40' : 'bg-red-900/30'}`}
+                          style={{ width: `${barW}%` }}
+                        />
+                      )}
+                      <div className="absolute inset-0 flex items-center justify-between px-2">
+                        <span className="text-[11px] text-zinc-200 font-medium flex items-center gap-1">
+                          {cp.hasData ? formatSilver(cp.price) : <span className="text-zinc-600">no data</span>}
+                          {cp.isBuy && <span className="text-blue-400">(buy)</span>}
+                          {cp.isOutlier && <span className="text-amber-400 text-[9px]" title="Flagged outlier — likely stale">⚠</span>}
+                        </span>
+                        <span className={`text-[11px] font-medium tabular-nums ${cp.hasData ? (cp.profit > 0 ? 'text-profit' : 'text-loss') : 'text-zinc-600'}`}>
+                          {cp.hasData ? `${cp.profit > 0 ? '+' : ''}${formatSilver(cp.profit)}` : '—'}
+                        </span>
+                      </div>
                     </div>
+                    <span
+                      className={`text-[10px] tabular-nums w-10 text-right shrink-0 ${ageColor(cp.ageHours)}`}
+                      title={cp.hasData ? `Price record from ${formatAge(cp.ageHours)} ago` : 'No data'}
+                    >
+                      {cp.hasData ? formatAge(cp.ageHours) : '—'}
+                    </span>
                   </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
+          </div>
+          <div className="mt-2 text-[9px] text-zinc-600 flex items-center gap-3">
+            <span><span className="text-gold">●</span> craft city</span>
+            <span><span className="text-amber-400">⚠</span> outlier (dim)</span>
+            <span>age: <span className="text-green-400">&lt;1h</span> / <span className="text-amber-400">~4h</span> / <span className="text-red-400">stale</span></span>
           </div>
         </div>
       )}
