@@ -4,11 +4,27 @@ import { formatSilver } from '../../utils/formatters';
 import ItemIcon from '../common/ItemIcon';
 import type { ItemDefinition, Tier, Enchantment } from '../../types';
 
-// Base crafting fame per craft (wiki approximation)
-const FAME_PER_TIER: Record<number, number> = {
-  2: 2.4, 3: 12, 4: 60, 5: 180, 6: 540, 7: 1620, 8: 4860,
+// Crafting fame formula.
+//
+// Albion's real fame-per-craft scales with the item's total resource value,
+// not a flat tier table. A T4 Plate Shoes (8 bars) should NOT give the same
+// fame as a T4 2H Claymore (20 bars + 12 leather) — but the old hard-coded
+// FAME_PER_TIER lookup did exactly that, making small-recipe items like
+// shoes look like ~250 crafts to fill a journal when the real number is
+// much smaller.
+//
+// New formula:
+//   fame = sum(resource_count × resource_IV) × FAME_COEFF × premium_bonus
+//
+// Where IV ramps with tier and enchant (same numbers the usage-fee math
+// already uses in profitCalculator.ts) and FAME_COEFF is calibrated against
+// real in-game observations (≈ 10 → a T6.0 Plate Shoes journal fills in
+// ~75 crafts, a T6.0 Plate Armor in ~38 crafts, rough-but-realistic).
+const RESOURCE_ITEM_VALUE: Record<number, number> = {
+  2: 4, 3: 8, 4: 16, 5: 32, 6: 64, 7: 128, 8: 256,
 };
-const ENCHANT_MULT: Record<number, number> = { 0: 1, 1: 2, 2: 4, 3: 8, 4: 16 };
+const ENCHANT_IV_MULT: Record<number, number> = { 0: 1, 1: 2, 2: 4, 3: 8, 4: 16 };
+const FAME_COEFF = 10;
 const JOURNAL_CAPACITY: Record<number, number> = {
   2: 1800, 3: 9000, 4: 45000, 5: 135000, 6: 405000, 7: 1215000, 8: 3645000,
 };
@@ -69,8 +85,16 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
 
   if (!profession) return null;
 
-  const baseFame = FAME_PER_TIER[tier] ?? 0;
-  const famePerCraft = baseFame * ENCHANT_MULT[enchantment] * (hasPremium ? 1.5 : 1);
+  // Fame per craft is recipe-value-based — larger recipes yield more fame.
+  // Used to be a flat per-tier lookup that ignored recipe size entirely,
+  // which is why a shoes craft looked like it needed hundreds of crafts
+  // to fill a journal.
+  const resourceIV = (RESOURCE_ITEM_VALUE[tier] ?? 0) * (ENCHANT_IV_MULT[enchantment] ?? 1);
+  let recipeValue = 0;
+  for (const req of selectedItem.recipe) {
+    recipeValue += req.count * resourceIV;
+  }
+  const famePerCraft = recipeValue * FAME_COEFF * (hasPremium ? 1.5 : 1);
   const totalFame = famePerCraft * quantity;
   const capacity = JOURNAL_CAPACITY[tier] ?? 0;
   const journalsNeeded = capacity > 0 ? Math.ceil(totalFame / capacity) : 0;
