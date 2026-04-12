@@ -255,13 +255,17 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         }
       }
 
-      // Best per item — but drop entries with absurd margins, they're almost
-      // always stale single-listing outliers (e.g. a Muisak "sold" for 14M
-      // because one player stuck a joke price on it a week ago).
-      const MAX_REALISTIC_MARGIN = 300; // percent
+      // Sanity filters — any of these firing means the sell price is almost
+      // certainly a stale/joke listing, not a real market price:
+      //   1. Margin > 200% (selling for 3x the craft cost is unrealistic)
+      //   2. Sell price > 50x craft cost (e.g. Muisak 14M vs 77K cost)
+      //   3. Sell price > 5M per unit for a non-artifact (T6.1 gear
+      //      almost never sells for >5M legitimately)
       const final = new Map<string, ScanResult>();
       for (const r of scanResults) {
-        if (r.margin > MAX_REALISTIC_MARGIN) continue;
+        if (r.margin > 200) continue;
+        if (r.materialCost > 0 && r.sellPrice / r.materialCost > 50) continue;
+        if (!r.item.artifactId && r.sellPrice > 5_000_000) continue;
         const key = r.item.baseId;
         const existing = final.get(key);
         if (!existing || r.profit > existing.profit) final.set(key, r);
@@ -374,7 +378,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-zinc-500 uppercase tracking-wider border-b border-surface-lighter">
-                  <th className="text-left px-3 py-2.5 w-12"></th>
+                  <th className="text-left px-3 py-2.5 w-[68px]"></th>
                   <th className="text-left px-3 py-2.5 cursor-pointer hover:text-gold" onClick={() => handleSort('name')}>Item{sortIcon('name')}</th>
                   {!blackMarketOnly && <th className="text-left px-3 py-2.5">Sell At</th>}
                   {blackMarketOnly && <th className="text-left px-3 py-2.5">BM Qualities</th>}
@@ -393,11 +397,16 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                     className="border-b border-surface-lighter/50 hover:bg-surface-light cursor-pointer transition-colors"
                   >
                     <td className="px-3 py-2.5">
-                      <ItemIcon itemId={r.itemId} size={32} className="bg-surface-lighter rounded" />
+                      <div className="w-14 h-14 flex items-center justify-center">
+                        <ItemIcon itemId={r.itemId} size={56} />
+                      </div>
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className="text-zinc-200">{r.item.name}</span>
-                      {r.item.artifactId && <span className="text-purple-400 text-xs ml-1">*</span>}
+                      <div className="text-zinc-200 font-medium">{r.item.name}</div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-[10px] text-gold font-bold">T{tier}{enchantment > 0 && `.${enchantment}`}</span>
+                        {r.item.artifactId && <span className="text-purple-400 text-[10px] font-semibold">Artifact</span>}
+                      </div>
                     </td>
                     {!blackMarketOnly && (
                       <td className="px-3 py-2.5">
