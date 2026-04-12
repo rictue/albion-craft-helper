@@ -10,6 +10,7 @@ import RecipeDisplay from './RecipeDisplay';
 import ReturnRateSlider from './ReturnRateSlider';
 import ProfitSummary from './ProfitSummary';
 import JournalBoostCard from './JournalBoostCard';
+import LiquidityCard from './LiquidityCard';
 import TierSelector from '../common/TierSelector';
 import EnchantmentSelector from '../common/EnchantmentSelector';
 import type { Tier, Enchantment } from '../../types';
@@ -268,8 +269,8 @@ export default function CraftingCalculator() {
           )}
         </div>
 
-        {/* Right sidebar - Profit summary */}
-        <div className="lg:col-span-3 lg:sticky lg:top-20">
+        {/* Right sidebar - Profit summary + market liquidity */}
+        <div className="lg:col-span-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto space-y-4">
           {result ? (
             <ProfitSummary result={result} onAddToPlan={handleAddToPlan} prices={prices} itemId={craftedItemId} altItemId={altVariantId} />
           ) : (
@@ -277,6 +278,9 @@ export default function CraftingCalculator() {
               <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Profit</div>
               <div className="text-2xl text-zinc-600">---</div>
             </div>
+          )}
+          {selectedItem && craftedItemId && (
+            <LiquidityCard itemId={craftedItemId} altItemId={altVariantId} />
           )}
         </div>
       </div>
