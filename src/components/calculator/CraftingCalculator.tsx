@@ -142,36 +142,18 @@ export default function CraftingCalculator() {
     allCitiesMaterials.forEach((v, k) => map.set(k, v));
     materialMap.forEach((v, k) => map.set(k, v));
 
-    // Resolve sell price for crafted item
+    // Resolve sell price for crafted item. Match ONLY the exact itemId —
+    // the old altId (2H_↔MAIN_) fallback cross-contaminated distinct items
+    // like Battleaxe (MAIN_AXE) and Greataxe (2H_AXE), silently showing
+    // the wrong item's market price when one of them had no listings.
     if (selectedItem) {
       const itemId = craftedItemId;
-      const altId = itemId.includes('_2H_')
-        ? itemId.replace('_2H_', '_MAIN_')
-        : itemId.includes('_MAIN_')
-          ? itemId.replace('_MAIN_', '_2H_')
-          : null;
-
-      // From selected selling location (preferred)
-      let found = false;
-      sellMap.forEach((v, k) => {
-        if (k === itemId) { map.set(itemId, v); found = true; }
-        if (altId && k === altId && !found) { map.set(itemId, v); found = true; }
-      });
-
+      let sellPrice = sellMap.get(itemId) ?? 0;
       // Fallback: best sell price from any city (NOT buy orders)
-      if (!found) {
-        const sellPrice = allCitiesSell.get(itemId) || (altId ? allCitiesSell.get(altId) : 0) || 0;
-        if (sellPrice > 0) map.set(itemId, sellPrice);
+      if (sellPrice <= 0) {
+        sellPrice = allCitiesSell.get(itemId) ?? 0;
       }
-    }
-
-    // Cross-map all 2H_↔MAIN_ variants so any lookup works
-    const crossKeys = [...map.keys()];
-    for (const k of crossKeys) {
-      let alt: string | null = null;
-      if (k.includes('_2H_')) alt = k.replace('_2H_', '_MAIN_');
-      else if (k.includes('_MAIN_')) alt = k.replace('_MAIN_', '_2H_');
-      if (alt && !map.has(alt)) map.set(alt, map.get(k)!);
+      if (sellPrice > 0) map.set(itemId, sellPrice);
     }
 
     // Custom prices (highest priority)

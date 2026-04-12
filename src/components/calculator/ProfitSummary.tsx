@@ -90,7 +90,11 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
 
       for (const p of prices) {
         if (p.city !== city.id) continue;
-        if (p.item_id !== itemId && p.item_id !== altItemId) continue;
+        // Match ONLY the exact itemId. Previously we also accepted altItemId
+        // (the 2H_↔MAIN_ swap) as a fallback, but for items where both
+        // variants are real distinct weapons (e.g. Battleaxe = MAIN_AXE and
+        // Greataxe = 2H_AXE) this silently showed the wrong item's price.
+        if (p.item_id !== itemId) continue;
 
         if (city.id === 'Black Market') {
           if (p.buy_price_max > bestSell) {
