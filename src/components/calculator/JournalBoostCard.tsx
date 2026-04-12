@@ -80,12 +80,19 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
     ? Math.min(100, (totalFame / (journalsNeeded * capacity)) * 100)
     : 0;
 
-  // Only count journals you can FULLY fill — a partial journal is stored fame
-  // that you'll use on the next run, not a realized cost. Previous math used
-  // ceil() for buyCost which counted an empty journal even when you couldn't
-  // fill one, silently turning every small-quantity craft into a fake loss.
-  const buyCost = (emptyPrice || 0) * journalsFullyFilled;
-  const fullSellTotal = (fullPrice || 0) * journalsFullyFilled;
+  // Journal math — prorated model:
+  //   - You buy one empty journal per started journal (ceil).
+  //   - Each journal's value scales with its fill ratio: 79% filled = 0.79
+  //     × fullPrice. Partials can't literally be sold, but economically
+  //     they are stored fame that will be realized when you finish them.
+  //   - netGain = (total fill fraction × fullPrice) − empties bought.
+  //
+  //   When partial fill × fullPrice < emptyPrice, netGain goes negative,
+  //   which is a genuine signal: filling just a sliver of a journal is
+  //   usually a money loss, and the user should crank up the quantity.
+  const totalFillFraction = capacity > 0 ? totalFame / capacity : 0;
+  const buyCost = (emptyPrice || 0) * journalsNeeded;
+  const fullSellTotal = (fullPrice || 0) * totalFillFraction;
   const netGain = fullSellTotal - buyCost;
 
   // Bubble the net gain up to the parent so ProfitSummary can show a combined
@@ -131,11 +138,11 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
               <span>
                 <strong className="text-zinc-300">{journalsFullyFilled}</strong> fully filled
                 {partialFameLeft > 0 && (
-                  <span className="text-zinc-600"> · +{Math.round(partialFameLeft).toLocaleString()} leftover ({((partialFameLeft / capacity) * 100).toFixed(0)}%)</span>
+                  <span className="text-zinc-600"> · +{Math.round(partialFameLeft).toLocaleString()} ({((partialFameLeft / capacity) * 100).toFixed(0)}% of one)</span>
                 )}
               </span>
               <span>
-                Buy <strong className="text-emerald-400">{journalsFullyFilled}</strong> empty
+                Buy <strong className="text-emerald-400">{journalsNeeded}</strong> empty
               </span>
             </div>
             <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
@@ -149,7 +156,7 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-1">
               <ItemIcon itemId={emptyId} size={22} />
-              <div className="text-[10px] uppercase text-zinc-600">Empty x{journalsFullyFilled}</div>
+              <div className="text-[10px] uppercase text-zinc-600">Empty x{journalsNeeded}</div>
             </div>
             <div className="text-xs text-zinc-400">
               {emptyPrice ? formatSilver(emptyPrice) : '—'} each
@@ -161,7 +168,9 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-1">
               <ItemIcon itemId={fullId} size={22} />
-              <div className="text-[10px] uppercase text-zinc-600">Full x{journalsFullyFilled}</div>
+              <div className="text-[10px] uppercase text-zinc-600">
+                Full × {totalFillFraction.toFixed(2)}
+              </div>
             </div>
             <div className="text-xs text-zinc-400">
               {fullPrice ? formatSilver(fullPrice) : '—'} each
@@ -171,16 +180,16 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
         </div>
 
         {/* Net gain */}
-        <div className={`rounded-lg border px-4 py-2.5 flex items-center justify-between ${netGain > 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-zinc-900/60 border-zinc-800'}`}>
+        <div className={`rounded-lg border px-4 py-2.5 flex items-center justify-between ${netGain > 0 ? 'bg-green-500/10 border-green-500/20' : netGain < 0 ? 'bg-red-500/5 border-red-500/10' : 'bg-zinc-900/60 border-zinc-800'}`}>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-zinc-500">Net extra silver from journals</div>
             <div className="text-[10px] text-zinc-600">
-              {journalsFullyFilled === 0
-                ? 'Not enough fame to fill a journal yet — increase quantity'
-                : 'Fills that can actually be sold (partials stay with you)'}
+              {netGain >= 0
+                ? 'Partial fills counted at their pro-rata fame value'
+                : 'Partial is worth less than the empty journal — increase quantity'}
             </div>
           </div>
-          <div className={`text-lg font-bold tabular-nums ${netGain > 0 ? 'text-green-400' : 'text-zinc-500'}`}>
+          <div className={`text-lg font-bold tabular-nums ${netGain > 0 ? 'text-green-400' : netGain < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
             {netGain > 0 ? '+' : ''}{formatSilver(netGain)}
           </div>
         </div>

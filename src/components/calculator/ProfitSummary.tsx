@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { CraftingResult } from '../../utils/profitCalculator';
 import type { MarketPrice } from '../../types';
 import { formatSilver } from '../../utils/formatters';
@@ -49,15 +49,27 @@ function formatAge(h: number): string {
 }
 
 function ageColor(h: number): string {
+  // Tighter thresholds than the first version. Albion market can swing
+  // 20-30% inside a couple of hours, so anything past 1h is already
+  // "watch out", not "fresh". Using distinct hue families (emerald → yellow
+  // → orange → red) so the eye can actually tell levels apart at 10px text.
   if (!Number.isFinite(h)) return 'text-zinc-600';
-  if (h < 1) return 'text-green-400';
-  if (h < 4) return 'text-lime-400';
-  if (h < 12) return 'text-amber-400';
-  return 'text-red-400';
+  if (h < 1)  return 'text-emerald-400';   // fresh
+  if (h < 3)  return 'text-yellow-400';    // warming
+  if (h < 8)  return 'text-orange-500';    // stale
+  return 'text-red-500';                   // dead
 }
 
 export default function ProfitSummary({ result, onAddToPlan, prices, itemId, altItemId, journalNet = 0 }: Props) {
   const [added, setAdded] = useState(false);
+  // When the user clicks a city row in the Sell Prices list, the top
+  // Investment/Best Profit card is pinned to that city. null = auto (use
+  // the best real-data city).
+  const [pinnedCityName, setPinnedCityName] = useState<string | null>(null);
+  // Reset the pin whenever the item/tier/enchant changes so we don't carry
+  // an irrelevant pick across items.
+  useEffect(() => { setPinnedCityName(null); }, [itemId]);
+
   const { settings } = useAppStore();
   const qty = settings.quantity || 1;
   const taxRate = settings.hasPremium ? 0.065 : 0.105;
@@ -126,21 +138,19 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
       }
     }
 
-    // Sort order:
-    //   1. The currently-selected craft city ALWAYS first (whether or not it
-    //      has data — user explicitly wants to see where they are even if the
-    //      market is empty there).
-    //   2. Remaining cities with real data, sorted by profit descending.
-    //   3. Outlier rows.
-    //   4. No-data rows.
+    // Sort order — STABLE across tier/enchant changes so the user can cycle
+    // tiers without rows jumping around:
+    //   1. The currently-selected craft city ALWAYS first.
+    //   2. Remaining data rows in the CITIES declaration order (stable).
+    //   3. Outlier rows in the same stable order.
+    //   4. No-data rows at the bottom, also stable.
+    const cityOrder = new Map(CITIES.map((c, i) => [c.name, i]));
     return results.sort((a, b) => {
       if (a.isCraftCity !== b.isCraftCity) return a.isCraftCity ? -1 : 1;
-      // group: realData (0) < outlier (1) < noData (2)
       const rank = (r: CityPrice) => !r.hasData ? 2 : r.isOutlier ? 1 : 0;
       const ra = rank(a); const rb = rank(b);
       if (ra !== rb) return ra - rb;
-      if (!a.hasData && !b.hasData) return 0;
-      return b.profit - a.profit;
+      return (cityOrder.get(a.city) ?? 99) - (cityOrder.get(b.city) ?? 99);
     });
   }, [prices, itemId, altItemId, result.investment, taxRate, qty, settings.craftingCity]);
 
@@ -156,10 +166,16 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
     [cityPrices],
   );
 
-  // Use the real best city (highest profit) for the headline card, not the
-  // pinned craft city — otherwise the header would go red even when the
-  // craft city has no market data and another city would be profitable.
-  const bestCity = bestRealCity ?? cityPrices[0];
+  // Which city drives the top Investment / Best Profit card?
+  //   1. If the user clicked a specific city row, use that (pin).
+  //   2. Otherwise use the best real-data, non-outlier city.
+  //   3. Otherwise fall back to whatever is first in the list so we never
+  //      crash the render.
+  const pinnedCity = pinnedCityName
+    ? cityPrices.find(c => c.city === pinnedCityName)
+    : undefined;
+  const bestCity = pinnedCity ?? bestRealCity ?? cityPrices[0];
+  const isPinned = !!pinnedCity;
   const bestProfit = bestCity?.profit || 0;
   const bestPrice = bestCity?.price || 0;
   const totalProfit = bestProfit + journalNet;
@@ -190,7 +206,18 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
             // When there's journal income, show a breakdown: craft + journal = total
             <>
               <div className="flex justify-between items-baseline">
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Total Profit</div>
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                  <span>{isPinned ? 'Selected City' : 'Total Profit'}</span>
+                  {isPinned && (
+                    <button
+                      onClick={() => setPinnedCityName(null)}
+                      className="text-gold/70 hover:text-gold normal-case text-[9px] tracking-normal"
+                      title="Reset to best-profit city"
+                    >
+                      [auto]
+                    </button>
+                  )}
+                </div>
                 {bestCity && (
                   <div className="text-[10px] text-zinc-500">
                     Sell @ {bestCity.city} · {formatSilver(bestPrice)} ea
@@ -219,7 +246,18 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
             // No journal data — classic single-line display
             <div className="flex justify-between items-center">
               <div>
-                <div className="text-xs text-zinc-500">Best Profit</div>
+                <div className="text-xs text-zinc-500 flex items-center gap-1">
+                  <span>{isPinned ? 'Selected Profit' : 'Best Profit'}</span>
+                  {isPinned && (
+                    <button
+                      onClick={() => setPinnedCityName(null)}
+                      className="text-gold/70 hover:text-gold text-[9px]"
+                      title="Reset to best-profit city"
+                    >
+                      [auto]
+                    </button>
+                  )}
+                </div>
                 <div className={`text-xl font-bold ${isProfit ? 'text-profit' : 'text-loss'}`}>
                   {isProfit ? '+' : ''}{formatSilver(bestProfit)}
                 </div>
@@ -248,13 +286,32 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
               return cityPrices.map((cp, i) => {
                 const barW = cp.hasData ? Math.max(4, (cp.price / maxPrice) * 100) : 0;
                 const dimClass = !cp.hasData || cp.isOutlier ? 'opacity-50' : '';
+                const isPinnedRow = cp.city === pinnedCityName;
+                const ringClass = isPinnedRow
+                  ? 'ring-2 ring-gold/80 rounded bg-gold/5'
+                  : cp.isCraftCity
+                    ? 'ring-1 ring-gold/40 rounded'
+                    : '';
                 return (
                   <div
                     key={cp.city}
-                    className={`flex items-center gap-2 ${cp.isCraftCity ? 'ring-1 ring-gold/40 rounded' : ''}`}
-                    title={cp.isOutlier ? 'Flagged as outlier: price > 2x median of the other royal cities' : cp.isCraftCity ? 'Your current crafting city' : undefined}
+                    onClick={() => {
+                      if (!cp.hasData) return;
+                      // Toggle: clicking the same city twice goes back to auto
+                      setPinnedCityName(prev => (prev === cp.city ? null : cp.city));
+                    }}
+                    className={`flex items-center gap-2 p-0.5 ${ringClass} ${cp.hasData ? 'cursor-pointer hover:bg-zinc-800/40' : 'cursor-default'} transition-colors`}
+                    title={
+                      cp.isOutlier
+                        ? 'Flagged as outlier: price > 2x median of the other royal cities. Click to pin anyway.'
+                        : cp.hasData
+                          ? isPinnedRow
+                            ? 'Pinned — click again to return to auto (best profit city)'
+                            : 'Click to pin the top card to this city'
+                          : 'No market data for this city'
+                    }
                   >
-                    <span className={`text-[11px] font-bold w-3 ${cp.isCraftCity ? 'text-gold' : i === 0 ? 'text-gold' : 'text-zinc-600'}`}>{i + 1}</span>
+                    <span className={`text-[11px] font-bold w-3 ${isPinnedRow || cp.isCraftCity || i === 0 ? 'text-gold' : 'text-zinc-600'}`}>{i + 1}</span>
                     <span className={`text-xs w-20 shrink-0 flex items-center gap-1 ${cp.isCraftCity ? 'text-gold font-semibold' : 'text-zinc-400'}`}>
                       {cp.isCraftCity && <span className="text-[9px]">●</span>}
                       {cp.city}
@@ -288,10 +345,11 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
               });
             })()}
           </div>
-          <div className="mt-2 text-[9px] text-zinc-600 flex items-center gap-3">
+          <div className="mt-2 text-[9px] text-zinc-600 flex items-center gap-3 flex-wrap">
+            <span className="italic">tap row to pin ↑</span>
             <span><span className="text-gold">●</span> craft city</span>
-            <span><span className="text-amber-400">⚠</span> outlier (dim)</span>
-            <span>age: <span className="text-green-400">&lt;1h</span> / <span className="text-amber-400">~4h</span> / <span className="text-red-400">stale</span></span>
+            <span><span className="text-amber-400">⚠</span> outlier</span>
+            <span>age: <span className="text-emerald-400">&lt;1h</span> / <span className="text-yellow-400">&lt;3h</span> / <span className="text-orange-500">&lt;8h</span> / <span className="text-red-500">stale</span></span>
           </div>
         </div>
       )}
