@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useState } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { fetchPrices, buildPriceMap } from '../../services/api';
 import { calculateCrafting } from '../../utils/profitCalculator';
@@ -22,7 +22,16 @@ export default function CraftingCalculator() {
     customPrices, addToPlan,
   } = useAppStore();
 
-  const loadPrices = useCallback(async () => {
+  // Timestamp of the last successful fetch, so we can show "Updated Xm ago"
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
+  // Re-render clock so the "Xm ago" label stays fresh without mutating state
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => tick(n => n + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const loadPrices = useCallback(async (force: boolean = false) => {
     if (!selectedItem) return;
 
     setPricesLoading(true);
@@ -46,8 +55,11 @@ export default function CraftingCalculator() {
         itemIds.push(resolveArtifactId(selectedItem.artifactId, tier));
       }
 
-      const data = await fetchPrices(itemIds);
+      // Pass `force` through to bypass the 30-second price cache when the
+      // user explicitly asks for fresh data via the Refresh button.
+      const data = await fetchPrices(itemIds, undefined, false, force);
       setPrices(data);
+      setFetchedAt(Date.now());
     } catch (err) {
       console.error('Failed to load prices:', err);
     } finally {
@@ -56,8 +68,20 @@ export default function CraftingCalculator() {
   }, [selectedItem, tier, enchantment, setPrices, setPricesLoading]);
 
   useEffect(() => {
-    loadPrices();
+    loadPrices(false);
   }, [loadPrices]);
+
+  // Format "Xm ago" / "just now" label for the last fetch timestamp
+  const fetchedAgoLabel = useMemo(() => {
+    if (!fetchedAt) return '';
+    const sec = Math.floor((Date.now() - fetchedAt) / 1000);
+    if (sec < 5) return 'just now';
+    if (sec < 60) return `${sec}s ago`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    return `${hr}h ago`;
+  }, [fetchedAt, pricesLoading]); // pricesLoading triggers recompute on refresh
 
   const craftedItemId = useMemo(() => {
     if (!selectedItem) return '';
@@ -186,7 +210,7 @@ export default function CraftingCalculator() {
           {selectedItem ? (
             <>
               <div className="bg-surface rounded-xl border border-surface-lighter p-4">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-4 mb-4 flex-wrap">
                   <h2 className="text-lg font-semibold text-gold">{selectedItem.name}</h2>
                   {pricesLoading && (
                     <div className="flex items-center gap-1">
@@ -194,13 +218,22 @@ export default function CraftingCalculator() {
                       <span className="text-xs text-zinc-500">Loading...</span>
                     </div>
                   )}
-                  <button
-                    onClick={loadPrices}
-                    className="ml-auto text-xs text-zinc-500 hover:text-gold transition-colors px-2 py-1 rounded hover:bg-surface-light"
-                    title="Refresh prices"
-                  >
-                    &#8635; Refresh
-                  </button>
+                  <div className="ml-auto flex items-center gap-2">
+                    {fetchedAt && !pricesLoading && (
+                      <span className="text-[10px] text-zinc-500" title={new Date(fetchedAt).toLocaleString()}>
+                        Prices updated {fetchedAgoLabel}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => loadPrices(true)}
+                      disabled={pricesLoading}
+                      className="text-xs font-bold text-gold bg-gold/10 hover:bg-gold/20 border border-gold/30 transition-colors px-3 py-1.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                      title="Bypass the 30s cache and fetch the latest market data"
+                    >
+                      <span className={pricesLoading ? 'animate-spin inline-block' : 'inline-block'}>&#8635;</span>
+                      {pricesLoading ? 'Refreshing...' : 'Refresh Prices'}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex gap-6">
                   <TierSelector value={tier} onChange={(t: Tier) => setTier(t)} />

@@ -121,13 +121,19 @@ export default function ReturnRateSlider({ subcategory, baseId, itemName }: Prop
           Base: 15.3%
         </span>
         {hasBonus && (
-          <span className="text-xs px-2 py-0.5 rounded bg-green-900/30 text-green-400">
-            City +15%
+          <span
+            className="text-xs px-2 py-0.5 rounded bg-green-900/30 text-green-400"
+            title="Royal city specialization bonus — flat +9.6% RR"
+          >
+            City +9.6%
           </span>
         )}
         {settings.useFocus && (
-          <span className="text-xs px-2 py-0.5 rounded bg-blue-900/30 text-blue-400">
-            Focus +59%
+          <span
+            className="text-xs px-2 py-0.5 rounded bg-blue-900/30 text-blue-400"
+            title="Focus crafting: +59 LPB ≈ +28% effective RR"
+          >
+            Focus (+59 LPB)
           </span>
         )}
         {specInput > 0 && (
