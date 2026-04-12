@@ -32,6 +32,12 @@ export default function CraftingCalculator() {
     return () => window.clearInterval(id);
   }, []);
 
+  // Net silver from selling filled journals, reported upward by JournalBoostCard
+  // so ProfitSummary can fold it into the combined profit figure.
+  const [journalNet, setJournalNet] = useState(0);
+  // Reset when item/tier/enchant changes — new journal card will re-report.
+  useEffect(() => { setJournalNet(0); }, [selectedItem, tier, enchantment]);
+
   const loadPrices = useCallback(async (force: boolean = false) => {
     if (!selectedItem) return;
 
@@ -251,6 +257,7 @@ export default function CraftingCalculator() {
               {result && <RecipeDisplay result={result} prices={prices} />}
 
               <JournalBoostCard
+                onNetChange={setJournalNet}
                 selectedItem={selectedItem}
                 tier={tier}
                 enchantment={enchantment}
@@ -272,7 +279,7 @@ export default function CraftingCalculator() {
         {/* Right sidebar - Profit summary + market liquidity */}
         <div className="lg:col-span-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto space-y-4">
           {result ? (
-            <ProfitSummary result={result} onAddToPlan={handleAddToPlan} prices={prices} itemId={craftedItemId} altItemId={altVariantId} />
+            <ProfitSummary result={result} onAddToPlan={handleAddToPlan} prices={prices} itemId={craftedItemId} altItemId={altVariantId} journalNet={journalNet} />
           ) : (
             <div className="bg-surface rounded-xl border border-surface-lighter p-6 text-center">
               <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Profit</div>

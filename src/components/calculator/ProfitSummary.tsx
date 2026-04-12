@@ -12,6 +12,9 @@ interface Props {
   prices: MarketPrice[];
   itemId: string;
   altItemId?: string;
+  /** Extra silver earned from selling filled journals, reported by
+   *  JournalBoostCard. Added to the combined total figure. */
+  journalNet?: number;
 }
 
 interface CityPrice {
@@ -21,7 +24,7 @@ interface CityPrice {
   isBuy: boolean;
 }
 
-export default function ProfitSummary({ result, onAddToPlan, prices, itemId, altItemId }: Props) {
+export default function ProfitSummary({ result, onAddToPlan, prices, itemId, altItemId, journalNet = 0 }: Props) {
   const [added, setAdded] = useState(false);
   const { settings } = useAppStore();
   const qty = settings.quantity || 1;
@@ -74,7 +77,9 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
   const bestCity = cityPrices[0];
   const bestProfit = bestCity?.profit || 0;
   const bestPrice = bestCity?.price || 0;
-  const isProfit = bestProfit > 0;
+  const totalProfit = bestProfit + journalNet;
+  const isProfit = totalProfit > 0;
+  const hasJournal = Math.abs(journalNet) > 0.5; // ignore noise
 
   const handleAdd = () => {
     onAddToPlan();
@@ -95,21 +100,53 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
         </div>
 
         {/* Profit card */}
-        <div className={`rounded-lg p-3 ${isProfit ? 'bg-green-950/30' : 'bg-red-950/30'}`}>
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="text-xs text-zinc-500">Best Profit</div>
-              <div className={`text-xl font-bold ${isProfit ? 'text-profit' : 'text-loss'}`}>
-                {isProfit ? '+' : ''}{formatSilver(bestProfit)}
+        <div className={`rounded-lg p-3 ${isProfit ? 'bg-green-950/30 border border-green-600/20' : 'bg-red-950/30 border border-red-600/20'}`}>
+          {hasJournal ? (
+            // When there's journal income, show a breakdown: craft + journal = total
+            <>
+              <div className="flex justify-between items-baseline">
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Total Profit</div>
+                {bestCity && (
+                  <div className="text-[10px] text-zinc-500">
+                    Sell @ {bestCity.city} · {formatSilver(bestPrice)} ea
+                  </div>
+                )}
               </div>
+              <div className={`text-2xl font-black tabular-nums mt-0.5 ${isProfit ? 'text-profit' : 'text-loss'}`}>
+                {isProfit ? '+' : ''}{formatSilver(totalProfit)}
+              </div>
+              <div className="mt-2 pt-2 border-t border-zinc-800 space-y-0.5">
+                <div className="flex justify-between items-baseline text-[11px]">
+                  <span className="text-zinc-500">Craft profit</span>
+                  <span className={`tabular-nums font-semibold ${bestProfit >= 0 ? 'text-zinc-300' : 'text-red-400/80'}`}>
+                    {bestProfit >= 0 ? '+' : ''}{formatSilver(bestProfit)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-baseline text-[11px]">
+                  <span className="text-emerald-500/80">Journal income</span>
+                  <span className={`tabular-nums font-semibold ${journalNet >= 0 ? 'text-emerald-400' : 'text-red-400/80'}`}>
+                    {journalNet >= 0 ? '+' : ''}{formatSilver(journalNet)}
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : (
+            // No journal data — classic single-line display
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="text-xs text-zinc-500">Best Profit</div>
+                <div className={`text-xl font-bold ${isProfit ? 'text-profit' : 'text-loss'}`}>
+                  {isProfit ? '+' : ''}{formatSilver(bestProfit)}
+                </div>
+              </div>
+              {bestCity && (
+                <div className="text-right">
+                  <div className="text-xs text-zinc-500">Sell at {bestCity.city}</div>
+                  <div className="text-sm text-zinc-300">{formatSilver(bestPrice)} ea</div>
+                </div>
+              )}
             </div>
-            {bestCity && (
-              <div className="text-right">
-                <div className="text-xs text-zinc-500">Sell at {bestCity.city}</div>
-                <div className="text-sm text-zinc-300">{formatSilver(bestPrice)} ea</div>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
 

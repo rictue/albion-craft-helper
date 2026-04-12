@@ -33,9 +33,12 @@ interface Props {
   enchantment: Enchantment;
   quantity: number;
   hasPremium: boolean;
+  /** Called whenever the computed journal net-gain changes so the parent can
+   *  fold it into the combined profit figure. */
+  onNetChange?: (net: number) => void;
 }
 
-export default function JournalBoostCard({ selectedItem, tier, enchantment, quantity, hasPremium }: Props) {
+export default function JournalBoostCard({ selectedItem, tier, enchantment, quantity, hasPremium, onNetChange }: Props) {
   const [emptyPrice, setEmptyPrice] = useState<number | null>(null);
   const [fullPrice, setFullPrice] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -80,6 +83,12 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
   const buyCost = (emptyPrice || 0) * journalsNeeded;
   const fullSellTotal = (fullPrice || 0) * journalsFullyFilled;
   const netGain = fullSellTotal - buyCost;
+
+  // Bubble the net gain up to the parent so ProfitSummary can show a combined
+  // (craft + journal) total profit figure.
+  useEffect(() => {
+    onNetChange?.(netGain);
+  }, [netGain, onNetChange]);
 
   const emptyId = `T${tier}_JOURNAL_${profession.id}_EMPTY`;
   const fullId  = `T${tier}_JOURNAL_${profession.id}_FULL`;
