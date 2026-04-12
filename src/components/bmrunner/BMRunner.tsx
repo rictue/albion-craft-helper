@@ -135,24 +135,25 @@ export default function BMRunner() {
     return copy;
   }, [rows, sortBy]);
 
-  // One-trip summary: take as many unique top items as fit in mount capacity
+  // One-trip summary: assume MAX 1 buy order exists per item on BM.
+  // AODP doesn't expose order depth, and in practice BM buy orders are
+  // extremely limited (often 1-10 per item). Assuming 1 is pessimistic
+  // but safe — the user carries 1 of EACH profitable item (diverse load)
+  // and sells each one to the single best buy order.
   const tripSummary = useMemo(() => {
     if (sortedRows.length === 0) return null;
     let weightLeft = mountCap;
     let tripProfit = 0;
     let itemsCarried = 0;
     const carried: { name: string; qty: number; profit: number }[] = [];
-    // Try to fit 100 of each top item until capacity runs out (a realistic one-trip assumption)
     for (const r of sortedRows) {
       if (weightLeft <= 0) break;
-      const maxByWeight = Math.floor(weightLeft / r.unitWeight);
-      const qty = Math.min(100, maxByWeight);
-      if (qty <= 0) continue;
-      weightLeft -= qty * r.unitWeight;
-      tripProfit += qty * r.profit;
-      itemsCarried += qty;
-      carried.push({ name: r.itemName, qty, profit: qty * r.profit });
-      if (carried.length >= 5) break;
+      if (r.unitWeight > weightLeft) continue;
+      // 1 per item — conservative BM assumption
+      weightLeft -= r.unitWeight;
+      tripProfit += r.profit;
+      itemsCarried += 1;
+      carried.push({ name: r.itemName, qty: 1, profit: r.profit });
     }
     return { tripProfit, itemsCarried, carried, weightUsed: mountCap - weightLeft };
   }, [sortedRows, mountCap]);
