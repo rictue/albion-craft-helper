@@ -3,7 +3,7 @@ import { fetchPrices } from '../../services/api';
 import { ALL_ITEMS } from '../../data/items';
 import { resolveItemId } from '../../utils/itemIdParser';
 import { formatSilver, formatPercent } from '../../utils/formatters';
-import { TRANSPORT_MOUNTS, getItemWeight, getMountCapacity } from '../../utils/transport';
+import { getMountGroups, getItemWeight, getMountCapacity } from '../../utils/transport';
 import { ageHoursOf, formatAge } from '../../utils/dataAge';
 import ItemIcon from '../common/ItemIcon';
 import type { MarketPrice, Tier, Enchantment } from '../../types';
@@ -206,7 +206,11 @@ export default function BMRunner() {
               onChange={(e) => setMount(e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-red-500/40"
             >
-              {TRANSPORT_MOUNTS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.capacity.toLocaleString()} kg)</option>)}
+              {getMountGroups().map(g => (
+                <optgroup key={g.group} label={g.group}>
+                  {g.mounts.map(m => <option key={m.id} value={m.id}>{m.name} ({m.capacity.toLocaleString()} kg)</option>)}
+                </optgroup>
+              ))}
             </select>
           </div>
         </div>
@@ -313,6 +317,19 @@ export default function BMRunner() {
             <div className="text-[10px] text-zinc-500 max-w-xs">
               Assumes 100 of each top item until mount is full. Not a guarantee — BM buy orders may fill before you arrive.
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* BM order depth warning */}
+      {rows.length > 0 && (
+        <div className="bg-amber-500/5 rounded-xl border border-amber-500/20 px-4 py-2.5 flex items-start gap-2">
+          <span className="text-amber-400 text-base shrink-0 mt-0.5">⚠</span>
+          <div className="text-[11px] text-zinc-400">
+            <strong className="text-amber-300">BM buy orders have LIMITED quantity!</strong>
+            {' '}The price shown is the highest buy order — but there might only be 3-10 items at that price, not hundreds.
+            {' '}<strong className="text-zinc-300">Before buying 100 items to transport, check the BM order book in-game</strong> (Caerleon AH → item → Buy Orders tab → see quantity per price).
+            {' '}AODP does not provide order depth data.
           </div>
         </div>
       )}

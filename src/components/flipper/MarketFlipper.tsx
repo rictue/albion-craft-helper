@@ -3,7 +3,7 @@ import { fetchPrices } from '../../services/api';
 import { ALL_ITEMS } from '../../data/items';
 import { resolveItemId } from '../../utils/itemIdParser';
 import { formatSilver, formatPercent } from '../../utils/formatters';
-import { TRANSPORT_MOUNTS, getItemWeight, getMountCapacity } from '../../utils/transport';
+import { getMountGroups, getItemWeight, getMountCapacity } from '../../utils/transport';
 import { ageHoursOf, formatAge } from '../../utils/dataAge';
 import ItemIcon from '../common/ItemIcon';
 import type { MarketPrice, Tier, Enchantment } from '../../types';
@@ -208,7 +208,11 @@ export default function MarketFlipper() {
           <div>
             <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Your Mount (transport capacity)</label>
             <select value={mount} onChange={(e) => setMount(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40">
-              {TRANSPORT_MOUNTS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.capacity.toLocaleString()} kg)</option>)}
+              {getMountGroups().map(g => (
+                <optgroup key={g.group} label={g.group}>
+                  {g.mounts.map(m => <option key={m.id} value={m.id}>{m.name} ({m.capacity.toLocaleString()} kg)</option>)}
+                </optgroup>
+              ))}
             </select>
           </div>
           <div>
