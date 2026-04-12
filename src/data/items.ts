@@ -347,4 +347,52 @@ export const ITEM_CATEGORIES: CategoryGroup[] = [
   { id: 'cape', name: 'Cape', category: 'cape', items: CAPE },
 ];
 
+// ZvZ meta items (25-50+ player fights). Sourced from AFM Meta Items
+// kill event statistics, filtered to equipment slot types only.
+// Updated: April 2026.
+const ZVZ_META_BASE_IDS = new Set([
+  // Holy Staffs
+  'MAIN_HOLYSTAFF_AVALON',     // Hallowfall
+  '2H_HOLYSTAFF_UNDEAD',       // Redemption Staff
+  '2H_HOLYSTAFF_CRYSTAL',      // Exalted Staff
+  // Nature Staffs
+  'MAIN_NATURESTAFF',           // Nature Staff
+  '2H_NATURESTAFF_HELL',        // Blight Staff
+  '2H_NATURESTAFF_KEEPER',      // Rampant Staff
+  // Plate
+  'HEAD_PLATE_SET1',             // Soldier Helmet
+  'HEAD_PLATE_SET3',             // Guardian Helmet
+  'ARMOR_PLATE_KEEPER',          // Judicator Armor
+  'SHOES_PLATE_AVALON',          // Boots of Valor
+  // Leather
+  'HEAD_LEATHER_SET1',           // Mercenary Hood
+  'HEAD_LEATHER_SET3',           // Assassin Hood
+  'HEAD_LEATHER_AVALON',         // Hood of Tenacity
+  'ARMOR_LEATHER_HELL',          // Hellion Jacket
+  'ARMOR_LEATHER_FEY',           // Mistwalker Jacket
+  'ARMOR_LEATHER_AVALON',        // Jacket of Tenacity
+  'SHOES_LEATHER_SET1',          // Mercenary Shoes
+  'SHOES_LEATHER_MORGANA',       // Stalker Shoes
+  // Cloth
+  'HEAD_CLOTH_SET2',             // Cleric Cowl
+  'HEAD_CLOTH_KEEPER',           // Druid Cowl
+  'ARMOR_CLOTH_SET2',            // Cleric Robe
+  'ARMOR_CLOTH_AVALON',          // Robe of Purity
+  'SHOES_CLOTH_SET2',            // Cleric Sandals
+  // Offhands
+  'OFF_TOWERSHIELD_UNDEAD',      // Sarcophagus
+  'OFF_SHIELD_CRYSTAL',          // Unbreakable Ward
+  'OFF_HORN_KEEPER',             // Mistcaller
+  'OFF_TORCH_CRYSTAL',           // Blueflame Torch
+]);
+
+// Tag all ZvZ meta items
+for (const cat of ITEM_CATEGORIES) {
+  for (const item of cat.items) {
+    if (ZVZ_META_BASE_IDS.has(item.baseId)) {
+      item.zvzMeta = true;
+    }
+  }
+}
+
 export const ALL_ITEMS: ItemDefinition[] = ITEM_CATEGORIES.flatMap(c => c.items);

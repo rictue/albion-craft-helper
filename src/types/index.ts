@@ -27,6 +27,9 @@ export interface ItemDefinition {
   recipe: ResourceRequirement[];
   artifactId?: string;
   icon?: string;
+  /** True if this item is part of the current ZvZ meta (25-50+ player
+   *  fights). Sourced from AFM Meta Items kill statistics. */
+  zvzMeta?: boolean;
 }
 
 export interface CategoryGroup {

@@ -59,6 +59,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
     setLocalCraftCity(city);
     updateSettings({ craftingCity: city });
   };
+  const [zvzOnly, setZvzOnly] = useState(false);
   const [results, setResults] = useState<ScanResult[]>([]);
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -72,8 +73,9 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
     setResults([]);
 
     try {
+      const itemPool = zvzOnly ? ALL_ITEMS.filter(i => i.zvzMeta) : ALL_ITEMS;
       const allIds = new Set<string>();
-      for (const item of ALL_ITEMS) {
+      for (const item of itemPool) {
         const itemId = resolveItemId(item.baseId, tier, enchantment);
         allIds.add(itemId);
         if (itemId.includes('_2H_')) allIds.add(itemId.replace('_2H_', '_MAIN_'));
@@ -153,7 +155,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
       const craftMaterials = materialPriceByCity.get(craftCity) || new Map();
       const scanResults: ScanResult[] = [];
 
-      for (const item of ALL_ITEMS) {
+      for (const item of itemPool) {
         const itemId = resolveItemId(item.baseId, tier, enchantment);
         const altId = itemId.includes('_2H_')
           ? itemId.replace('_2H_', '_MAIN_')
@@ -279,7 +281,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
       setScanning(false);
       setProgress(100);
     }
-  }, [tier, enchantment, settings, blackMarketOnly, localCraftCity]);
+  }, [tier, enchantment, settings, blackMarketOnly, localCraftCity, zvzOnly]);
 
   const sorted = useMemo(() => {
     const arr = [...results];
@@ -335,6 +337,17 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
             </select>
           </div>
           <div className="flex items-end gap-1.5 pb-2">
+            <button
+              onClick={() => setZvzOnly(!zvzOnly)}
+              className={`text-[10px] px-2 py-1 rounded font-semibold transition-colors ${
+                zvzOnly
+                  ? 'bg-red-500/20 text-red-300 border border-red-500/40 ring-1 ring-red-500/30'
+                  : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:text-zinc-300'
+              }`}
+              title="Filter to ZvZ meta items only (top 30 items from 25-50+ player fights, sourced from AFM kill data)"
+            >
+              ⚔ ZvZ META
+            </button>
             {settings.hasPremium && <span className="text-[10px] bg-gold/20 text-gold px-2 py-1 rounded font-semibold">PREMIUM</span>}
             {settings.useFocus && <span className="text-[10px] bg-blue-900/30 text-blue-400 px-2 py-1 rounded font-semibold">FOCUS</span>}
             {(settings.dailyStationBonusPct ?? 0) > 0 && (
