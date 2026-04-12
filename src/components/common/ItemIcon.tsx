@@ -15,39 +15,54 @@ function getApiSize(displaySize: number): number {
   return 256;
 }
 
-// Render API is inconsistent: some items use 2H_, some use MAIN_
-// Try the given ID first, then swap 2H_<->MAIN_ as fallback
-function getAlternateId(itemId: string): string | null {
-  if (itemId.match(/^T\d+_2H_/)) {
-    return itemId.replace(/^(T\d+_)2H_/, '$1MAIN_');
+// Render API is inconsistent: some items render fine with their full id,
+// some need variants. Try each fallback in order until one succeeds.
+//
+//  1. swap 2H_ <-> MAIN_  (API has these keyed inconsistently)
+//  2. strip the @N enchant suffix (artifact weapons sometimes only exist
+//     as the base-enchant render)
+//  3. do both at once
+function getFallbackIds(itemId: string): string[] {
+  const fallbacks: string[] = [];
+
+  const swapVariant = (id: string): string | null => {
+    if (id.match(/^T\d+_2H_/)) return id.replace(/^(T\d+_)2H_/, '$1MAIN_');
+    if (id.match(/^T\d+_MAIN_/)) return id.replace(/^(T\d+_)MAIN_/, '$12H_');
+    return null;
+  };
+
+  const variant = swapVariant(itemId);
+  if (variant) fallbacks.push(variant);
+
+  const withoutEnchant = itemId.replace(/@\d+$/, '');
+  if (withoutEnchant !== itemId) {
+    fallbacks.push(withoutEnchant);
+    const variantNoEnchant = swapVariant(withoutEnchant);
+    if (variantNoEnchant) fallbacks.push(variantNoEnchant);
   }
-  if (itemId.match(/^T\d+_MAIN_/)) {
-    return itemId.replace(/^(T\d+_)MAIN_/, '$12H_');
-  }
-  return null;
+
+  return fallbacks;
 }
 
 export default function ItemIcon({ itemId, size = 64, quality = 1, className = '' }: Props) {
   const [currentId, setCurrentId] = useState(itemId);
-  const [triedAlt, setTriedAlt] = useState(false);
+  const [fallbackIndex, setFallbackIndex] = useState(0);
   const [error, setError] = useState(false);
   const apiSize = getApiSize(size);
   const url = getItemIconUrl(currentId, quality, apiSize);
 
   useEffect(() => {
     setCurrentId(itemId);
-    setTriedAlt(false);
+    setFallbackIndex(0);
     setError(false);
   }, [itemId]);
 
   const handleError = () => {
-    if (!triedAlt) {
-      const alt = getAlternateId(currentId);
-      if (alt) {
-        setCurrentId(alt);
-        setTriedAlt(true);
-        return;
-      }
+    const fallbacks = getFallbackIds(itemId);
+    if (fallbackIndex < fallbacks.length) {
+      setCurrentId(fallbacks[fallbackIndex]);
+      setFallbackIndex(fallbackIndex + 1);
+      return;
     }
     setError(true);
   };

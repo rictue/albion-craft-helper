@@ -80,7 +80,11 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
     ? Math.min(100, (totalFame / (journalsNeeded * capacity)) * 100)
     : 0;
 
-  const buyCost = (emptyPrice || 0) * journalsNeeded;
+  // Only count journals you can FULLY fill — a partial journal is stored fame
+  // that you'll use on the next run, not a realized cost. Previous math used
+  // ceil() for buyCost which counted an empty journal even when you couldn't
+  // fill one, silently turning every small-quantity craft into a fake loss.
+  const buyCost = (emptyPrice || 0) * journalsFullyFilled;
   const fullSellTotal = (fullPrice || 0) * journalsFullyFilled;
   const netGain = fullSellTotal - buyCost;
 
@@ -130,7 +134,9 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
                   <span className="text-zinc-600"> · +{Math.round(partialFameLeft).toLocaleString()} leftover ({((partialFameLeft / capacity) * 100).toFixed(0)}%)</span>
                 )}
               </span>
-              <span>Buy <strong className="text-emerald-400">{journalsNeeded}</strong> empty</span>
+              <span>
+                Buy <strong className="text-emerald-400">{journalsFullyFilled}</strong> empty
+              </span>
             </div>
             <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
               <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400" style={{ width: `${fillPercent}%` }} />
@@ -143,12 +149,14 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-1">
               <ItemIcon itemId={emptyId} size={22} />
-              <div className="text-[10px] uppercase text-zinc-600">Empty x{journalsNeeded}</div>
+              <div className="text-[10px] uppercase text-zinc-600">Empty x{journalsFullyFilled}</div>
             </div>
             <div className="text-xs text-zinc-400">
               {emptyPrice ? formatSilver(emptyPrice) : '—'} each
             </div>
-            <div className="text-sm font-bold text-red-400 tabular-nums">-{formatSilver(buyCost)}</div>
+            <div className="text-sm font-bold text-red-400 tabular-nums">
+              {buyCost > 0 ? `-${formatSilver(buyCost)}` : formatSilver(0)}
+            </div>
           </div>
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-1">
@@ -166,7 +174,11 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
         <div className={`rounded-lg border px-4 py-2.5 flex items-center justify-between ${netGain > 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-zinc-900/60 border-zinc-800'}`}>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-zinc-500">Net extra silver from journals</div>
-            <div className="text-[10px] text-zinc-600">Fills that can actually be sold (partials stay with you)</div>
+            <div className="text-[10px] text-zinc-600">
+              {journalsFullyFilled === 0
+                ? 'Not enough fame to fill a journal yet — increase quantity'
+                : 'Fills that can actually be sold (partials stay with you)'}
+            </div>
           </div>
           <div className={`text-lg font-bold tabular-nums ${netGain > 0 ? 'text-green-400' : 'text-zinc-500'}`}>
             {netGain > 0 ? '+' : ''}{formatSilver(netGain)}

@@ -47,10 +47,18 @@ interface Props {
 
 export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
   const navigate = useNavigate();
-  const { settings, setSelectedItem, setTier, setEnchantment } = useAppStore();
+  const { settings, setSelectedItem, setTier, setEnchantment, updateSettings } = useAppStore();
 
   const [tier, setLocalTier] = useState<Tier>(4);
   const [enchantment, setLocalEnchant] = useState<Enchantment>(0);
+  // Local override for the craft city — changing it here also writes back to
+  // global settings so the main Calculator picks up the same city when the
+  // user jumps over from a suggestion row.
+  const [localCraftCity, setLocalCraftCity] = useState<string>(settings.craftingCity);
+  const handleCityChange = (city: string) => {
+    setLocalCraftCity(city);
+    updateSettings({ craftingCity: city });
+  };
   const [results, setResults] = useState<ScanResult[]>([]);
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -141,7 +149,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         }
       }
 
-      const craftCity = settings.craftingCity;
+      const craftCity = localCraftCity;
       const craftMaterials = materialPriceByCity.get(craftCity) || new Map();
       const scanResults: ScanResult[] = [];
 
@@ -180,11 +188,14 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
             if (sellPrice > 0) allCityPrices.push({ city: sellCityId, price: sellPrice });
           }
 
-          // Filter outliers: remove prices > 5x median
+          // Filter outliers: remove prices > 2x median. 5x used to let through
+          // stale single-listing spikes (e.g. T6.1 Muisak "selling" for 14M
+          // because one person posted an absurd ask); 2x matches the rest of
+          // the site's sanity bar.
           if (allCityPrices.length >= 2) {
             const sorted = [...allCityPrices].sort((a, b) => a.price - b.price);
             const median = sorted[Math.floor(sorted.length / 2)].price;
-            const filtered = allCityPrices.filter(cp => cp.price <= median * 5);
+            const filtered = allCityPrices.filter(cp => cp.price <= median * 2);
             allCityPrices.length = 0;
             allCityPrices.push(...filtered);
           }
@@ -244,9 +255,13 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         }
       }
 
-      // Best per item
+      // Best per item — but drop entries with absurd margins, they're almost
+      // always stale single-listing outliers (e.g. a Muisak "sold" for 14M
+      // because one player stuck a joke price on it a week ago).
+      const MAX_REALISTIC_MARGIN = 300; // percent
       const final = new Map<string, ScanResult>();
       for (const r of scanResults) {
+        if (r.margin > MAX_REALISTIC_MARGIN) continue;
         const key = r.item.baseId;
         const existing = final.get(key);
         if (!existing || r.profit > existing.profit) final.set(key, r);
@@ -260,7 +275,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
       setScanning(false);
       setProgress(100);
     }
-  }, [tier, enchantment, settings, blackMarketOnly]);
+  }, [tier, enchantment, settings, blackMarketOnly, localCraftCity]);
 
   const sorted = useMemo(() => {
     const arr = [...results];
@@ -303,11 +318,26 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         <div className="flex flex-wrap items-end gap-6">
           <TierSelector value={tier} onChange={setLocalTier} />
           <EnchantmentSelector value={enchantment} onChange={setLocalEnchant} />
-          <div className="flex items-end gap-3 text-sm">
-            <span className="text-zinc-500">Craft:</span>
-            <span className="text-gold">{settings.craftingCity}</span>
-            {settings.hasPremium && <span className="text-xs bg-gold/20 text-gold px-1.5 py-0.5 rounded">Premium</span>}
-            {settings.useFocus && <span className="text-xs bg-blue-900/30 text-blue-400 px-1.5 py-0.5 rounded">Focus</span>}
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1">Craft City</label>
+            <select
+              value={localCraftCity}
+              onChange={(e) => handleCityChange(e.target.value)}
+              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-gold/40 min-w-[140px]"
+            >
+              {CITIES.filter(c => c.id !== 'Black Market').map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end gap-1.5 pb-2">
+            {settings.hasPremium && <span className="text-[10px] bg-gold/20 text-gold px-2 py-1 rounded font-semibold">PREMIUM</span>}
+            {settings.useFocus && <span className="text-[10px] bg-blue-900/30 text-blue-400 px-2 py-1 rounded font-semibold">FOCUS</span>}
+            {(settings.dailyStationBonusPct ?? 0) > 0 && (
+              <span className="text-[10px] bg-amber-900/30 text-amber-300 px-2 py-1 rounded font-semibold">
+                +{settings.dailyStationBonusPct}% DAILY
+              </span>
+            )}
           </div>
           <button
             onClick={scan}
