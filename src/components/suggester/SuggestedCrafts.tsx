@@ -92,13 +92,15 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
       const idArray = [...allIds];
       const allPrices: MarketPrice[] = [];
       const batchSize = 50;
-      // For BM mode: fetch all qualities to count buy orders
-      const useAllQualities = blackMarketOnly;
       const totalBatches = Math.ceil(idArray.length / batchSize);
 
       for (let i = 0; i < idArray.length; i += batchSize) {
         const batch = idArray.slice(i, i + batchSize);
-        const data = await fetchPrices(batch, undefined, useAllQualities);
+        // Always fetch all qualities — the old blackMarketOnly guard forced
+        // quality=1 in normal mode, which returned fake 300K prices instead
+        // of the real 27K Outstanding-quality market. This was also why ZvZ
+        // scans returned 0 results (all items looked unprofitable at Q1).
+        const data = await fetchPrices(batch);
         allPrices.push(...data);
         setProgress(Math.round(((i / batchSize + 1) / totalBatches) * 100));
       }
