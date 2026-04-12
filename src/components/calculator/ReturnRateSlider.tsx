@@ -58,8 +58,12 @@ export default function ReturnRateSlider({ subcategory, baseId, itemName }: Prop
     [settings.craftingCity, subcategory, settings.useFocus, bonusLPB],
   );
 
+  const dailyBonus = (settings.dailyStationBonusPct ?? 0) / 100;
+
   const isOverride = settings.returnRateOverride !== null;
-  const currentRate = isOverride ? settings.returnRateOverride! / 100 : autoRate;
+  const currentRate = isOverride
+    ? settings.returnRateOverride! / 100
+    : Math.min(0.999, autoRate + dailyBonus);
 
   const cityInfo = CITIES.find(c => c.id === settings.craftingCity);
   const hasBonus = cityInfo?.specializations.includes(subcategory) || false;
@@ -134,6 +138,14 @@ export default function ReturnRateSlider({ subcategory, baseId, itemName }: Prop
             title="Focus crafting: +59 LPB ≈ +28% effective RR"
           >
             Focus (+59 LPB)
+          </span>
+        )}
+        {dailyBonus > 0 && (
+          <span
+            className="text-xs px-2 py-0.5 rounded bg-amber-900/30 text-amber-300"
+            title="Today's station / production bonus, entered manually at the top of the page"
+          >
+            Daily +{settings.dailyStationBonusPct}%
           </span>
         )}
         {specInput > 0 && (

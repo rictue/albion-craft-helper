@@ -61,6 +61,14 @@ export interface CraftingSettings {
   returnRateOverride: number | null;
   usageFeePerHundred: number;
   quantity: number;
+  /**
+   * Today's additional station/production bonus as a raw percentage
+   * (e.g. 15 means +15% added to the final return rate). Albion Online
+   * rotates this daily per city/item type — the value is visible at the
+   * crafting station in-game. There is no public API for it, so the user
+   * enters it manually.
+   */
+  dailyStationBonusPct: number;
 }
 
 export interface PlannerEntry {

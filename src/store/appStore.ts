@@ -66,6 +66,7 @@ export const useAppStore = create<AppState>()(
         returnRateOverride: null,
         usageFeePerHundred: 0,
         quantity: 1,
+        dailyStationBonusPct: 0,
       },
       updateSettings: (partial) =>
         set((state) => ({ settings: { ...state.settings, ...partial } })),

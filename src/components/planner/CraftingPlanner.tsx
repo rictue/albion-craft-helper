@@ -87,8 +87,10 @@ export default function CraftingPlanner() {
   }, [prices, settings.craftingCity, settings.sellingLocation, customPrices]);
 
   const results = useMemo(() => {
+    const dailyBonus = (settings.dailyStationBonusPct ?? 0) / 100;
     return plannerItems.map((entry) => {
-      const rr = calculateReturnRate(settings.craftingCity, entry.item.subcategory, settings.useFocus);
+      const base = calculateReturnRate(settings.craftingCity, entry.item.subcategory, settings.useFocus);
+      const rr = Math.min(0.999, base + dailyBonus);
       return {
         entry,
         result: calculateCrafting(

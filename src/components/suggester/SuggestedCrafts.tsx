@@ -192,7 +192,8 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
           for (const cp of allCityPrices) {
             priceMap.set(itemId, cp.price);
 
-            const rr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
+            const baseRr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
+            const rr = Math.min(0.999, baseRr + (settings.dailyStationBonusPct ?? 0) / 100);
             const result = calculateCrafting(item, tier, enchantment, 1, rr, settings.hasPremium, settings.usageFeePerHundred, priceMap);
 
             if (result.profit > 0) {
@@ -220,7 +221,8 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         const bestBmPrice = bmQualities[0].price;
         priceMap.set(itemId, bestBmPrice);
 
-        const rr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
+        const baseRr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
+        const rr = Math.min(0.999, baseRr + (settings.dailyStationBonusPct ?? 0) / 100);
         const result = calculateCrafting(item, tier, enchantment, 1, rr, settings.hasPremium, settings.usageFeePerHundred, priceMap);
 
         const flipInfo = cheapestSellByItem.get(itemId) || (altId ? cheapestSellByItem.get(altId) : undefined);
