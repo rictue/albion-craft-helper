@@ -4,6 +4,7 @@ import { ALL_ITEMS } from '../../data/items';
 import { resolveItemId } from '../../utils/itemIdParser';
 import { formatSilver, formatPercent } from '../../utils/formatters';
 import { TRANSPORT_MOUNTS, getItemWeight, getMountCapacity } from '../../utils/transport';
+import { ageHoursOf, formatAge } from '../../utils/dataAge';
 import ItemIcon from '../common/ItemIcon';
 import type { MarketPrice, Tier, Enchantment } from '../../types';
 
@@ -29,12 +30,10 @@ const NON_PREMIUM_TAX = 0.105;
 // Max acceptable data age in hours. Older than this is considered stale and filtered out.
 const MAX_DATA_AGE_HOURS = 4;
 
-function ageHours(dateStr: string | undefined): number {
-  if (!dateStr) return Infinity;
-  const t = new Date(dateStr).getTime();
-  if (!t) return Infinity;
-  return (Date.now() - t) / (1000 * 60 * 60);
-}
+// Local alias to the shared, timezone-aware helper. The old inline version
+// parsed AODP dates as local time which added a fake timezone offset to the
+// age (UTC+3 → listings aged 3 hours instantly).
+const ageHours = ageHoursOf;
 
 export default function MarketFlipper() {
   const [tier, setTier] = useState<Tier>(6);
@@ -313,8 +312,7 @@ export default function MarketFlipper() {
                       </td>
                       <td className="px-3 py-3 text-right">
                         {(() => {
-                          const ageMin = Math.round(r.maxAgeHours * 60);
-                          const txt = ageMin < 60 ? `${ageMin}m` : `${r.maxAgeHours.toFixed(1)}h`;
+                          const txt = formatAge(r.maxAgeHours);
                           const color = r.maxAgeHours < 0.5 ? 'text-green-400' : r.maxAgeHours < 2 ? 'text-lime-400' : r.maxAgeHours < 4 ? 'text-amber-400' : 'text-red-400';
                           return <span className={`text-[10px] font-semibold ${color}`}>{txt}</span>;
                         })()}

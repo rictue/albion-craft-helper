@@ -4,6 +4,7 @@ import { ALL_ITEMS } from '../../data/items';
 import { resolveItemId } from '../../utils/itemIdParser';
 import { formatSilver, formatPercent } from '../../utils/formatters';
 import { TRANSPORT_MOUNTS, getItemWeight, getMountCapacity } from '../../utils/transport';
+import { ageHoursOf, formatAge } from '../../utils/dataAge';
 import ItemIcon from '../common/ItemIcon';
 import type { MarketPrice, Tier, Enchantment } from '../../types';
 
@@ -30,12 +31,10 @@ const DEFAULT_MAX_AGE_HOURS = 6;
 
 const SOURCE_CITIES = ['Lymhurst', 'Bridgewatch', 'Fort Sterling', 'Martlock', 'Thetford'] as const;
 
-function ageHours(dateStr: string | undefined): number {
-  if (!dateStr) return Infinity;
-  const t = new Date(dateStr).getTime();
-  if (!t) return Infinity;
-  return (Date.now() - t) / (1000 * 60 * 60);
-}
+// Alias to the shared timezone-aware helper. The old local version parsed
+// AODP dates as local time, silently adding the user's timezone offset to
+// every age.
+const ageHours = ageHoursOf;
 
 export default function BMRunner() {
   const [tier, setTier] = useState<Tier>(6);
@@ -380,8 +379,7 @@ export default function BMRunner() {
                       <td className="px-3 py-3 text-right text-[11px] text-zinc-300 tabular-nums">{maxPerTrip}</td>
                       <td className="px-3 py-3 text-right">
                         {(() => {
-                          const ageMin = Math.round(maxAge * 60);
-                          const txt = ageMin < 60 ? `${ageMin}m` : `${maxAge.toFixed(1)}h`;
+                          const txt = formatAge(maxAge);
                           const color = maxAge < 1 ? 'text-green-400' : maxAge < 3 ? 'text-lime-400' : maxAge < 6 ? 'text-amber-400' : 'text-red-400';
                           return <span className={`text-[10px] font-semibold ${color}`}>{txt}</span>;
                         })()}

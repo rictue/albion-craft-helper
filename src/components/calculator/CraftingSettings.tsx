@@ -76,6 +76,32 @@ export default function CraftingSettings() {
             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] text-zinc-500 pointer-events-none">%</span>
           </div>
         </div>
+
+        <div
+          className="flex items-center gap-2"
+          title="Station usage fee in silver per 100 nutrition, shown at the crafting station in-game. Gets subtracted from profit. Typical range: 0-500. Set to the 'fee per 100' value you see at the station owner's listing."
+        >
+          <label className="text-xs text-zinc-500 font-medium flex items-center gap-1">
+            <span>Station fee:</span>
+            <span className="text-zinc-600 text-[10px]">(/100 nut)</span>
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              min={0}
+              max={10000}
+              step={10}
+              value={settings.usageFeePerHundred}
+              onChange={(e) => updateSettings({ usageFeePerHundred: Math.max(0, parseFloat(e.target.value) || 0) })}
+              className={`w-20 bg-zinc-800 border rounded-lg pl-2 pr-6 py-1.5 text-sm text-zinc-200 text-right focus:outline-none focus:ring-2 ${
+                settings.usageFeePerHundred > 0
+                  ? 'border-red-500/40 focus:ring-red-500/40 text-red-300'
+                  : 'border-zinc-700 focus:ring-gold/40'
+              }`}
+            />
+            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 pointer-events-none">ag</span>
+          </div>
+        </div>
       </div>
     </Card>
   );

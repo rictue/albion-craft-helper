@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import type { CraftingResult } from '../../utils/profitCalculator';
 import type { MarketPrice } from '../../types';
 import { formatSilver } from '../../utils/formatters';
+import { ageHoursOf, formatAge, ageColor } from '../../utils/dataAge';
 import { useAppStore } from '../../store/appStore';
 import { CITIES } from '../../data/cities';
 import ItemIcon from '../common/ItemIcon';
@@ -30,34 +31,6 @@ interface CityPrice {
   ageHours: number;
   /** True if this entry was flagged as an outlier (>2x median of others). */
   isOutlier: boolean;
-}
-
-function ageHoursOf(dateStr: string | undefined): number {
-  if (!dateStr) return Infinity;
-  const t = new Date(dateStr).getTime();
-  if (!t || t <= 0) return Infinity;
-  const h = (Date.now() - t) / 3_600_000;
-  return h < 0 ? Infinity : h;
-}
-
-function formatAge(h: number): string {
-  if (!Number.isFinite(h)) return '—';
-  if (h < 1 / 60) return 'just now';
-  if (h < 1) return `${Math.round(h * 60)}m`;
-  if (h < 24) return `${h.toFixed(1)}h`;
-  return `${Math.round(h / 24)}d`;
-}
-
-function ageColor(h: number): string {
-  // Tighter thresholds than the first version. Albion market can swing
-  // 20-30% inside a couple of hours, so anything past 1h is already
-  // "watch out", not "fresh". Using distinct hue families (emerald → yellow
-  // → orange → red) so the eye can actually tell levels apart at 10px text.
-  if (!Number.isFinite(h)) return 'text-zinc-600';
-  if (h < 1)  return 'text-emerald-400';   // fresh
-  if (h < 3)  return 'text-yellow-400';    // warming
-  if (h < 8)  return 'text-orange-500';    // stale
-  return 'text-red-500';                   // dead
 }
 
 export default function ProfitSummary({ result, onAddToPlan, prices, itemId, altItemId, journalNet = 0 }: Props) {

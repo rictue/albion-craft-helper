@@ -24,7 +24,12 @@ const RESOURCE_ITEM_VALUE: Record<number, number> = {
   2: 4, 3: 8, 4: 16, 5: 32, 6: 64, 7: 128, 8: 256,
 };
 const ENCHANT_IV_MULT: Record<number, number> = { 0: 1, 1: 2, 2: 4, 3: 8, 4: 16 };
-const FAME_COEFF = 10;
+// Calibrated against real in-game observation (Apr 2026):
+//   125 × T4.1 Battleaxe crafts (recipe value 768) with premium produced
+//   49.5 full Warrior journals (T4 cap 45,000) = 2,227,500 fame total
+//   = 17,820 fame per craft
+//   = 768 × 15.47 × 1.5 (premium)
+const FAME_COEFF = 15.47;
 const JOURNAL_CAPACITY: Record<number, number> = {
   2: 1800, 3: 9000, 4: 45000, 5: 135000, 6: 405000, 7: 1215000, 8: 3645000,
 };
