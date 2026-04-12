@@ -33,6 +33,15 @@ interface CityPrice {
   isOutlier: boolean;
 }
 
+// Rough crafting focus cost per tier (base, no specialization reduction).
+// Sourced from community Albion data. Actual in-game cost is
+//   baseFocus × 2^enchant × 0.5^(spec × 2.5 / 100) × craftSizeMultiplier
+// but we only know tier+enchant here — treat the output as an upper bound.
+const CRAFT_FOCUS_BASE: Record<number, number> = {
+  2: 5, 3: 15, 4: 40, 5: 105, 6: 280, 7: 700, 8: 1800,
+};
+const DAILY_FOCUS_CAP = 30_000; // roughly one day of focus regen
+
 export default function ProfitSummary({ result, onAddToPlan, prices, itemId, altItemId, journalNet = 0 }: Props) {
   const [added, setAdded] = useState(false);
   // When the user clicks a city row in the Sell Prices list, the top
@@ -159,6 +168,27 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
   const isProfit = totalProfit > 0;
   const hasJournal = Math.abs(journalNet) > 0.5; // ignore noise
 
+  // Focus efficiency: silver earned per focus point. Only meaningful when
+  // focus crafting is enabled. Tier/enchant are parsed from the itemId so
+  // we don't need to thread them down from the parent.
+  const focusStats = useMemo(() => {
+    if (!settings.useFocus) return null;
+    const tierMatch = /^T(\d+)_/.exec(result.itemId);
+    const enchantMatch = /@(\d+)$/.exec(result.itemId);
+    const tier = tierMatch ? parseInt(tierMatch[1]) : 0;
+    const enchant = enchantMatch ? parseInt(enchantMatch[1]) : 0;
+    const base = CRAFT_FOCUS_BASE[tier] ?? 0;
+    if (base === 0) return null;
+    const qty = settings.quantity || 1;
+    const focusPerCraft = base * Math.pow(2, enchant);
+    const totalFocus = focusPerCraft * qty;
+    const perUnitProfit = (totalProfit) / qty;
+    const silverPerFocus = focusPerCraft > 0 ? perUnitProfit / focusPerCraft : 0;
+    const craftsFromDailyCap = Math.floor(DAILY_FOCUS_CAP / focusPerCraft);
+    const dailyProfit = craftsFromDailyCap * perUnitProfit;
+    return { tier, enchant, focusPerCraft, totalFocus, silverPerFocus, craftsFromDailyCap, dailyProfit };
+  }, [settings.useFocus, settings.quantity, result.itemId, totalProfit]);
+
   const handleAdd = () => {
     onAddToPlan();
     setAdded(true);
@@ -262,13 +292,21 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
               const maxPrice = Math.max(1, ...cityPrices.filter(c => c.hasData && !c.isOutlier).map(c => c.price));
               return cityPrices.map((cp, i) => {
                 const barW = cp.hasData ? Math.max(4, (cp.price / maxPrice) * 100) : 0;
-                const dimClass = !cp.hasData || cp.isOutlier ? 'opacity-50' : '';
+                // Outlier rows get a striped / dashed treatment instead of
+                // the subtle 50% opacity that most users missed entirely.
+                const dimClass = !cp.hasData
+                  ? 'opacity-40'
+                  : cp.isOutlier
+                    ? 'opacity-70'
+                    : '';
                 const isPinnedRow = cp.city === pinnedCityName;
                 const ringClass = isPinnedRow
                   ? 'ring-2 ring-gold/80 rounded bg-gold/5'
                   : cp.isCraftCity
                     ? 'ring-1 ring-gold/40 rounded'
-                    : '';
+                    : cp.isOutlier
+                      ? 'ring-1 ring-amber-500/40 bg-amber-500/5 rounded border-dashed'
+                      : '';
                 return (
                   <div
                     key={cp.city}
@@ -327,6 +365,41 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
             <span><span className="text-gold">●</span> craft city</span>
             <span><span className="text-amber-400">⚠</span> outlier</span>
             <span>age: <span className="text-emerald-400">&lt;1h</span> / <span className="text-yellow-400">&lt;3h</span> / <span className="text-orange-500">&lt;8h</span> / <span className="text-red-500">stale</span></span>
+          </div>
+        </div>
+      )}
+
+      {/* Focus efficiency — silver per focus point */}
+      {focusStats && (
+        <div className="bg-bg-raised rounded-xl border border-blue-600/20 p-3" title="Focus is limited — this card shows how efficiently the current craft uses it. Higher silver/focus is better. Daily cap assumes ~30k focus regen.">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[10px] uppercase tracking-wider text-blue-400 font-semibold">Focus Efficiency</div>
+            <div className="text-[9px] text-zinc-600">T{focusStats.tier}{focusStats.enchant > 0 && `.${focusStats.enchant}`} · no spec</div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-zinc-900/60 rounded-lg p-2">
+              <div className="text-[9px] text-zinc-500 uppercase">Silver / focus</div>
+              <div className={`text-base font-bold tabular-nums ${focusStats.silverPerFocus > 0 ? 'text-profit' : 'text-loss'}`}>
+                {focusStats.silverPerFocus > 0 ? '+' : ''}{formatSilver(focusStats.silverPerFocus)}
+              </div>
+            </div>
+            <div className="bg-zinc-900/60 rounded-lg p-2">
+              <div className="text-[9px] text-zinc-500 uppercase">Per craft</div>
+              <div className="text-base font-bold tabular-nums text-zinc-300">
+                {focusStats.focusPerCraft}
+              </div>
+            </div>
+          </div>
+          <div className="mt-2 pt-2 border-t border-zinc-800 flex items-center justify-between text-[11px]">
+            <div className="text-zinc-500">
+              Daily cap (30k) → <span className="text-blue-300 font-semibold">{focusStats.craftsFromDailyCap}</span> crafts
+            </div>
+            <div className={`font-bold tabular-nums ${focusStats.dailyProfit > 0 ? 'text-profit' : 'text-loss'}`}>
+              {focusStats.dailyProfit > 0 ? '+' : ''}{formatSilver(focusStats.dailyProfit)}
+            </div>
+          </div>
+          <div className="mt-1 text-[9px] text-zinc-600 italic">
+            Upper bound — real spec reduces focus cost significantly
           </div>
         </div>
       )}

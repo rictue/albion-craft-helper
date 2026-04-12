@@ -203,7 +203,43 @@ export default function CraftingPlanner() {
 
       {/* Material aggregation */}
       <div className="bg-surface rounded-xl border border-surface-lighter p-4">
-        <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-3">Total Materials Needed</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs text-zinc-500 uppercase tracking-wider">Total Materials Needed</h3>
+          <button
+            onClick={() => {
+              if (totals.materialTotals.size === 0) return;
+              // Build a Discord/Markdown-friendly shopping list
+              const lines: string[] = ['**Shopping list**'];
+              let grand = 0;
+              for (const mat of totals.materialTotals.values()) {
+                lines.push(`- ${mat.name}: **${mat.count.toLocaleString()}** (~${formatSilver(mat.cost)})`);
+                grand += mat.cost;
+              }
+              lines.push('');
+              lines.push(`Total estimated cost: **${formatSilver(grand)}**`);
+              const text = lines.join('\n');
+              // Try the async Clipboard API first; fall back to a hidden
+              // textarea + execCommand for older browsers.
+              const cb = navigator.clipboard;
+              if (cb && cb.writeText) {
+                cb.writeText(text).catch(() => {
+                  // swallow — button will just look unresponsive
+                });
+              } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } catch { /* noop */ }
+                document.body.removeChild(ta);
+              }
+            }}
+            className="text-xs text-gold/80 hover:text-gold bg-gold/10 hover:bg-gold/20 border border-gold/30 rounded-lg px-3 py-1 font-semibold transition-colors"
+            title="Copy a Discord/Markdown-formatted shopping list of everything needed for this plan"
+          >
+            📋 Copy Shopping List
+          </button>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[...totals.materialTotals.entries()].map(([key, mat]) => (
             <div key={key} className="bg-surface-light rounded-lg p-3">

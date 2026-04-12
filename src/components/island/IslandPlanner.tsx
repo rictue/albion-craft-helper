@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { fetchPrices } from '../../services/api';
 import { formatSilver } from '../../utils/formatters';
 import ItemIcon from '../common/ItemIcon';
@@ -80,6 +80,13 @@ export default function IslandPlanner() {
     setLivePrices(liveMap);
     setScannedAt(new Date().toLocaleTimeString());
     setLoading(false);
+  }, []);
+
+  // Auto-fetch crop prices on first mount so the table isn't showing
+  // stale hard-coded defaults until the user clicks 'Analyze Crops'.
+  useEffect(() => {
+    analyze();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const results = useMemo((): Row[] => {
