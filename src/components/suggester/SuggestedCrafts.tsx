@@ -497,7 +497,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
 
       {!scanning && results.length === 0 && (
         <div className="bg-surface rounded-xl border border-surface-lighter p-12 text-center">
-          <div className="text-5xl mb-4 opacity-20">{blackMarketOnly ? '&#9876;' : '&#128200;'}</div>
+          <div className="text-5xl mb-4 opacity-20">{blackMarketOnly ? '\u2694' : '\uD83D\uDCC8'}</div>
           <h2 className="text-lg text-zinc-400 mb-2">{title}</h2>
           <p className="text-sm text-zinc-500">{emptyText}</p>
           <p className="text-xs text-zinc-600 mt-2">Settings (craft city, premium, focus) from Calculator page.</p>
