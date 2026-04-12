@@ -69,15 +69,6 @@ export default function CraftingPlanner() {
     const sellMap = buildPriceMap(prices, settings.sellingLocation, true);
     sellMap.forEach((v, k) => map.set(k, v));
 
-    // Map alt-variant prices: if T4_MAIN_X has price but T4_2H_X doesn't, copy it
-    const allKeys = [...map.keys()];
-    for (const k of allKeys) {
-      let altKey: string | null = null;
-      if (k.includes('_2H_')) altKey = k.replace('_2H_', '_MAIN_');
-      else if (k.includes('_MAIN_')) altKey = k.replace('_MAIN_', '_2H_');
-      if (altKey && !map.has(altKey)) map.set(altKey, map.get(k)!);
-    }
-
     // Custom prices highest priority
     Object.entries(customPrices).forEach(([key, price]) => {
       const [itemId] = key.split(':');

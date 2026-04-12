@@ -12,6 +12,8 @@ interface Props {
   onAddToPlan: () => void;
   prices: MarketPrice[];
   itemId: string;
+  /** @deprecated No longer used for price matching (cross-variant bug). Kept
+   *  in the interface so callers don't break; ignored inside the component. */
   altItemId?: string;
   /** Extra silver earned from selling filled journals, reported by
    *  JournalBoostCard. Added to the combined total figure. */
@@ -20,17 +22,17 @@ interface Props {
 
 interface CityPrice {
   city: string;
+  /** Cheapest sell listing (what you pay to BUY this item in this city). */
   price: number;
   profit: number;
   isBuy: boolean;
-  /** true when we actually found market data for this city */
   hasData: boolean;
-  /** true when this is the city the user is currently crafting in */
   isCraftCity: boolean;
-  /** Age of the underlying price record in hours. Infinity when unknown. */
   ageHours: number;
-  /** True if this entry was flagged as an outlier (>2x median of others). */
   isOutlier: boolean;
+  /** Highest buy order in this city (what you'd get if you INSTANT-SELL). */
+  buyOrderPrice: number;
+  buyOrderAge: number;
 }
 
 // Rough crafting focus cost per tier (base, no specialization reduction).
@@ -42,7 +44,7 @@ const CRAFT_FOCUS_BASE: Record<number, number> = {
 };
 const DAILY_FOCUS_CAP = 30_000; // roughly one day of focus regen
 
-export default function ProfitSummary({ result, onAddToPlan, prices, itemId, altItemId, journalNet = 0 }: Props) {
+export default function ProfitSummary({ result, onAddToPlan, prices, itemId, journalNet = 0 }: Props) {
   const [added, setAdded] = useState(false);
   // When the user clicks a city row in the Sell Prices list, the top
   // Investment/Best Profit card is pinned to that city. null = auto (use
@@ -70,12 +72,15 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
       let bestDate: string | undefined;
       let isBuy = false;
 
+      // Also track buy orders (buy_price_max) for royal cities so the
+      // user can see both "cheapest sell listing" AND "instant-sell buy
+      // order" side by side. This solves the 300K-sell vs 27K-buy
+      // confusion — user sees both and picks the right interpretation.
+      let bestBuyOrder = 0;
+      let bestBuyDate: string | undefined;
+
       for (const p of prices) {
         if (p.city !== city.id) continue;
-        // Match ONLY the exact itemId. Previously we also accepted altItemId
-        // (the 2H_↔MAIN_ swap) as a fallback, but for items where both
-        // variants are real distinct weapons (e.g. Battleaxe = MAIN_AXE and
-        // Greataxe = 2H_AXE) this silently showed the wrong item's price.
         if (p.item_id !== itemId) continue;
 
         if (city.id === 'Black Market') {
@@ -90,12 +95,17 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
             bestDate = p.sell_price_min_date;
             isBuy = false;
           }
+          // Best buy order in this city (what you'd get for an instant sell)
+          if (p.buy_price_max > bestBuyOrder) {
+            bestBuyOrder = p.buy_price_max;
+            bestBuyDate = p.buy_price_max_date;
+          }
         }
       }
 
-      const hasData = bestSell > 0;
+      const hasData = bestSell > 0 || bestBuyOrder > 0;
       const totalSell = bestSell * qty;
-      const profit = hasData ? totalSell * (1 - taxRate) - result.investment : 0;
+      const profit = bestSell > 0 ? totalSell * (1 - taxRate) - result.investment : 0;
       results.push({
         city: city.name,
         price: bestSell,
@@ -105,6 +115,8 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
         isCraftCity: city.id === settings.craftingCity,
         ageHours: ageHoursOf(bestDate),
         isOutlier: false,
+        buyOrderPrice: bestBuyOrder,
+        buyOrderAge: ageHoursOf(bestBuyDate),
       });
     }
 
@@ -138,7 +150,7 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
       if (ra !== rb) return ra - rb;
       return (cityOrder.get(a.city) ?? 99) - (cityOrder.get(b.city) ?? 99);
     });
-  }, [prices, itemId, altItemId, result.investment, taxRate, qty, settings.craftingCity]);
+  }, [prices, itemId, result.investment, taxRate, qty, settings.craftingCity]);
 
   // For the headline "Total Profit" card we want the best *actual* profit,
   // not the pinned craft city — otherwise the header would flash red when
@@ -340,12 +352,26 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, alt
                       )}
                       <div className="absolute inset-0 flex items-center justify-between px-2">
                         <span className="text-[11px] text-zinc-200 font-medium flex items-center gap-1">
-                          {cp.hasData ? formatSilver(cp.price) : <span className="text-zinc-600">no data</span>}
-                          {cp.isBuy && <span className="text-blue-400">(buy)</span>}
+                          {cp.price > 0 ? (
+                            <>
+                              {formatSilver(cp.price)}
+                              {cp.isBuy && <span className="text-blue-400">(buy)</span>}
+                            </>
+                          ) : cp.buyOrderPrice > 0 ? (
+                            <span className="text-blue-400">{formatSilver(cp.buyOrderPrice)} (buy)</span>
+                          ) : (
+                            <span className="text-zinc-600">no data</span>
+                          )}
                           {cp.isOutlier && <span className="text-amber-400 text-[9px]" title="Flagged outlier — likely stale">⚠</span>}
+                          {/* Show buy order alongside sell when both exist */}
+                          {!cp.isBuy && cp.buyOrderPrice > 0 && cp.price > 0 && (
+                            <span className="text-[9px] text-blue-400/70" title={`Instant-sell buy order: ${formatSilver(cp.buyOrderPrice)}`}>
+                              / {formatSilver(cp.buyOrderPrice)}
+                            </span>
+                          )}
                         </span>
                         <span className={`text-[11px] font-medium tabular-nums ${cp.hasData ? (cp.profit > 0 ? 'text-profit' : 'text-loss') : 'text-zinc-600'}`}>
-                          {cp.hasData ? `${cp.profit > 0 ? '+' : ''}${formatSilver(cp.profit)}` : '—'}
+                          {cp.hasData && cp.price > 0 ? `${cp.profit > 0 ? '+' : ''}${formatSilver(cp.profit)}` : '—'}
                         </span>
                       </div>
                     </div>

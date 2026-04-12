@@ -3,6 +3,7 @@ import { fetchPrices, clearPriceCache } from '../../services/api';
 import { RESOURCE_TYPES, CITY_REFINE_BONUS } from '../../data/refining';
 import { lpbToReturnRate } from '../../utils/returnRate';
 import { formatSilver, formatPercent } from '../../utils/formatters';
+import { ageHoursOf } from '../../utils/dataAge';
 import { CITIES } from '../../data/cities';
 import { getRefineSpec, setRefineSpec } from '../../data/specs';
 import ItemIcon from '../common/ItemIcon';
@@ -357,12 +358,9 @@ export default function SimpleRefine() {
     };
   }, [recipe, simulation, rawPrice, prevPrice, sellPrice, feePerCraft, sellMode, premium, focusSplit]);
 
-  // Stale price warning (>6h old)
-  const priceAge = (dateStr: string): number => {
-    if (!dateStr) return Infinity;
-    const ageMs = Date.now() - new Date(dateStr).getTime();
-    return ageMs / (1000 * 60 * 60); // hours
-  };
+  // Stale price warning (>6h old). Uses the shared AODP-aware parser so
+  // the user's timezone doesn't inflate ages by +3h (UTC+3 Turkey).
+  const priceAge = (dateStr: string): number => ageHoursOf(dateStr);
   const staleWarning = prices && Math.max(
     priceAge(prices.rawDate),
     priceAge(prices.prevDate),
