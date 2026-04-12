@@ -5,7 +5,10 @@ import { Card } from '../ui';
 export default function CraftingSettings() {
   const { settings, updateSettings } = useAppStore();
 
-  const cityOptions = CITIES.filter(c => c.id !== 'Black Market').map(c => ({ value: c.id, label: c.name }));
+  // Royal cities (for crafting — no Black Market station)
+  const craftCityOptions = CITIES.filter(c => c.id !== 'Black Market').map(c => ({ value: c.id, label: c.name }));
+  // Sell locations include Black Market (BM buy orders are a valid sell target)
+  const sellLocationOptions = CITIES.map(c => ({ value: c.id, label: c.name }));
 
   return (
     <Card padding="sm">
@@ -17,7 +20,22 @@ export default function CraftingSettings() {
             onChange={(e) => updateSettings({ craftingCity: e.target.value })}
             className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-gold/40"
           >
-            {cityOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            {craftCityOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2" title="Where the crafted item will be sold. Black Market uses buy orders (instant), royal cities use sell listings.">
+          <label className="text-xs text-zinc-500 font-medium">Sell:</label>
+          <select
+            value={settings.sellingLocation}
+            onChange={(e) => updateSettings({ sellingLocation: e.target.value })}
+            className={`border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${
+              settings.sellingLocation === 'Black Market'
+                ? 'bg-red-950/30 border-red-700/40 text-red-300 focus:ring-red-500/40'
+                : 'bg-zinc-800 border-zinc-700 text-zinc-200 focus:ring-gold/40'
+            }`}
+          >
+            {sellLocationOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
         </div>
 

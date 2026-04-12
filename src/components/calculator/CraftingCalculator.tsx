@@ -4,6 +4,17 @@ import { fetchPrices, buildPriceMap } from '../../services/api';
 import { calculateCrafting } from '../../utils/profitCalculator';
 import { calculateReturnRate } from '../../utils/returnRate';
 import { resolveItemId, resolveMaterialId, resolveArtifactId } from '../../utils/itemIdParser';
+import { formatPercent } from '../../utils/formatters';
+
+// Short labels for the material-budget widget so the user knows what unit
+// they are entering into the input (e.g. "999 Planks").
+const MATERIAL_LABELS: Record<string, string> = {
+  METALBAR: 'Metal Bars',
+  PLANKS: 'Planks',
+  CLOTH: 'Cloth',
+  LEATHER: 'Leather',
+  STONEBLOCK: 'Stone Blocks',
+};
 import ItemSearch from './ItemSearch';
 import CraftingSettings from './CraftingSettings';
 import RecipeDisplay from './RecipeDisplay';
@@ -19,9 +30,17 @@ export default function CraftingCalculator() {
   const {
     selectedItem, tier, enchantment,
     setSelectedItem, setTier, setEnchantment,
-    settings, prices, setPrices, pricesLoading, setPricesLoading,
+    settings, updateSettings, prices, setPrices, pricesLoading, setPricesLoading,
     customPrices, addToPlan,
   } = useAppStore();
+
+  // Material budget widget — user enters 'I have X of the primary material'
+  // and the quantity input is auto-computed based on the recipe's primary
+  // resource count (first ingredient) AND the current return rate.
+  const [budgetInput, setBudgetInput] = useState<number | ''>('');
+  // Reset the budget whenever the selected item changes — the recipe
+  // changes so a previous budget would be applied to a different material.
+  useEffect(() => { setBudgetInput(''); }, [selectedItem, tier, enchantment]);
 
   // Timestamp of the last successful fetch, so we can show "Updated Xm ago"
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
@@ -232,6 +251,57 @@ export default function CraftingCalculator() {
                   <TierSelector value={tier} onChange={(t: Tier) => setTier(t)} />
                   <EnchantmentSelector value={enchantment} onChange={(e: Enchantment) => setEnchantment(e)} />
                 </div>
+
+                {/* Material budget → auto-quantity helper */}
+                {selectedItem.recipe.length > 0 && (() => {
+                  // Use the primary (largest-count) recipe ingredient as
+                  // the limiting resource. Includes reinvest loop gain.
+                  const primary = [...selectedItem.recipe].sort((a, b) => b.count - a.count)[0];
+                  const matLabel = MATERIAL_LABELS[primary.materialBase] ?? primary.materialBase;
+                  const effectivePerCraft = primary.count * Math.max(0.01, 1 - returnRate);
+                  const previewQty = budgetInput && budgetInput > 0
+                    ? Math.max(1, Math.floor(budgetInput / effectivePerCraft))
+                    : null;
+                  return (
+                    <div
+                      className="mt-3 pt-3 border-t border-surface-lighter flex items-center gap-2 flex-wrap"
+                      title={`Enter how many T${tier}${enchantment > 0 ? '.' + enchantment : ''} ${matLabel} you have in stock — quantity auto-updates based on the current return rate.`}
+                    >
+                      <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
+                        I have:
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={budgetInput}
+                        placeholder="e.g. 999"
+                        onChange={(e) => {
+                          const n = e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0);
+                          setBudgetInput(n);
+                          if (typeof n === 'number' && n > 0 && effectivePerCraft > 0) {
+                            const qty = Math.max(1, Math.floor(n / effectivePerCraft));
+                            updateSettings({ quantity: Math.min(99999, qty) });
+                          }
+                        }}
+                        className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-zinc-200 text-right focus:outline-none focus:ring-2 focus:ring-gold/40"
+                      />
+                      <span className="text-xs text-zinc-400">
+                        T{tier}{enchantment > 0 ? '.' + enchantment : ''} {matLabel}
+                      </span>
+                      <span className="text-[10px] text-zinc-500 ml-auto">
+                        {previewQty !== null ? (
+                          <>
+                            → <span className="text-gold font-bold tabular-nums">{previewQty}</span> crafts · uses <span className="text-zinc-400">{(previewQty * effectivePerCraft).toFixed(0)}</span> of {budgetInput}{' '}
+                            <span className="text-zinc-600">({formatPercent(returnRate * 100)} RR)</span>
+                          </>
+                        ) : (
+                          <span className="text-zinc-600">Recipe uses {primary.count} {matLabel.toLowerCase()} per craft</span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               <ReturnRateSlider subcategory={selectedItem.subcategory} baseId={selectedItem.baseId} itemName={selectedItem.name} />

@@ -240,9 +240,45 @@ export default function CraftingPlanner() {
         </div>
         <button
           onClick={() => {
+            // Write to BOTH histories:
+            //   1. Zustand profitHistory (shown inline on this page)
+            //   2. /craft-history page's localStorage bucket
+            // These used to be two disconnected systems so the user would
+            // click 'Mark All' here and see nothing on /craft-history.
+            const LS_KEY = 'albion-craft-history-v1';
+            type CraftHistoryEntry = {
+              id: string; ts: number;
+              type: 'crafting'; name: string;
+              cost: number; revenue: number; notes?: string;
+            };
+            let existing: CraftHistoryEntry[] = [];
+            try {
+              const raw = localStorage.getItem(LS_KEY);
+              if (raw) existing = JSON.parse(raw) as CraftHistoryEntry[];
+            } catch {
+              // corrupted localStorage — start fresh rather than crash
+            }
+
+            const newEntries: CraftHistoryEntry[] = [];
             results.forEach(({ entry, result }) => {
-              addProfitRecord({ itemName: entry.item.name + ' T' + entry.tier + '.' + entry.enchantment, quantity: entry.quantity, profit: result.profit });
+              const name = `${entry.item.name} T${entry.tier}${entry.enchantment > 0 ? '.' + entry.enchantment : ''}`;
+              addProfitRecord({ itemName: name, quantity: entry.quantity, profit: result.profit });
+              newEntries.push({
+                id: Date.now().toString() + Math.random().toString(36).slice(2),
+                ts: Date.now(),
+                type: 'crafting',
+                name,
+                cost: Math.round(result.investment),
+                revenue: Math.round(result.sellPrice - result.tax),
+                notes: `Planner batch · qty ${entry.quantity}`,
+              });
             });
+            try {
+              // Newest first, keep the whole list
+              localStorage.setItem(LS_KEY, JSON.stringify([...newEntries.reverse(), ...existing]));
+            } catch {
+              // storage full / quota exceeded — nothing we can do
+            }
             clearPlan();
           }}
           className="mt-4 w-full bg-green-900/30 hover:bg-green-900/50 text-green-300 border border-green-800/30 rounded-lg py-2.5 text-sm font-semibold transition-colors"
