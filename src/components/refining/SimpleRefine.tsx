@@ -400,7 +400,7 @@ export default function SimpleRefine() {
           <div>
             <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Enchant</label>
             <div className="flex gap-1">
-              {[0, 1, 2, 3].map(e => (
+              {[0, 1, 2, 3, 4].map(e => (
                 <button key={e} onClick={() => setEnchant(e)} className={`flex-1 h-10 rounded-lg text-sm font-bold transition-all ${enchant === e ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-800/80'}`}>
                   .{e}
                 </button>

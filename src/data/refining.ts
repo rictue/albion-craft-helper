@@ -33,7 +33,7 @@ function generateRecipes(
   tierNames: Record<number, { raw: string; refined: string }>,
 ): RefineRecipe[] {
   const recipes: RefineRecipe[] = [];
-  const enchantNames = ['', 'Uncommon', 'Rare', 'Epic'];
+  const enchantNames = ['', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
 
   for (let tier = 2; tier <= 8; tier++) {
     const names = tierNames[tier];
@@ -57,7 +57,7 @@ function generateRecipes(
     // T4 enchanted uses T3 BASE planks (no T3 enchanted in recipes).
     // T5+ enchanted uses matching enchant prev: T5.2 needs T4.2, T6.1 needs T5.1, etc.
     if (tier >= 4) {
-      for (let e = 1; e <= 3; e++) {
+      for (let e = 1; e <= 4; e++) {
         const prevEnch = tier === 4
           ? prevRefined  // T4.X → T3 base
           : `T${tier - 1}_${refinedPrefix}_LEVEL${e}@${e}`; // T5+ → prev enchanted

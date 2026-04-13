@@ -234,7 +234,7 @@ export default function BMRunner() {
           <div>
             <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Enchant</label>
             <div className="flex gap-1">
-              {[0, 1, 2, 3].map(e => (
+              {[0, 1, 2, 3, 4].map(e => (
                 <button
                   key={e}
                   onClick={() => setEnchant(e as Enchantment)}

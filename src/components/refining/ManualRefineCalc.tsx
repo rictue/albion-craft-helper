@@ -288,7 +288,7 @@ export default function ManualRefineCalc() {
           <div>
             <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Enchant</label>
             <div className="flex gap-1.5">
-              {[0, 1, 2, 3].map(e => (
+              {[0, 1, 2, 3, 4].map(e => (
                 <button key={e} onClick={() => setEnchant(e)} className={`flex-1 h-10 rounded-lg text-sm font-bold transition-all ${enchant === e ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm shadow-purple-500/10' : 'bg-zinc-800/60 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-800'}`}>
                   .{e}
                 </button>
