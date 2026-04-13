@@ -9,6 +9,7 @@ import { calculateCrafting } from '../../utils/profitCalculator';
 import { calculateReturnRate } from '../../utils/returnRate';
 import { resolveItemId, resolveMaterialId, resolveArtifactId } from '../../utils/itemIdParser';
 import { formatSilver, formatPercent } from '../../utils/formatters';
+import { ageHoursOf, formatAge, ageColor } from '../../utils/dataAge';
 import ItemIcon from '../common/ItemIcon';
 import TierSelector from '../common/TierSelector';
 import EnchantmentSelector from '../common/EnchantmentSelector';
@@ -25,6 +26,7 @@ interface CityPriceInfo {
   sellPrice: number;
   profit: number;
   margin: number;
+  ageHours: number;
 }
 
 interface ScanResult {
@@ -120,23 +122,29 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         setProgress(Math.round(((i / batchSize + 1) / totalBatches) * 100));
       }
 
-      // Build price maps per city
+      // Build price maps per city + date maps for age display
       const materialPriceByCity = new Map<string, Map<string, number>>();
       const sellPriceByCity = new Map<string, Map<string, number>>();
+      const sellDateByCity = new Map<string, Map<string, string>>();
 
       for (const city of CITIES) {
         const matMap = new Map<string, number>();
         const sellMap = new Map<string, number>();
+        const dateMap = new Map<string, string>();
         for (const p of allPrices) {
           if (p.city !== city.id) continue;
           if (p.sell_price_min > 0) {
             const existing = matMap.get(p.item_id);
-            if (!existing || p.sell_price_min < existing) matMap.set(p.item_id, p.sell_price_min);
+            if (!existing || p.sell_price_min < existing) {
+              matMap.set(p.item_id, p.sell_price_min);
+              if (p.sell_price_min_date) dateMap.set(p.item_id, p.sell_price_min_date);
+            }
             sellMap.set(p.item_id, p.sell_price_min);
           }
         }
         materialPriceByCity.set(city.id, matMap);
         sellPriceByCity.set(city.id, sellMap);
+        sellDateByCity.set(city.id, dateMap);
       }
 
       const cheapestMaterials = new Map<string, number>();
@@ -229,11 +237,13 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
           for (const cp of allCityPrices) {
             priceMap.set(itemId, cp.price);
             const result = calculateCrafting(item, tier, enchantment, 1, rr, settings.hasPremium, settings.usageFeePerHundred, priceMap);
+            const dateStr = sellDateByCity.get(cp.city)?.get(itemId) ?? (altId ? sellDateByCity.get(cp.city)?.get(altId) : undefined);
             perCityResults.push({
               city: cp.city,
               sellPrice: cp.price,
               profit: result.profit,
               margin: result.profitMargin,
+              ageHours: ageHoursOf(dateStr),
             });
             if (!bestCityResult || result.profit > bestCityResult.profit) {
               bestCityResult = { city: cp.city, price: cp.price, profit: result.profit, margin: result.profitMargin, matCost: result.effectiveMaterialCost };
@@ -555,6 +565,9 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                                 <span className="text-xs text-zinc-300 tabular-nums">{formatSilver(cp.sellPrice)}</span>
                                 <span className={`text-xs font-semibold tabular-nums ${cp.profit > 0 ? 'text-green-400' : 'text-red-400'}`}>
                                   {cp.profit > 0 ? '+' : ''}{formatSilver(cp.profit)}
+                                </span>
+                                <span className={`text-[10px] tabular-nums ${ageColor(cp.ageHours)}`}>
+                                  {formatAge(cp.ageHours)}
                                 </span>
                               </div>
                             </div>
