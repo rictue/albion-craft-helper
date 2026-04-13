@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
-import { ALL_ITEMS, ZVZ_META_BASE_IDS } from '../../data/items';
+import { ALL_ITEMS } from '../../data/items';
+import { ZVZ_META_BASE_IDS } from '../../data/zvzMeta';
 import { CITIES } from '../../data/cities';
 import { fetchPrices } from '../../services/api';
 import { calculateCrafting } from '../../utils/profitCalculator';

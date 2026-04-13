@@ -2,7 +2,7 @@ import type { ItemDefinition, CategoryGroup } from '../types';
 
 // Auto-generated from Albion Online game data + localization (ao-bin-dumps)
 // Run: node scripts/generate-items.mjs
-// Generated: 2026-04-04T15:00:11.179Z
+// Generated: 2026-04-13T18:24:21.270Z
 
 const SWORD: ItemDefinition[] = [
   { baseId: 'MAIN_SWORD', name: 'Broadsword', category: 'weapon_1h', subcategory: 'sword', recipe: [{ materialBase: 'METALBAR', count: 16 }, { materialBase: 'LEATHER', count: 8 }] },
@@ -71,6 +71,7 @@ const DAGGER: ItemDefinition[] = [
 ];
 
 const KNUCKLES: ItemDefinition[] = [
+  { baseId: '2H_IRONGAUNTLETS_HELL', name: 'Black Hands', category: 'weapon_2h', subcategory: 'knuckles', recipe: [{ materialBase: 'METALBAR', count: 12 }, { materialBase: 'LEATHER', count: 20 }], artifactId: 'ARTEFACT_2H_IRONGAUNTLETS_HELL' },
   { baseId: '2H_KNUCKLES_SET1', name: 'Brawler Gloves', category: 'weapon_2h', subcategory: 'knuckles', recipe: [{ materialBase: 'METALBAR', count: 12 }, { materialBase: 'LEATHER', count: 20 }] },
   { baseId: '2H_KNUCKLES_SET2', name: 'Battle Bracers', category: 'weapon_2h', subcategory: 'knuckles', recipe: [{ materialBase: 'METALBAR', count: 12 }, { materialBase: 'LEATHER', count: 20 }] },
   { baseId: '2H_KNUCKLES_SET3', name: 'Spiked Gauntlets', category: 'weapon_2h', subcategory: 'knuckles', recipe: [{ materialBase: 'METALBAR', count: 12 }, { materialBase: 'LEATHER', count: 20 }] },
@@ -344,55 +345,7 @@ export const ITEM_CATEGORIES: CategoryGroup[] = [
   { id: 'booktype', name: 'Tomes', category: 'offhand', items: BOOKTYPE },
   { id: 'torchtype', name: 'Torches', category: 'offhand', items: TORCHTYPE },
   { id: 'bags', name: 'Bags', category: 'bag', items: BAGS },
-  { id: 'cape', name: 'Cape', category: 'cape', items: CAPE },
+  { id: 'cape', name: 'cape', category: 'cape', items: CAPE },
 ];
-
-// ZvZ meta items (25-50+ player fights). Sourced from AFM Meta Items
-// kill event statistics, filtered to equipment slot types only.
-// Updated: April 2026.
-export const ZVZ_META_BASE_IDS = new Set([
-  // Holy Staffs
-  'MAIN_HOLYSTAFF_AVALON',     // Hallowfall
-  '2H_HOLYSTAFF_UNDEAD',       // Redemption Staff
-  '2H_HOLYSTAFF_CRYSTAL',      // Exalted Staff
-  // Nature Staffs
-  'MAIN_NATURESTAFF',           // Nature Staff
-  '2H_NATURESTAFF_HELL',        // Blight Staff
-  '2H_NATURESTAFF_KEEPER',      // Rampant Staff
-  // Plate
-  'HEAD_PLATE_SET1',             // Soldier Helmet
-  'HEAD_PLATE_SET3',             // Guardian Helmet
-  'ARMOR_PLATE_KEEPER',          // Judicator Armor
-  'SHOES_PLATE_AVALON',          // Boots of Valor
-  // Leather
-  'HEAD_LEATHER_SET1',           // Mercenary Hood
-  'HEAD_LEATHER_SET3',           // Assassin Hood
-  'HEAD_LEATHER_AVALON',         // Hood of Tenacity
-  'ARMOR_LEATHER_HELL',          // Hellion Jacket
-  'ARMOR_LEATHER_FEY',           // Mistwalker Jacket
-  'ARMOR_LEATHER_AVALON',        // Jacket of Tenacity
-  'SHOES_LEATHER_SET1',          // Mercenary Shoes
-  'SHOES_LEATHER_MORGANA',       // Stalker Shoes
-  // Cloth
-  'HEAD_CLOTH_SET2',             // Cleric Cowl
-  'HEAD_CLOTH_KEEPER',           // Druid Cowl
-  'ARMOR_CLOTH_SET2',            // Cleric Robe
-  'ARMOR_CLOTH_AVALON',          // Robe of Purity
-  'SHOES_CLOTH_SET2',            // Cleric Sandals
-  // Offhands
-  'OFF_TOWERSHIELD_UNDEAD',      // Sarcophagus
-  'OFF_SHIELD_CRYSTAL',          // Unbreakable Ward
-  'OFF_HORN_KEEPER',             // Mistcaller
-  'OFF_TORCH_CRYSTAL',           // Blueflame Torch
-]);
-
-// Tag all ZvZ meta items
-for (const cat of ITEM_CATEGORIES) {
-  for (const item of cat.items) {
-    if (ZVZ_META_BASE_IDS.has(item.baseId)) {
-      item.zvzMeta = true;
-    }
-  }
-}
 
 export const ALL_ITEMS: ItemDefinition[] = ITEM_CATEGORIES.flatMap(c => c.items);
