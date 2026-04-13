@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
 import { ALL_ITEMS } from '../../data/items';
@@ -20,6 +20,13 @@ interface BmQualityOrder {
   priceMin: number;
 }
 
+interface CityPriceInfo {
+  city: string;
+  sellPrice: number;
+  profit: number;
+  margin: number;
+}
+
 interface ScanResult {
   item: ItemDefinition;
   craftCity: string;
@@ -29,6 +36,8 @@ interface ScanResult {
   profit: number;
   margin: number;
   itemId: string;
+  /** Sell prices across ALL cities for this item (sorted by profit desc). */
+  allCities?: CityPriceInfo[];
   // BM specific
   bmBuyOrders?: number;
   bmQualities?: BmQualityOrder[];
@@ -61,6 +70,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
     updateSettings({ craftingCity: city });
   };
   const [zvzOnly, setZvzOnly] = useState(false);
+  const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [results, setResults] = useState<ScanResult[]>([]);
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -209,24 +219,35 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
             allCityPrices.push(...filtered);
           }
 
+          // Compute profit for EACH city so we can show a per-city breakdown
+          // when the user expands a row, just like the Calculator's city list.
+          const baseRr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
+          const rr = baseRr;
+          const perCityResults: CityPriceInfo[] = [];
+          let bestCityResult: { city: string; price: number; profit: number; margin: number; matCost: number } | null = null;
+
           for (const cp of allCityPrices) {
             priceMap.set(itemId, cp.price);
-
-            const baseRr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
-            // Daily station bonus is NOT applied here — it's per-station,
-            // not global. Each station in each city has a different bonus.
-            // Only the single-item Calculator applies it (user enters
-            // the specific station's bonus there).
-            const rr = baseRr;
             const result = calculateCrafting(item, tier, enchantment, 1, rr, settings.hasPremium, settings.usageFeePerHundred, priceMap);
-
-            if (result.profit > 0) {
-              scanResults.push({
-                item, craftCity, sellCity: cp.city,
-                materialCost: result.effectiveMaterialCost, sellPrice: cp.price,
-                profit: result.profit, margin: result.profitMargin, itemId,
-              });
+            perCityResults.push({
+              city: cp.city,
+              sellPrice: cp.price,
+              profit: result.profit,
+              margin: result.profitMargin,
+            });
+            if (!bestCityResult || result.profit > bestCityResult.profit) {
+              bestCityResult = { city: cp.city, price: cp.price, profit: result.profit, margin: result.profitMargin, matCost: result.effectiveMaterialCost };
             }
+          }
+          perCityResults.sort((a, b) => b.profit - a.profit);
+
+          if (bestCityResult && bestCityResult.profit > 0) {
+            scanResults.push({
+              item, craftCity, sellCity: bestCityResult.city,
+              materialCost: bestCityResult.matCost, sellPrice: bestCityResult.price,
+              profit: bestCityResult.profit, margin: bestCityResult.margin, itemId,
+              allCities: perCityResults,
+            });
           }
         }
 
@@ -246,7 +267,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
         priceMap.set(itemId, bestBmPrice);
 
         const baseRr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
-        const rr = Math.min(0.999, baseRr + (settings.dailyStationBonusPct ?? 0) / 100);
+        const rr = baseRr;
         const result = calculateCrafting(item, tier, enchantment, 1, rr, settings.hasPremium, settings.usageFeePerHundred, priceMap);
 
         const flipInfo = cheapestSellByItem.get(itemId) || (altId ? cheapestSellByItem.get(altId) : undefined);
@@ -416,11 +437,13 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((r) => (
+                {sorted.map((r) => {
+                  const isExpanded = expandedItem === r.item.baseId;
+                  return (
+                  <React.Fragment key={r.item.baseId}>
                   <tr
-                    key={r.item.baseId}
-                    onClick={() => handleItemClick(r)}
-                    className="border-b border-surface-lighter/50 hover:bg-surface-light cursor-pointer transition-colors"
+                    onClick={() => setExpandedItem(isExpanded ? null : r.item.baseId)}
+                    className={`border-b border-surface-lighter/50 hover:bg-surface-light cursor-pointer transition-colors ${isExpanded ? 'bg-surface-light' : ''}`}
                   >
                     <td className="px-3 py-2.5">
                       <div className="w-14 h-14 flex items-center justify-center">
@@ -432,6 +455,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                       <div className="flex items-center gap-1 mt-0.5">
                         <span className="text-[10px] text-gold font-bold">T{tier}{enchantment > 0 && `.${enchantment}`}</span>
                         {r.item.artifactId && <span className="text-purple-400 text-[10px] font-semibold">Artifact</span>}
+                        <span className="text-[9px] text-zinc-600">{isExpanded ? '▲' : '▼'} {r.allCities?.length ?? 0} cities</span>
                       </div>
                     </td>
                     {!blackMarketOnly && (
@@ -501,7 +525,47 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
                       </td>
                     )}
                   </tr>
-                ))}
+                  {/* Expanded per-city price breakdown */}
+                  {isExpanded && r.allCities && r.allCities.length > 0 && (
+                    <tr className="bg-zinc-900/60">
+                      <td colSpan={blackMarketOnly ? 8 : 7} className="px-4 py-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
+                            Sell Prices by City — {r.item.name} T{tier}{enchantment > 0 && `.${enchantment}`}
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleItemClick(r); }}
+                            className="text-[10px] text-gold hover:text-gold/80 font-semibold"
+                          >
+                            Open in Calculator →
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+                          {r.allCities.map((cp, ci) => (
+                            <div
+                              key={cp.city}
+                              className={`flex items-center justify-between px-3 py-1.5 rounded ${
+                                ci === 0 ? 'bg-green-900/20 border border-green-700/30' : 'bg-zinc-800/50'
+                              }`}
+                            >
+                              <span className={`text-xs ${ci === 0 ? 'text-green-300 font-semibold' : 'text-zinc-400'}`}>
+                                {ci === 0 && '★ '}{cp.city}
+                              </span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-zinc-300 tabular-nums">{formatSilver(cp.sellPrice)}</span>
+                                <span className={`text-xs font-semibold tabular-nums ${cp.profit > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {cp.profit > 0 ? '+' : ''}{formatSilver(cp.profit)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
