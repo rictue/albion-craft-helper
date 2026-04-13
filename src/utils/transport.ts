@@ -80,9 +80,11 @@ export function getMountCapacity(id: string): number {
  * planning math.
  */
 export function getItemWeight(itemId: string): number {
-  // Raw & refined resources
-  if (/T\d+_(WOOD|ORE|HIDE|FIBER|ROCK)(_|$)/.test(itemId)) return 0.1;
-  if (/T\d+_(PLANKS|METALBAR|LEATHER|CLOTH|STONEBLOCK)(_|$)/.test(itemId)) return 0.2;
+  // Raw & refined resources — in Albion ALL resources weigh ~1 kg each
+  // regardless of tier. The old 0.1/0.2 values were 10x too low, causing
+  // the site to say "1 trip" when 15K logs actually need 2-4 trips.
+  if (/T\d+_(WOOD|ORE|HIDE|FIBER|ROCK)(_|$)/.test(itemId)) return 1.0;
+  if (/T\d+_(PLANKS|METALBAR|LEATHER|CLOTH|STONEBLOCK)(_|$)/.test(itemId)) return 1.0;
 
   // Equipment
   if (itemId.includes('_2H_')) return 11.5;
