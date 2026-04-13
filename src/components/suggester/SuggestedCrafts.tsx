@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
-import { ALL_ITEMS } from '../../data/items';
+import { ALL_ITEMS, ZVZ_META_BASE_IDS } from '../../data/items';
 import { CITIES } from '../../data/cities';
 import { fetchPrices } from '../../services/api';
 import { calculateCrafting } from '../../utils/profitCalculator';
@@ -73,7 +73,11 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
     setResults([]);
 
     try {
-      const itemPool = zvzOnly ? ALL_ITEMS.filter(i => i.zvzMeta) : ALL_ITEMS;
+      // Use the exported Set directly instead of relying on the zvzMeta
+      // property mutation — more reliable at runtime.
+      const itemPool = zvzOnly
+        ? ALL_ITEMS.filter(i => ZVZ_META_BASE_IDS.has(i.baseId))
+        : ALL_ITEMS;
       const allIds = new Set<string>();
       for (const item of itemPool) {
         const itemId = resolveItemId(item.baseId, tier, enchantment);
@@ -208,7 +212,11 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
             priceMap.set(itemId, cp.price);
 
             const baseRr = calculateReturnRate(craftCity, item.subcategory, settings.useFocus);
-            const rr = Math.min(0.999, baseRr + (settings.dailyStationBonusPct ?? 0) / 100);
+            // Daily station bonus is NOT applied here — it's per-station,
+            // not global. Each station in each city has a different bonus.
+            // Only the single-item Calculator applies it (user enters
+            // the specific station's bonus there).
+            const rr = baseRr;
             const result = calculateCrafting(item, tier, enchantment, 1, rr, settings.hasPremium, settings.usageFeePerHundred, priceMap);
 
             if (result.profit > 0) {
@@ -352,9 +360,11 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
             </button>
             {settings.hasPremium && <span className="text-[10px] bg-gold/20 text-gold px-2 py-1 rounded font-semibold">PREMIUM</span>}
             {settings.useFocus && <span className="text-[10px] bg-blue-900/30 text-blue-400 px-2 py-1 rounded font-semibold">FOCUS</span>}
-            {(settings.dailyStationBonusPct ?? 0) > 0 && (
+            {/* Daily station bonus intentionally NOT shown here — it's
+                per-station and would mislead the scanner results */
+            false && (
               <span className="text-[10px] bg-amber-900/30 text-amber-300 px-2 py-1 rounded font-semibold">
-                +{settings.dailyStationBonusPct}% DAILY
+                DAILY
               </span>
             )}
           </div>

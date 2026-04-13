@@ -350,7 +350,7 @@ export const ITEM_CATEGORIES: CategoryGroup[] = [
 // ZvZ meta items (25-50+ player fights). Sourced from AFM Meta Items
 // kill event statistics, filtered to equipment slot types only.
 // Updated: April 2026.
-const ZVZ_META_BASE_IDS = new Set([
+export const ZVZ_META_BASE_IDS = new Set([
   // Holy Staffs
   'MAIN_HOLYSTAFF_AVALON',     // Hallowfall
   '2H_HOLYSTAFF_UNDEAD',       // Redemption Staff
