@@ -33,14 +33,14 @@ export default function EnchantmentSelector({ value, onChange }: Props) {
             key={e}
             onClick={() => onChange(e)}
             title={ENCHANT_NAMES[e]}
-            className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${
+            className={`flex-1 min-w-[36px] h-10 rounded-lg text-sm font-bold transition-all ${
               value === e
                 ? 'bg-zinc-700 ring-2 ring-gold/40 shadow-sm'
                 : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-500'
             }`}
             style={{ color: value === e ? ENCHANT_COLORS[e] : undefined }}
           >
-            {e}
+            .{e}
           </button>
         ))}
       </div>
