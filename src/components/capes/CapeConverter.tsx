@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { fetchPrices } from '../../services/api';
 import { formatSilver } from '../../utils/formatters';
 import { ageHoursOf, formatAge, ageColor } from '../../utils/dataAge';
+import { useAppStore } from '../../store/appStore';
 import ItemIcon from '../common/ItemIcon';
 import type { Tier, Enchantment, MarketPrice } from '../../types';
 
@@ -88,7 +89,11 @@ function cheapestNonBM(prices: MarketPrice[], itemId: string): { price: number; 
   return { price: best === Infinity ? 0 : best, date: bestDate };
 }
 
+// Custom-price key format — matches the RecipeDisplay override scheme.
+const customKey = (itemId: string) => `${itemId}:custom`;
+
 export default function CapeConverter() {
+  const { customPrices, setCustomPrice, removeCustomPrice } = useAppStore();
   const [tier, setTier] = useState<Tier>(6);
   const [enchant, setEnchant] = useState<Enchantment>(1);
   const [premium, setPremium] = useState(true);
@@ -96,6 +101,22 @@ export default function CapeConverter() {
   const [loading, setLoading] = useState(false);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
   const [hideNegative, setHideNegative] = useState(true);
+  // Inline edit state — which item id is being edited and the draft text
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string>('');
+
+  const getOverride = (itemId: string): number | null => {
+    const v = customPrices[customKey(itemId)];
+    return v && v > 0 ? v : null;
+  };
+
+  const commitEdit = (itemId: string) => {
+    const n = parseFloat(draft);
+    if (Number.isFinite(n) && n > 0) setCustomPrice(customKey(itemId), n);
+    else removeCustomPrice(customKey(itemId));
+    setEditingId(null);
+    setDraft('');
+  };
 
   const scan = useCallback(async () => {
     setLoading(true);
@@ -113,8 +134,16 @@ export default function CapeConverter() {
 
     const prices: MarketPrice[] = await fetchPrices(ids);
 
+    // Helper: apply a user custom-price override to a {price,date} pair.
+    // If the user typed a price for this item, it wins over the market.
+    const withOverride = (itemId: string, market: { price: number; date: string | undefined }) => {
+      const ov = customPrices[customKey(itemId)];
+      if (ov && ov > 0) return { price: ov, date: undefined };
+      return market;
+    };
+
     const baseCapeItemId = tierId(BASE_CAPE_ID, tier, enchant);
-    const base = cheapestNonBM(prices, baseCapeItemId);
+    const base = withOverride(baseCapeItemId, cheapestNonBM(prices, baseCapeItemId));
     const recipe = RECIPE[tier];
 
     const taxRate = premium ? PREMIUM_TAX : NON_PREMIUM_TAX;
@@ -125,8 +154,8 @@ export default function CapeConverter() {
       const crestItemId = `T${tier}_${f.crestId}`;
       const heartItemId = `T${tier}_${f.heartId}`;
 
-      const crest = cheapestNonBM(prices, crestItemId);
-      const heart = cheapestNonBM(prices, heartItemId);
+      const crest = withOverride(crestItemId, cheapestNonBM(prices, crestItemId));
+      const heart = withOverride(heartItemId, cheapestNonBM(prices, heartItemId));
 
       // Best sell listing for the faction cape (outlier filter 2x median)
       const listings: { city: string; price: number; date: string }[] = [];
@@ -285,40 +314,54 @@ export default function CapeConverter() {
                 <span className="text-gold font-bold text-xs">T{r.tier}{r.enchant > 0 && `.${r.enchant}`}</span>
               </div>
 
-              {/* Body — inputs */}
+              {/* Body — inputs. Every unit price is click-to-edit so the
+                  user can type their own buy-order fill price when market
+                  data is stale or thin. */}
               <div className="px-4 py-3 space-y-1.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ItemIcon itemId={r.baseCapeItemId} size={16} />
-                    <span className="text-zinc-500">1× Plain Cape</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-red-400 tabular-nums">-{formatSilver(r.baseCapeCost)}</span>
-                    <span className={`text-[9px] tabular-nums ${ageColor(r.baseCapeAge)}`}>{formatAge(r.baseCapeAge)}</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ItemIcon itemId={r.crestItemId} size={16} />
-                    <span className="text-zinc-500">{r.crestQty}× Crest <span className="text-zinc-600">@{formatSilver(r.crestPrice)}</span></span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-red-400 tabular-nums">-{formatSilver(r.crestPrice * r.crestQty)}</span>
-                    <span className={`text-[9px] tabular-nums ${ageColor(r.crestAge)}`}>{formatAge(r.crestAge)}</span>
-                  </div>
-                </div>
-                {r.heartQty > 0 && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <ItemIcon itemId={r.heartItemId} size={16} />
-                      <span className="text-zinc-500">{r.heartQty}× Heart <span className="text-zinc-600">@{formatSilver(r.heartPrice)}</span></span>
+                {([
+                  { label: '1× Plain Cape', itemId: r.baseCapeItemId, qty: 1, unitPrice: r.baseCapeCost, age: r.baseCapeAge },
+                  { label: `${r.crestQty}× Crest`, itemId: r.crestItemId, qty: r.crestQty, unitPrice: r.crestPrice, age: r.crestAge },
+                  ...(r.heartQty > 0 ? [{ label: `${r.heartQty}× Heart`, itemId: r.heartItemId, qty: r.heartQty, unitPrice: r.heartPrice, age: r.heartAge }] : []),
+                ]).map(row => {
+                  const isEditing = editingId === row.itemId;
+                  const hasOverride = getOverride(row.itemId) != null;
+                  return (
+                    <div key={row.itemId} className={`flex items-center justify-between ${hasOverride ? 'ring-1 ring-gold/40 rounded px-1 -mx-1' : ''}`}>
+                      <div className="flex items-center gap-1.5">
+                        <ItemIcon itemId={row.itemId} size={16} />
+                        <span className="text-zinc-500">
+                          {row.label}{' '}
+                          {isEditing ? (
+                            <input
+                              type="number" min={0} autoFocus
+                              value={draft}
+                              onChange={e => setDraft(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') commitEdit(row.itemId);
+                                if (e.key === 'Escape') { setEditingId(null); setDraft(''); }
+                              }}
+                              onBlur={() => commitEdit(row.itemId)}
+                              className="w-20 bg-zinc-900 border border-gold/40 rounded px-1.5 py-0.5 text-[11px] text-gold text-right focus:outline-none"
+                              placeholder="price/ea"
+                            />
+                          ) : (
+                            <button
+                              onClick={() => { setEditingId(row.itemId); setDraft(hasOverride ? String(getOverride(row.itemId)) : (row.unitPrice > 0 ? String(row.unitPrice) : '')); }}
+                              className={`text-zinc-600 hover:text-gold ${hasOverride ? 'text-gold' : ''}`}
+                              title="Click to type your own price for this item"
+                            >
+                              @{formatSilver(row.unitPrice)}{hasOverride && ' ✎'}{!hasOverride && ' ✎'}
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-red-400 tabular-nums">-{formatSilver(row.unitPrice * row.qty)}</span>
+                        <span className={`text-[9px] tabular-nums ${ageColor(row.age)}`}>{formatAge(row.age)}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-red-400 tabular-nums">-{formatSilver(r.heartPrice * r.heartQty)}</span>
-                      <span className={`text-[9px] tabular-nums ${ageColor(r.heartAge)}`}>{formatAge(r.heartAge)}</span>
-                    </div>
-                  </div>
-                )}
+                  );
+                })}
                 {r.silverFee > 0 && (
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-500">Silver fee</span>

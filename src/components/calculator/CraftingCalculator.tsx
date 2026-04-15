@@ -180,8 +180,10 @@ export default function CraftingCalculator() {
       if (sellPrice > 0) map.set(itemId, sellPrice);
     }
 
-    // Custom prices (highest priority)
+    // Custom prices (highest priority). Skip entries with price <= 0 so
+    // a cleared override falls back to the API price instead of zeroing it.
     Object.entries(customPrices).forEach(([key, price]) => {
+      if (!(price > 0)) return;
       const [itemId] = key.split(':');
       map.set(itemId, price);
     });
