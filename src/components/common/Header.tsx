@@ -96,6 +96,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
         { to: '/history', label: 'Price History' },
         { to: '/gold', label: 'Gold Prices' },
         { to: '/transmute', label: 'Transmutation' },
+        { to: '/capes', label: 'Cape Converter' },
       ],
     },
     {
@@ -260,6 +261,7 @@ export default function Header() {
                   { to: '/suggested', label: 'Suggested Crafts' },
                   { to: '/blackmarket', label: 'Black Market' },
                   { to: '/transmute', label: 'Transmutation' },
+                  { to: '/capes', label: 'Cape Converter' },
                   { to: '/portfolio', label: 'Portfolio' },
                 ],
               },

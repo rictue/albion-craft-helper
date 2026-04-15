@@ -34,6 +34,7 @@ const CompareMode      = lazy(() => import('./components/compare/CompareMode'));
 const Portfolio        = lazy(() => import('./components/portfolio/Portfolio'));
 const CraftHistory     = lazy(() => import('./components/history/CraftHistory'));
 const MountBreeding    = lazy(() => import('./components/mounts/MountBreeding'));
+const CapeConverter    = lazy(() => import('./components/capes/CapeConverter'));
 
 function RouteFallback() {
   return (
@@ -82,6 +83,7 @@ export default function App() {
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/craft-history" element={<CraftHistory />} />
             <Route path="/mounts" element={<MountBreeding />} />
+            <Route path="/capes" element={<CapeConverter />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/database" element={<CustomDatabase />} />
           </Routes>
