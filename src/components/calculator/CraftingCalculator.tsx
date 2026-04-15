@@ -127,24 +127,13 @@ export default function CraftingCalculator() {
   const priceMap = useMemo(() => {
     const map = new Map<string, number>();
 
-    const materialMap = buildPriceMap(prices, settings.craftingCity);
     const sellMap = buildPriceMap(prices, settings.sellingLocation, true);
 
-    // Fallback for MATERIALS: cheapest sell_price_min across all cities (buy low)
-    const allCitiesMaterials = new Map<string, number>();
-    for (const price of prices) {
-      if (price.sell_price_min > 0) {
-        const existing = allCitiesMaterials.get(price.item_id);
-        if (!existing || price.sell_price_min < existing) {
-          allCitiesMaterials.set(price.item_id, price.sell_price_min);
-        }
-      }
-    }
-
-    // For CRAFTED ITEM sell price: highest sell_price_min across royal cities
-    // (sell high) — but filter outliers at 2x median to avoid a single overpriced
-    // listing skewing results.
-    const allCitiesSell = new Map<string, number>();
+    // Build per-item listing arrays so we can median-filter outliers on
+    // BOTH sides. Without this, a single joke listing (e.g. somebody
+    // posts T4.3 Leather at 70k in a thin market) becomes the 'price' the
+    // calculator uses, making the craft look 10x more expensive than it
+    // really is. 2x median drops outliers on the high side.
     const byItemCityPrices = new Map<string, number[]>();
     for (const price of prices) {
       if (price.sell_price_min <= 0) continue;
@@ -152,17 +141,30 @@ export default function CraftingCalculator() {
       if (!byItemCityPrices.has(price.item_id)) byItemCityPrices.set(price.item_id, []);
       byItemCityPrices.get(price.item_id)!.push(price.sell_price_min);
     }
+
+    // Cheapest non-outlier price across all cities — what you'd pay to buy
+    // the material. Used for materials regardless of craft city.
+    const allCitiesMaterials = new Map<string, number>();
+    // Highest non-outlier sell price across royal cities — what you get
+    // selling the crafted item.
+    const allCitiesSell = new Map<string, number>();
+
     for (const [id, list] of byItemCityPrices.entries()) {
       if (list.length === 0) continue;
       const sorted = [...list].sort((a, b) => a - b);
       const median = sorted[Math.floor(sorted.length / 2)];
       const filtered = list.filter(p => p <= median * 2);
-      if (filtered.length > 0) allCitiesSell.set(id, Math.max(...filtered));
+      if (filtered.length === 0) continue;
+      allCitiesMaterials.set(id, Math.min(...filtered));
+      allCitiesSell.set(id, Math.max(...filtered));
     }
 
-    // Start with material fallback prices, then override with crafting city
+    // Materials: use the filtered cheapest across ALL cities. The craft
+    // city's individual price is no longer authoritative — in thin markets
+    // the craft city might be the one hosting the outlier listing.
     allCitiesMaterials.forEach((v, k) => map.set(k, v));
-    materialMap.forEach((v, k) => map.set(k, v));
+    // (Craft-city override removed: prevents a single 70k outlier at the
+    // current craft city from dominating the cost calculation.)
 
     // Resolve sell price for crafted item. Match ONLY the exact itemId —
     // the old altId (2H_↔MAIN_) fallback cross-contaminated distinct items
