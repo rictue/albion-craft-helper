@@ -2,8 +2,12 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import Header from './components/common/Header';
 
-// Keep the landing page (Craft Calculator) eager so initial paint is instant.
-import CraftingCalculator from './components/calculator/CraftingCalculator';
+// Keep the landing page (MoneyHub) eager so initial paint is instant.
+// The hub is a simple 'pick a strategy' page that onboards new users
+// without dumping them into a complex calculator they may not understand.
+import MoneyHub from './components/hub/MoneyHub';
+
+const CraftingCalculator = lazy(() => import('./components/calculator/CraftingCalculator'));
 
 // Lazy-load every other route. Each becomes its own chunk so users who never
 // open e.g. the killboard never download its code.
@@ -55,7 +59,8 @@ export default function App() {
         <Header />
         <Suspense fallback={<RouteFallback />}>
           <Routes>
-            <Route path="/" element={<CraftingCalculator />} />
+            <Route path="/" element={<MoneyHub />} />
+            <Route path="/calculator" element={<CraftingCalculator />} />
             <Route path="/suggested" element={<SuggestedCrafts />} />
             <Route path="/blackmarket" element={<SuggestedCrafts blackMarketOnly />} />
             <Route path="/refining" element={<SimpleRefine />} />

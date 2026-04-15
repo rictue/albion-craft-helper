@@ -102,7 +102,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
     {
       title: 'Economy',
       links: [
-        { to: '/', label: 'Craft Calculator' },
+        { to: '/calculator', label: 'Craft Calculator' },
         { to: '/refining', label: 'Refining' },
         { to: '/compare', label: 'Compare Tiers' },
         { to: '/cooking', label: 'Cooking' },
@@ -278,7 +278,7 @@ export default function Header() {
               {
                 title: 'Crafting',
                 items: [
-                  { to: '/', label: 'Craft Calculator' },
+                  { to: '/calculator', label: 'Craft Calculator' },
                   { to: '/refining', label: 'Refining' },
                   { to: '/compare', label: 'Compare Tiers' },
                   { to: '/cooking', label: 'Cooking' },

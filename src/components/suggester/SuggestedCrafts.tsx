@@ -350,7 +350,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
     setSelectedItem(r.item);
     setTier(tier);
     setEnchantment(enchantment);
-    navigate('/');
+    navigate('/calculator');
   };
 
   const sortIcon = (key: SortKey) => sortKey === key ? (sortAsc ? ' ↑' : ' ↓') : '';
