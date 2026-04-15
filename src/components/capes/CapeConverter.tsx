@@ -8,35 +8,51 @@ import type { Tier, Enchantment, MarketPrice } from '../../types';
 
 /**
  * Faction Cape Converter — buy a plain Cape + faction Crests + faction
- * Hearts from the market, talk to the faction NPC, get a faction cape.
+ * Faction Crest (the _BP blueprint) from the market, talk to the faction
+ * NPC, get a faction cape back.
  * All inputs are market-priced items so the full cost is purely silver.
  *
- * Only mob-faction capes are included. Royal-city faction capes
- * (Thetford, Lymhurst, Bridgewatch, Martlock, Fort Sterling, Caerleon)
- * need faction-mission standing and are NOT convertible from the market,
- * so they're excluded here.
+ * Covers both royal-city faction capes (Lymhurst, Thetford, Bridgewatch,
+ * Martlock, Fort Sterling, Caerleon, Brecilien) AND mob-faction capes
+ * (Keeper, Morgana, Undead, Demon, Heretic, Stalker) — all convertible
+ * via market-bought Crests (the _BP blueprint item).
  */
 
 const BASE_CAPE_ID = 'CAPE'; // T{n}_CAPE@{e}
 
-// Mob factions that convert plain capes using CREST + HEART tradeables.
+// Every faction that converts plain capes using market-tradeable Crests.
+// Real item IDs verified against ao-bin-dumps/formatted/items.txt.
+// Crest = blueprint variant of the cape, with the '_BP' suffix. No
+// separate 'heart' item — the old 'heart' concept was a misconception;
+// conversion recipe is just: 1 plain cape + 1 crest = 1 faction cape.
+// (Note the Demon cape uses CAPEITEM_DEMON, not CAPEITEM_HELL.)
 const FACTIONS = [
-  { key: 'KEEPER',  name: 'Keeper Cape',   capeId: 'CAPEITEM_KEEPER',   crestId: 'FACTIONTOKEN_KEEPER_CREST',   heartId: 'FACTIONTOKEN_KEEPER_HEART',   color: 'text-lime-400',    bg: 'bg-lime-500/5 border-lime-500/20' },
-  { key: 'MORGANA', name: 'Morgana Cape',  capeId: 'CAPEITEM_MORGANA',  crestId: 'FACTIONTOKEN_MORGANA_CREST',  heartId: 'FACTIONTOKEN_MORGANA_HEART',  color: 'text-red-400',     bg: 'bg-red-500/5 border-red-500/20' },
-  { key: 'UNDEAD',  name: 'Undead Cape',   capeId: 'CAPEITEM_UNDEAD',   crestId: 'FACTIONTOKEN_UNDEAD_CREST',   heartId: 'FACTIONTOKEN_UNDEAD_HEART',   color: 'text-purple-400',  bg: 'bg-purple-500/5 border-purple-500/20' },
-  { key: 'HELL',    name: 'Demon Cape',    capeId: 'CAPEITEM_HELL',     crestId: 'FACTIONTOKEN_HELL_CREST',     heartId: 'FACTIONTOKEN_HELL_HEART',     color: 'text-orange-400',  bg: 'bg-orange-500/5 border-orange-500/20' },
-  { key: 'HERETIC', name: 'Heretic Cape',  capeId: 'CAPEITEM_HERETIC',  crestId: 'FACTIONTOKEN_HERETIC_CREST',  heartId: 'FACTIONTOKEN_HERETIC_HEART',  color: 'text-amber-400',   bg: 'bg-amber-500/5 border-amber-500/20' },
-  { key: 'AVALON',  name: 'Stalker Cape',  capeId: 'CAPEITEM_AVALON',   crestId: 'FACTIONTOKEN_AVALON_CREST',   heartId: 'FACTIONTOKEN_AVALON_HEART',   color: 'text-cyan-400',    bg: 'bg-cyan-500/5 border-cyan-500/20' },
+  // Royal FW factions — most popular in PvP per AFM meta data
+  { key: 'LYMHURST',     name: 'Lymhurst Cape',     capeId: 'CAPEITEM_FW_LYMHURST',     crestId: 'CAPEITEM_FW_LYMHURST_BP',     color: 'text-green-400',   bg: 'bg-green-500/5 border-green-500/20' },
+  { key: 'SMUGGLER',     name: 'Smuggler Cape',     capeId: 'CAPEITEM_SMUGGLER',        crestId: 'CAPEITEM_SMUGGLER_BP',        color: 'text-orange-300',  bg: 'bg-orange-500/5 border-orange-500/20' },
+  { key: 'CAERLEON',     name: 'Caerleon Cape',     capeId: 'CAPEITEM_FW_CAERLEON',     crestId: 'CAPEITEM_FW_CAERLEON_BP',     color: 'text-rose-400',    bg: 'bg-rose-500/5 border-rose-500/20' },
+  { key: 'THETFORD',     name: 'Thetford Cape',     capeId: 'CAPEITEM_FW_THETFORD',     crestId: 'CAPEITEM_FW_THETFORD_BP',     color: 'text-violet-400',  bg: 'bg-violet-500/5 border-violet-500/20' },
+  { key: 'MARTLOCK',     name: 'Martlock Cape',     capeId: 'CAPEITEM_FW_MARTLOCK',     crestId: 'CAPEITEM_FW_MARTLOCK_BP',     color: 'text-sky-400',     bg: 'bg-sky-500/5 border-sky-500/20' },
+  { key: 'FORTSTERLING', name: 'Fort Sterling Cape',capeId: 'CAPEITEM_FW_FORTSTERLING', crestId: 'CAPEITEM_FW_FORTSTERLING_BP', color: 'text-zinc-300',    bg: 'bg-zinc-500/5 border-zinc-500/20' },
+  { key: 'BRIDGEWATCH',  name: 'Bridgewatch Cape',  capeId: 'CAPEITEM_FW_BRIDGEWATCH',  crestId: 'CAPEITEM_FW_BRIDGEWATCH_BP',  color: 'text-yellow-400',  bg: 'bg-yellow-500/5 border-yellow-500/20' },
+  { key: 'BRECILIEN',    name: 'Brecilien Cape',    capeId: 'CAPEITEM_FW_BRECILIEN',    crestId: 'CAPEITEM_FW_BRECILIEN_BP',    color: 'text-fuchsia-400', bg: 'bg-fuchsia-500/5 border-fuchsia-500/20' },
+  // Mob factions
+  { key: 'AVALON',       name: 'Avalonian Cape',    capeId: 'CAPEITEM_AVALON',          crestId: 'CAPEITEM_AVALON_BP',          color: 'text-cyan-400',    bg: 'bg-cyan-500/5 border-cyan-500/20' },
+  { key: 'KEEPER',       name: 'Keeper Cape',       capeId: 'CAPEITEM_KEEPER',          crestId: 'CAPEITEM_KEEPER_BP',          color: 'text-lime-400',    bg: 'bg-lime-500/5 border-lime-500/20' },
+  { key: 'MORGANA',      name: 'Morgana Cape',      capeId: 'CAPEITEM_MORGANA',         crestId: 'CAPEITEM_MORGANA_BP',         color: 'text-red-400',     bg: 'bg-red-500/5 border-red-500/20' },
+  { key: 'UNDEAD',       name: 'Undead Cape',       capeId: 'CAPEITEM_UNDEAD',          crestId: 'CAPEITEM_UNDEAD_BP',          color: 'text-purple-400',  bg: 'bg-purple-500/5 border-purple-500/20' },
+  { key: 'DEMON',        name: 'Demon Cape',        capeId: 'CAPEITEM_DEMON',           crestId: 'CAPEITEM_DEMON_BP',           color: 'text-red-500',     bg: 'bg-red-600/5 border-red-600/20' },
+  { key: 'HERETIC',      name: 'Heretic Cape',      capeId: 'CAPEITEM_HERETIC',         crestId: 'CAPEITEM_HERETIC_BP',         color: 'text-amber-400',   bg: 'bg-amber-500/5 border-amber-500/20' },
 ];
 
-// Conversion recipe per tier (plain cape + N crests + M hearts + silver fee)
-// Adjust these if the actual in-game numbers differ.
-const RECIPE: Record<number, { crests: number; hearts: number; silver: number }> = {
-  4: { crests: 2,   hearts: 0,  silver: 0 },
-  5: { crests: 4,   hearts: 1,  silver: 0 },
-  6: { crests: 8,   hearts: 2,  silver: 0 },
-  7: { crests: 16,  hearts: 4,  silver: 0 },
-  8: { crests: 32,  hearts: 8,  silver: 0 },
+// Conversion recipe per tier: 1 plain cape + N crests + silver fee.
+// Crests are market-tradeable (the '_BP' variant of the cape item).
+const RECIPE: Record<number, { crests: number; silver: number }> = {
+  4: { crests: 1, silver: 0 },
+  5: { crests: 1, silver: 0 },
+  6: { crests: 1, silver: 0 },
+  7: { crests: 1, silver: 0 },
+  8: { crests: 1, silver: 0 },
 };
 
 const PREMIUM_TAX = 0.065;
@@ -50,7 +66,6 @@ interface ConversionRow {
   factionItemId: string;
   baseCapeItemId: string;
   crestItemId: string;
-  heartItemId: string;
   tier: number;
   enchant: number;
   baseCapeCost: number;
@@ -58,9 +73,6 @@ interface ConversionRow {
   crestPrice: number;
   crestAge: number;
   crestQty: number;
-  heartPrice: number;
-  heartAge: number;
-  heartQty: number;
   silverFee: number;
   totalCost: number;
   factionSellPrice: number;
@@ -122,14 +134,12 @@ export default function CapeConverter() {
     setLoading(true);
     setRows([]);
 
-    // Collect every item ID we need: plain cape + each faction's cape + its
-    // crest + its heart. Crests and hearts don't have enchant levels in
-    // Albion (they're flat drops), so we fetch base tier IDs only.
+    // Collect every item ID we need: plain cape + each faction's cape +
+    // its crest (the _BP blueprint item). Crests are market-tradeable.
     const ids: string[] = [tierId(BASE_CAPE_ID, tier, enchant)];
     for (const f of FACTIONS) {
       ids.push(tierId(f.capeId, tier, enchant));
       ids.push(`T${tier}_${f.crestId}`);
-      ids.push(`T${tier}_${f.heartId}`);
     }
 
     const prices: MarketPrice[] = await fetchPrices(ids);
@@ -152,10 +162,8 @@ export default function CapeConverter() {
     for (const f of FACTIONS) {
       const factionItemId = tierId(f.capeId, tier, enchant);
       const crestItemId = `T${tier}_${f.crestId}`;
-      const heartItemId = `T${tier}_${f.heartId}`;
 
       const crest = withOverride(crestItemId, cheapestNonBM(prices, crestItemId));
-      const heart = withOverride(heartItemId, cheapestNonBM(prices, heartItemId));
 
       // Best sell listing for the faction cape (outlier filter 2x median)
       const listings: { city: string; price: number; date: string }[] = [];
@@ -179,7 +187,6 @@ export default function CapeConverter() {
       const totalCost =
         base.price +
         crest.price * recipe.crests +
-        heart.price * recipe.hearts +
         recipe.silver;
       const taxed = bestSell.price * (1 - taxRate);
       const profit = taxed - totalCost;
@@ -193,16 +200,12 @@ export default function CapeConverter() {
         factionItemId,
         baseCapeItemId,
         crestItemId,
-        heartItemId,
         tier, enchant,
         baseCapeCost: base.price,
         baseCapeAge: ageHoursOf(base.date),
         crestPrice: crest.price,
         crestAge: ageHoursOf(crest.date),
         crestQty: recipe.crests,
-        heartPrice: heart.price,
-        heartAge: ageHoursOf(heart.date),
-        heartQty: recipe.hearts,
         silverFee: recipe.silver,
         totalCost,
         factionSellPrice: bestSell.price,
@@ -230,8 +233,8 @@ export default function CapeConverter() {
       <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent rounded-xl border border-indigo-500/20 px-4 py-3">
         <div className="text-zinc-200 font-semibold text-sm mb-1">Faction Cape Converter</div>
         <div className="text-xs text-zinc-400 space-y-0.5">
-          <div>Buy a <strong className="text-indigo-300">plain Cape</strong> + <strong className="text-indigo-300">Crests</strong> + <strong className="text-indigo-300">Hearts</strong> from the market, talk to the faction NPC, get a faction cape.</div>
-          <div>All inputs are market-priced, so total cost is purely silver. Only mob factions (Keeper / Morgana / Undead / Demon / Heretic / Stalker) are shown — royal FW capes need faction standing and aren't market-convertible.</div>
+          <div>Buy a <strong className="text-indigo-300">plain Cape</strong> + a <strong className="text-indigo-300">faction Crest</strong> (the _BP blueprint item) from the market, talk to the faction NPC, get a faction cape.</div>
+          <div>All inputs are market-priced. Covers every faction: royal cities (Lymhurst, Caerleon, Thetford, Martlock, Fort Sterling, Bridgewatch, Brecilien) AND mob factions (Keeper, Morgana, Undead, Demon, Heretic, Stalker).</div>
         </div>
       </div>
 
@@ -292,7 +295,7 @@ export default function CapeConverter() {
           <div className="text-[11px] text-zinc-500 flex items-center gap-3 flex-wrap">
             <span>Scanned at {scannedAt}</span>
             <span><span className="text-green-400 font-semibold">{profitCount}</span> / {rows.length} profitable</span>
-            <span>T{tier} recipe: <span className="text-indigo-300 font-semibold">{recipe.crests}× crest</span>{recipe.hearts > 0 && <> + <span className="text-indigo-300 font-semibold">{recipe.hearts}× heart</span></>}{recipe.silver > 0 && <> + <span className="text-indigo-300 font-semibold">{formatSilver(recipe.silver)}</span> silver</>}</span>
+            <span>T{tier} recipe: 1× plain cape + <span className="text-indigo-300 font-semibold">{recipe.crests}× crest</span>{recipe.silver > 0 && <> + <span className="text-indigo-300 font-semibold">{formatSilver(recipe.silver)}</span> silver</>}</span>
           </div>
         )}
       </div>
@@ -321,7 +324,6 @@ export default function CapeConverter() {
                 {([
                   { label: '1× Plain Cape', itemId: r.baseCapeItemId, qty: 1, unitPrice: r.baseCapeCost, age: r.baseCapeAge },
                   { label: `${r.crestQty}× Crest`, itemId: r.crestItemId, qty: r.crestQty, unitPrice: r.crestPrice, age: r.crestAge },
-                  ...(r.heartQty > 0 ? [{ label: `${r.heartQty}× Heart`, itemId: r.heartItemId, qty: r.heartQty, unitPrice: r.heartPrice, age: r.heartAge }] : []),
                 ]).map(row => {
                   const isEditing = editingId === row.itemId;
                   const hasOverride = getOverride(row.itemId) != null;
