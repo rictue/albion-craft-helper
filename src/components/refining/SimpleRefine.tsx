@@ -405,286 +405,188 @@ export default function SimpleRefine() {
   if (!recipe) return null;
 
   return (
-    <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 pb-28">
-      {/* Page header */}
-      <div className="relative overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-bg-raised)] to-[color:var(--color-bg-overlay)] px-5 sm:px-7 py-5">
-        <div className="absolute top-0 right-0 w-64 h-32 rounded-full bg-cyan-500/5 blur-3xl pointer-events-none" />
-        <div className="relative flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-6 h-px bg-cyan-400/60" />
-              <span className="text-[10px] uppercase tracking-[0.2em] text-cyan-300 font-semibold">Refining</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-zinc-100 tracking-tight">Buy raw → refine with bonus → sell refined</h1>
-            <p className="text-xs text-zinc-500 mt-1.5 max-w-xl">
-              Auto-calc with reinvest chain. Focus consumed pass-by-pass. Station fees on every craft. Daily bonus supported.
-            </p>
-          </div>
-          {result && (
-            <div className="flex items-center gap-5 bg-[color:var(--color-bg-elevated)] border border-[color:var(--color-border-light)] rounded-xl px-5 py-3 shrink-0">
-              <div>
-                <div className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-semibold">Profit</div>
-                <div className={`text-xl font-bold tabular-nums ${result.profit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {result.profit > 0 ? '+' : ''}{formatSilver(result.profit)}
-                </div>
-              </div>
-              <div className="w-px h-10 bg-[color:var(--color-border)]" />
-              <div>
-                <div className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-semibold">ROI</div>
-                <div className={`text-xl font-bold tabular-nums ${result.roi > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {formatPercent(result.roi)}
-                </div>
-              </div>
-              {simulation && (
-                <>
-                  <div className="w-px h-10 bg-[color:var(--color-border)]" />
-                  <div>
-                    <div className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-semibold">Output</div>
-                    <div className="text-xl font-bold text-cyan-300 tabular-nums">{simulation.totalOutput}</div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+    <div className="max-w-[1500px] mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-10">
+      {/* Compact breadcrumb / page label */}
+      <div className="flex items-center gap-2 mb-4 text-[10px] uppercase tracking-[0.22em] text-zinc-600 font-semibold">
+        <span className="w-6 h-px bg-cyan-400/60" />
+        <span className="text-cyan-300">Refining</span>
+        <span className="text-zinc-700">/</span>
+        <span>{recipe.refinedName}</span>
       </div>
 
-      {/* Main config */}
-      <div className="surface p-5 space-y-4">
-        {/* Resource + Tier + Enchant */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Resource</label>
-            <select value={resource} onChange={(e) => setResource(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-              {RESOURCE_TYPES.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Tier</label>
-            <div className="flex gap-1">
-              {[4, 5, 6, 7, 8].map(t => (
-                <button key={t} onClick={() => setTier(t)} className={`flex-1 h-10 rounded-lg text-sm font-bold transition-all ${tier === t ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-800/80'}`}>
-                  T{t}
-                </button>
-              ))}
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5 items-start">
+        {/* ==================== SIDEBAR ==================== */}
+        <aside className="space-y-3 lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1">
+          {/* Step 1 — What to refine */}
+          <div className="surface p-4 space-y-3">
+            <StepHeader num={1} label="What to refine" />
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Resource</label>
+              <select value={resource} onChange={(e) => setResource(e.target.value)} className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                {RESOURCE_TYPES.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Tier</label>
+              <div className="grid grid-cols-5 gap-1">
+                {[4, 5, 6, 7, 8].map(t => (
+                  <button key={t} onClick={() => setTier(t)} className={`h-9 rounded-lg text-xs font-bold transition-all ${tier === t ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'}`}>
+                    T{t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Enchant</label>
+              <div className="grid grid-cols-5 gap-1">
+                {[0, 1, 2, 3, 4].map(e => (
+                  <button key={e} onClick={() => setEnchant(e)} className={`h-9 rounded-lg text-xs font-bold transition-all ${enchant === e ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'}`}>
+                    .{e}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Raw logs you have</label>
+              <input type="number" min={1} value={rawCount} onChange={(e) => setRawCount(parseInt(e.target.value) || 0)} className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
             </div>
           </div>
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Enchant</label>
-            <div className="flex gap-1">
-              {[0, 1, 2, 3, 4].map(e => (
-                <button key={e} onClick={() => setEnchant(e)} className={`flex-1 h-10 rounded-lg text-sm font-bold transition-all ${enchant === e ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:bg-zinc-800/80'}`}>
-                  .{e}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
 
-        {/* Raw count + Refine city + Spec + Focus + Daily Bonus */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Raw Logs</label>
-            <input type="number" min={1} value={rawCount} onChange={(e) => setRawCount(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
-          </div>
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Refine City</label>
-            <select value={refineCity} onChange={(e) => setRefineCity(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-              {CITIES.filter(c => c.id !== 'Black Market').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Your Spec</label>
-            <input type="number" min={0} max={100} value={specInput} onChange={(e) => updateSpec(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Options</label>
-            <div className="grid grid-cols-2 gap-1.5 flex-1">
-              <label className="flex items-center justify-center gap-1.5 cursor-pointer bg-zinc-800 border border-zinc-700 rounded-lg px-2 text-xs text-zinc-200 hover:bg-zinc-800/80">
+          {/* Step 2 — Where & how */}
+          <div className="surface p-4 space-y-3">
+            <StepHeader num={2} label="Where & how" />
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Refine city</label>
+              <select value={refineCity} onChange={(e) => setRefineCity(e.target.value)} className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                {CITIES.filter(c => c.id !== 'Black Market').map(c => <option key={c.id} value={c.id}>{c.name}{(CITY_REFINE_BONUS[c.id] || []).includes(resource) ? ' ★' : ''}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Your spec (this tier)</label>
+              <input type="number" min={0} max={100} value={specInput} onChange={(e) => updateSpec(parseInt(e.target.value) || 0)} className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className={`flex items-center justify-center gap-1.5 cursor-pointer border rounded-lg px-2 py-2 text-xs font-semibold transition-all ${useFocus ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' : 'bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border)] text-zinc-400 hover:text-zinc-200'}`}>
                 <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-cyan-500" />
                 Focus
               </label>
-              <label className="flex items-center justify-center gap-1.5 cursor-pointer bg-zinc-800 border border-zinc-700 rounded-lg px-2 text-xs text-zinc-200 hover:bg-zinc-800/80">
-                <input type="checkbox" checked={premium} onChange={(e) => setPremium(e.target.checked)} className="accent-cyan-500" />
+              <label className={`flex items-center justify-center gap-1.5 cursor-pointer border rounded-lg px-2 py-2 text-xs font-semibold transition-all ${premium ? 'bg-gold/15 border-gold/40 text-gold' : 'bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border)] text-zinc-400 hover:text-zinc-200'}`}>
+                <input type="checkbox" checked={premium} onChange={(e) => setPremium(e.target.checked)} className="accent-amber-500" />
                 Premium
               </label>
             </div>
-          </div>
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2" title="Daily Production Bonus — shown at the refining station in-game (+20% / etc). Rotates daily per resource.">
-              Daily Bonus %
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={60}
-              step={5}
-              value={dailyBonus}
-              onChange={(e) => setDailyBonus(Math.max(0, Math.min(60, parseFloat(e.target.value) || 0)))}
-              placeholder="0"
-              className={`w-full bg-zinc-800 border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${dailyBonus > 0 ? 'border-amber-500/40 text-amber-300 font-semibold' : 'border-zinc-700 text-zinc-200'}`}
-            />
-          </div>
-        </div>
-
-        {/* Focus budget row — only when focus enabled */}
-        {useFocus && (
-          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-zinc-800/60">
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Focus Budget</label>
-              <input type="number" min={0} step={1000} value={focusBudget} onChange={(e) => setFocusBudget(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
-              <div className="text-[9px] text-zinc-600 mt-1">Max focus you can spend (cap 30K daily)</div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5" title="Daily Production Bonus — shown at the refining station in-game">
+                Daily bonus %
+              </label>
+              <input
+                type="number" min={0} max={60} step={5}
+                value={dailyBonus}
+                onChange={(e) => setDailyBonus(Math.max(0, Math.min(60, parseFloat(e.target.value) || 0)))}
+                placeholder="0"
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 ${dailyBonus > 0 ? 'bg-amber-500/5 border-amber-500/40 text-amber-300 font-semibold' : 'bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border)] text-zinc-200'}`}
+              />
             </div>
-            <div className="col-span-1 md:col-span-3 flex items-end">
-              <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg px-4 py-2.5 w-full">
-                <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Chain breakdown (total across all passes)</div>
-                <div className="text-xs text-zinc-300">
-                  <span className="text-cyan-400 font-bold">{focusSplit.focusCrafts}</span> crafts with focus
-                  <span className="text-zinc-600"> (RR {formatPercent(rrFocus * 100)})</span>
-                  <span className="text-zinc-600 mx-2">·</span>
-                  <span className="text-amber-400 font-bold">{focusSplit.noFocusCrafts}</span> crafts without
-                  <span className="text-zinc-600"> (RR {formatPercent(rrNoFocus * 100)})</span>
+            {useFocus && (
+              <div className="pt-3 border-t border-[color:var(--color-border)] space-y-2">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Focus budget</label>
+                  <input type="number" min={0} step={1000} value={focusBudget} onChange={(e) => setFocusBudget(parseInt(e.target.value) || 0)} className="w-full bg-[color:var(--color-bg-overlay)] border border-cyan-500/30 rounded-lg px-3 py-2 text-sm text-cyan-300 tabular-nums focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
                 </div>
-                <div className="text-[10px] text-zinc-600 mt-0.5">
-                  Using <span className="text-cyan-400">{focusSplit.usedFocus.toLocaleString()}</span> / {focusBudget.toLocaleString()} focus
-                  {focusSplit.noFocusCrafts > 0 && <span className="text-amber-400 ml-2">⚠ Budget exhausted mid-chain — remainder runs at no-focus RR</span>}
+                <div className="bg-[color:var(--color-bg)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-[11px] leading-tight">
+                  <div>
+                    <span className="text-cyan-400 font-bold tabular-nums">{focusSplit.focusCrafts}</span>
+                    <span className="text-zinc-500"> w/focus · </span>
+                    <span className="text-amber-400 font-bold tabular-nums">{focusSplit.noFocusCrafts}</span>
+                    <span className="text-zinc-500"> without</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-600 mt-0.5">
+                    Spending <span className="text-cyan-400 tabular-nums">{focusSplit.usedFocus.toLocaleString()}</span> / {focusBudget.toLocaleString()}
+                  </div>
+                  {focusSplit.noFocusCrafts > 0 && (
+                    <div className="text-[10px] text-amber-400 mt-1">⚠ Budget exhausts mid-chain</div>
+                  )}
                 </div>
               </div>
-            </div>
+            )}
           </div>
-        )}
 
-        {/* Status row */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <div className={`px-3 py-1.5 rounded-lg border font-semibold ${cityBonusActive ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-zinc-800/50 border-zinc-800 text-zinc-500'}`}>
-            {cityBonusActive ? '★ City Bonus' : 'No City Bonus'}
-          </div>
-          <div className="px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 font-semibold">
-            RR: {formatPercent(rr * 100)}
-          </div>
-          <div className="px-3 py-1.5 rounded-lg bg-zinc-800/50 border border-zinc-800 text-zinc-400">
-            LPB: {lpb}
-          </div>
-          {useFocus && (
-            <div className="px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 font-semibold">
-              Focus/craft: {focusCostPerCraft}
+          {/* Step 3 — How to sell */}
+          <div className="surface p-4 space-y-3">
+            <StepHeader num={3} label="How to sell" />
+            <div className="grid grid-cols-2 gap-1">
+              <button onClick={() => setSellMode('market')} className={`h-9 rounded-lg text-[11px] font-semibold transition-all ${sellMode === 'market' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-400 border border-[color:var(--color-border)]'}`}>
+                Market {premium ? '−6.5%' : '−10.5%'}
+              </button>
+              <button onClick={() => setSellMode('discord')} className={`h-9 rounded-lg text-[11px] font-semibold transition-all ${sellMode === 'discord' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-400 border border-[color:var(--color-border)]'}`}>
+                Discord −5%
+              </button>
             </div>
-          )}
-          {dailyBonus > 0 && (
-            <div className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-semibold">
-              ⚡ Daily +{dailyBonus}%
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Station fee / craft</label>
+              <input type="number" min={0} value={feePerCraft} onChange={(e) => setFeePerCraft(parseInt(e.target.value) || 0)} className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
             </div>
-          )}
-          {loading && <span className="text-[10px] text-zinc-500">Loading...</span>}
-          {staleWarning && !liveMode && (
-            <div className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px]">
-              ⚠ Prices &gt;6h old — open ADP Client + AH in-game
-            </div>
-          )}
+          </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          {/* Data freshness controls */}
+          <div className="surface-flat p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={() => doFetch(true)}
+                disabled={loading}
+                className="flex-1 px-3 py-2 rounded-lg text-[11px] font-semibold bg-[color:var(--color-bg-overlay)] hover:bg-[color:var(--color-bg-elevated)] text-zinc-300 border border-[color:var(--color-border)] disabled:opacity-50 transition-colors"
+                title="Force refresh prices from AODP"
+              >
+                {loading ? 'Loading…' : '↻ Refresh prices'}
+              </button>
+              <label className={`flex items-center gap-1.5 cursor-pointer px-3 py-2 rounded-lg border text-[11px] font-semibold transition-colors ${liveMode ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300' : 'bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border)] text-zinc-400'}`}>
+                <input type="checkbox" checked={liveMode} onChange={(e) => setLiveMode(e.target.checked)} className="accent-emerald-500" />
+                {liveMode && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                Live
+              </label>
+            </div>
             {lastFetchAt && (
-              <span className="text-[10px] text-zinc-600">
+              <div className="text-[10px] text-zinc-600 text-center">
                 Updated {Math.max(0, Math.floor((Date.now() - lastFetchAt) / 1000))}s ago
+              </div>
+            )}
+            {staleWarning && !liveMode && (
+              <div className="text-[10px] text-amber-400/90 bg-amber-500/5 border border-amber-500/20 rounded-lg px-2 py-1.5">
+                ⚠ Prices &gt;6h old — open ADP + AH in-game
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* ==================== MAIN ==================== */}
+        <main className="space-y-4 min-w-0">
+          {/* Status strip */}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className={`chip ${cityBonusActive ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30' : 'text-zinc-500 bg-[color:var(--color-bg-raised)] border-[color:var(--color-border)]'}`}>
+              {cityBonusActive ? '★ City bonus' : 'No city bonus'}
+            </span>
+            <span className="chip text-cyan-300 bg-cyan-500/10 border-cyan-500/30">
+              RR {formatPercent(rr * 100)}
+            </span>
+            <span className="chip text-zinc-400 bg-[color:var(--color-bg-raised)] border-[color:var(--color-border)]">
+              LPB {lpb}
+            </span>
+            {useFocus && (
+              <span className="chip text-purple-300 bg-purple-500/10 border-purple-500/30">
+                Focus/craft {focusCostPerCraft}
               </span>
             )}
-            <button
-              onClick={() => doFetch(true)}
-              disabled={loading}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 disabled:opacity-50 transition-colors"
-              title="Force refresh prices from AODP"
-            >
-              ↻ Refresh
-            </button>
-            <label className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors ${liveMode ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'}`}>
-              <input type="checkbox" checked={liveMode} onChange={(e) => setLiveMode(e.target.checked)} className="accent-green-500" />
-              {liveMode && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />}
-              LIVE
-            </label>
+            {dailyBonus > 0 && (
+              <span className="chip text-amber-300 bg-amber-500/10 border-amber-500/30">
+                ⚡ Daily +{dailyBonus}%
+              </span>
+            )}
           </div>
-        </div>
-      </div>
 
-      {/* Price inputs */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <div className="text-xs uppercase tracking-wider text-zinc-500 font-semibold">Prices</div>
-            <div className="text-[10px] text-zinc-600">Auto-filled from market. Override to use your actual prices.</div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <PriceInput
-            label="Raw Price"
-            itemId={recipe.rawId}
-            effectivePrice={rawPrice}
-            effectiveCity={rawPriceCity}
-            defaultPrice={bestBuy?.raw?.price ?? 0}
-            defaultCity={bestBuy?.raw?.city ?? ''}
-            customValue={customRaw}
-            stickyCity={rawCitySel}
-            onTypeNumber={(v) => { setCustomRaw(v); if (v != null) setRawCitySel(null); }}
-            onPickCity={(city) => { setRawCitySel(city); setCustomRaw(null); }}
-            onReset={() => { setCustomRaw(null); setRawCitySel(null); }}
-            allCities={prices?.raw}
-          />
-          {recipe.prevPerCraft > 0 && (
-            <PriceInput
-              label="Prev Tier Price"
-              itemId={recipe.prevRefinedId}
-              effectivePrice={prevPrice}
-              effectiveCity={prevResolved.city}
-              defaultPrice={bestBuy?.prev?.price ?? 0}
-              defaultCity={bestBuy?.prev?.city ?? ''}
-              customValue={customPrev}
-              stickyCity={prevCitySel}
-              onTypeNumber={(v) => { setCustomPrev(v); if (v != null) setPrevCitySel(null); }}
-              onPickCity={(city) => { setPrevCitySel(city); setCustomPrev(null); }}
-              onReset={() => { setCustomPrev(null); setPrevCitySel(null); }}
-              allCities={prices?.prev}
-            />
-          )}
-          <PriceInput
-            label="Sell Price"
-            itemId={recipe.refinedId}
-            effectivePrice={sellPrice}
-            effectiveCity={sellPriceCity}
-            defaultPrice={bestSell?.price ?? 0}
-            defaultCity={bestSell?.city ?? ''}
-            customValue={customSell}
-            stickyCity={sellCitySel}
-            onTypeNumber={(v) => { setCustomSell(v); if (v != null) setSellCitySel(null); }}
-            onPickCity={(city) => { setSellCitySel(city); setCustomSell(null); }}
-            onReset={() => { setCustomSell(null); setSellCitySel(null); }}
-            allCities={prices?.refined}
-            accent="green"
-          />
-        </div>
-
-        {/* Sell mode + fee */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Sell Mode</label>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button onClick={() => setSellMode('market')} className={`h-9 rounded-lg text-xs font-semibold transition-all ${sellMode === 'market' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50'}`}>
-                Market ({premium ? '−6.5%' : '−10.5%'} tax)
-              </button>
-              <button onClick={() => setSellMode('discord')} className={`h-9 rounded-lg text-xs font-semibold transition-all ${sellMode === 'discord' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50'}`}>
-                Discord (−5%)
-              </button>
-            </div>
-          </div>
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Station Fee / Craft</label>
-            <input type="number" min={0} value={feePerCraft} onChange={(e) => setFeePerCraft(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
-          </div>
-        </div>
-      </div>
-
-      {/* Results */}
-      {result && simulation && (
-        <>
+          {/* Results */}
+          {result && simulation && (
+            <>
           {/* Big profit card */}
           <div className={`rounded-2xl border p-6 ${result.profit > 0 ? 'bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20' : 'bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20'}`}>
             <div className="flex items-center justify-between">
@@ -746,6 +648,63 @@ export default function SimpleRefine() {
                 <div>{sellPriceCity && <span className="text-zinc-700">@ {sellPriceCity}</span>}</div>
                 <div className="text-zinc-700 text-[10px]">{sellMode === 'market' ? `${premium ? '6.5%' : '10.5%'} tax` : '5% Discord discount'}</div>
               </div>
+            </div>
+          </div>
+
+          {/* Prices section */}
+          <div className="surface p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="text-xs uppercase tracking-[0.12em] text-zinc-400 font-semibold">Market Prices</div>
+                <div className="text-[10px] text-zinc-600 mt-0.5">Auto-filled from AODP. Click a city to override, or type your actual price.</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <PriceInput
+                label="Raw Price"
+                itemId={recipe.rawId}
+                effectivePrice={rawPrice}
+                effectiveCity={rawPriceCity}
+                defaultPrice={bestBuy?.raw?.price ?? 0}
+                defaultCity={bestBuy?.raw?.city ?? ''}
+                customValue={customRaw}
+                stickyCity={rawCitySel}
+                onTypeNumber={(v) => { setCustomRaw(v); if (v != null) setRawCitySel(null); }}
+                onPickCity={(city) => { setRawCitySel(city); setCustomRaw(null); }}
+                onReset={() => { setCustomRaw(null); setRawCitySel(null); }}
+                allCities={prices?.raw}
+              />
+              {recipe.prevPerCraft > 0 && (
+                <PriceInput
+                  label="Prev Tier Price"
+                  itemId={recipe.prevRefinedId}
+                  effectivePrice={prevPrice}
+                  effectiveCity={prevResolved.city}
+                  defaultPrice={bestBuy?.prev?.price ?? 0}
+                  defaultCity={bestBuy?.prev?.city ?? ''}
+                  customValue={customPrev}
+                  stickyCity={prevCitySel}
+                  onTypeNumber={(v) => { setCustomPrev(v); if (v != null) setPrevCitySel(null); }}
+                  onPickCity={(city) => { setPrevCitySel(city); setCustomPrev(null); }}
+                  onReset={() => { setCustomPrev(null); setPrevCitySel(null); }}
+                  allCities={prices?.prev}
+                />
+              )}
+              <PriceInput
+                label="Sell Price"
+                itemId={recipe.refinedId}
+                effectivePrice={sellPrice}
+                effectiveCity={sellPriceCity}
+                defaultPrice={bestSell?.price ?? 0}
+                defaultCity={bestSell?.city ?? ''}
+                customValue={customSell}
+                stickyCity={sellCitySel}
+                onTypeNumber={(v) => { setCustomSell(v); if (v != null) setSellCitySel(null); }}
+                onPickCity={(city) => { setSellCitySel(city); setCustomSell(null); }}
+                onReset={() => { setCustomSell(null); setSellCitySel(null); }}
+                allCities={prices?.refined}
+                accent="green"
+              />
             </div>
           </div>
 
@@ -858,8 +817,22 @@ export default function SimpleRefine() {
               <span className="text-amber-400/70 font-medium">Expected values</span> — actual results vary ±20-30% per batch due to RNG. Run 30+ cycles for convergence. Check in-game prices for large investments.
             </div>
           </div>
-        </>
-      )}
+            </>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/** Small numbered step marker used in the sidebar sections */
+function StepHeader({ num, label }: { num: number; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-5 h-5 rounded-full bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-[10px] font-bold text-cyan-300">
+        {num}
+      </span>
+      <span className="text-[11px] uppercase tracking-[0.14em] text-zinc-300 font-semibold">{label}</span>
     </div>
   );
 }
