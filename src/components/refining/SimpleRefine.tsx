@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { fetchPrices, clearPriceCache } from '../../services/api';
 import { RESOURCE_TYPES, CITY_REFINE_BONUS } from '../../data/refining';
 import { lpbToReturnRate } from '../../utils/returnRate';
+import { computeFocusCost } from '../../utils/focusCost';
 import { formatSilver, formatPercent } from '../../utils/formatters';
 import { ageHoursOf } from '../../utils/dataAge';
 import { CITIES } from '../../data/cities';
@@ -12,20 +13,6 @@ const BASE_LPB = 18;
 const CITY_LPB = 40;
 const FOCUS_LPB = 59;
 const TAX_RATE = 0.065; // Premium
-
-// Base focus cost per tier (from game data, BASE / .0 enchant).
-// Enchanted refining multiplies this by the item-value enchant multiplier
-// (.1 = 2x, .2 = 4x, .3 = 8x, .4 = 16x) — see FOCUS_ENCHANT_MULT below.
-const BASE_FOCUS: Record<number, number> = {
-  2: 6, 3: 18, 4: 48, 5: 101, 6: 201, 7: 402, 8: 604,
-};
-
-// Focus cost multiplier per enchant level. Matches the item-value ratio, so
-// T4.4 refining is 16× more expensive than T4.0 refining (before spec
-// discount). This is why .4 refining burns focus so fast.
-const FOCUS_ENCHANT_MULT: Record<number, number> = {
-  0: 1, 1: 2, 2: 4, 3: 8, 4: 16,
-};
 
 // Raw resources + refined materials weight (Albion: all raw 0.1 kg, refined 0.2 kg)
 const RAW_WEIGHT_KG = 0.1;
@@ -276,18 +263,17 @@ export default function SimpleRefine() {
     return sum;
   }, [resource, tier, specInput]);
 
-  // Focus cost per craft. Real Albion formula:
-  //   cost = base_focus × enchant_mult × 0.5^((sumSpecs·0.3 + tierSpec·2.5) / 100)
-  // The old code missed BOTH the enchant multiplier (16× for .4!) and the
-  // cross-tier sum bonus, which made .4 refining look ~15× cheaper than it
-  // really is and produced phantom planks in the reinvest chain.
+  // Focus cost per craft — shared utility (src/utils/focusCost.ts) that
+  // applies the full Albion formula including enchant multiplier + the
+  // cross-tier spec sum × 0.3 discount.
   const focusCostPerCraft = useMemo(() => {
     if (!recipe) return 0;
-    const base = BASE_FOCUS[tier] || 0;
-    const enchantMult = FOCUS_ENCHANT_MULT[enchant] ?? 1;
-    const exponent = (totalResourceSpec * 0.3 + specInput * 2.5) / 100;
-    const discount = Math.pow(0.5, exponent);
-    return Math.max(1, Math.round(base * enchantMult * discount));
+    return computeFocusCost({
+      tier,
+      enchant,
+      tierSpec: specInput,
+      totalResourceSpec,
+    });
   }, [tier, enchant, specInput, totalResourceSpec, recipe]);
 
   // Reinvest loop simulation — single unified chain that consumes focus

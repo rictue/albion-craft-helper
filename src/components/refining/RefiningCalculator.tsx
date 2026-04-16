@@ -3,33 +3,20 @@ import { fetchPrices } from '../../services/api';
 import { RESOURCE_TYPES, CITY_REFINE_BONUS } from '../../data/refining';
 import { getRefineSpec } from '../../data/specs';
 import { lpbToReturnRate } from '../../utils/returnRate';
+import { computeFocusCost } from '../../utils/focusCost';
 import { formatSilver, formatPercent } from '../../utils/formatters';
 import { useAppStore } from '../../store/appStore';
 import { CITIES } from '../../data/cities';
 import ItemIcon from '../common/ItemIcon';
 import ManualRefineCalc from './ManualRefineCalc';
 
-// Correct values from Albion Wiki:
-// Base royal city = 18 LPB (15.2% RRR)
-// Refining specialization = +40 LPB
-// Focus = +59 LPB flat
+// Base royal city LPB = 18 (15.2% RR). Refining specialization adds
+// +40 LPB; focus adds +59 LPB on top. Focus cost math lives in the
+// shared utility src/utils/focusCost.ts so bugs don't drift between
+// the bulk scanner here and the SimpleRefine page.
 const BASE_REFINE_LPB = 18;
 const CITY_REFINE_LPB = 40;
 const FOCUS_REFINE_LPB = 59;
-
-// Base focus cost per refine (from game data _craftingfocus values).
-const FOCUS_COST_PER_TIER: Record<number, number> = {
-  2: 6, 3: 18, 4: 48, 5: 101, 6: 201, 7: 402, 8: 604,
-};
-
-// Focus cost with mastery/spec reduction (exponential decay from albiononline2d).
-// Formula: baseFocus × 0.5^((specBonus + masteryBonus) / 100)
-// For refining: specialty = specLevel × 2.5, baseMasteries = sum of all tier specs × 0.3
-// Simplified: we only use the specific tier's spec level as specialty
-function calcFocusCost(baseFocus: number, specLevel: number): number {
-  const specialty = specLevel * 2.5;
-  return Math.round(baseFocus * Math.pow(0.5, specialty / 100));
-}
 
 const ENCHANT_COLORS: Record<number, string> = {
   0: 'text-zinc-300',
@@ -132,6 +119,16 @@ export default function RefiningCalculator() {
       const cityBonus = CITY_REFINE_BONUS[refineCity] || [];
       const refineResults: RefineResult[] = [];
 
+      // Pre-compute cross-tier spec sum per resource so the focus cost is
+      // accurate (the Albion formula gives a 0.3× discount per total-tier
+      // spec point in addition to the 2.5× for the current tier).
+      const totalSpecSumByResource = new Map<string, number>();
+      for (const rt of typesToScan) {
+        let sum = 0;
+        for (let t = 2; t <= 8; t++) sum += getRefineSpec(rt.refinedPrefix, t);
+        totalSpecSumByResource.set(rt.id, sum);
+      }
+
       for (const rt of typesToScan) {
         for (const recipe of rt.recipes) {
           const rawInfo = cheapest.get(recipe.rawId);
@@ -187,7 +184,12 @@ export default function RefiningCalculator() {
             cheapestPrevPrice: prevPrice,
             rawPerCraft: recipe.rawPerCraft,
             prevPerCraft: recipe.prevPerCraft,
-            focusCostPerCraft: Math.round(calcFocusCost(FOCUS_COST_PER_TIER[recipe.tier] || 48, specLevel)),
+            focusCostPerCraft: computeFocusCost({
+              tier: recipe.tier,
+              enchant: recipe.enchant,
+              tierSpec: specLevel,
+              totalResourceSpec: totalSpecSumByResource.get(rt.id) ?? specLevel,
+            }),
           });
         }
       }

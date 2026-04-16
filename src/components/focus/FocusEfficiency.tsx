@@ -6,14 +6,16 @@ interface Row {
   note: string;
 }
 
+// LPB reference table. Spec does NOT add LPB — it only reduces focus
+// cost, so the previously-listed "Crafter spec (+15)" rows were wrong.
+// The only LPB sources are: base station (18), refining city bonus
+// (+40, resource-specific), and focus (+59). Royal-city weapon/armor
+// specialization is a flat +9.6% RR applied after LPB, not an LPB add.
 const ROWS: Row[] = [
-  { lpb: 18,  label: '18 LPB',  note: 'Base royal city, no spec, no focus' },
-  { lpb: 33,  label: '33 LPB',  note: 'Crafter spec (+15)' },
-  { lpb: 58,  label: '58 LPB',  note: 'City refining bonus (+40)' },
-  { lpb: 77,  label: '77 LPB',  note: 'Base + Focus (+59)' },
-  { lpb: 92,  label: '92 LPB',  note: 'Crafter spec + Focus' },
-  { lpb: 117, label: '117 LPB', note: 'City refining + Focus' },
-  { lpb: 132, label: '132 LPB', note: 'City refining + Spec + Focus (max)' },
+  { lpb: 18,  label: '18 LPB',  note: 'Base royal city station, no focus' },
+  { lpb: 58,  label: '58 LPB',  note: 'Matching refining city (+40)' },
+  { lpb: 77,  label: '77 LPB',  note: 'Base + focus (+59)' },
+  { lpb: 117, label: '117 LPB', note: 'Matching refining city + focus (refining max)' },
 ];
 
 export default function FocusEfficiency() {
@@ -66,20 +68,24 @@ export default function FocusEfficiency() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-500">Best setup</div>
-          <div className="text-sm font-bold text-cyan-400 mt-0.5">{(lpbToReturnRate(132) * 100).toFixed(1)}% return</div>
-          <div className="text-[10px] text-zinc-600 mt-1">City refining + Spec + Focus</div>
+          <div className="text-[10px] uppercase tracking-wider text-zinc-500">Refining max</div>
+          <div className="text-sm font-bold text-cyan-400 mt-0.5">{(lpbToReturnRate(117) * 100).toFixed(1)}% return</div>
+          <div className="text-[10px] text-zinc-600 mt-1">Matching city + focus</div>
         </div>
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
           <div className="text-[10px] uppercase tracking-wider text-zinc-500">Focus adds</div>
           <div className="text-sm font-bold text-green-400 mt-0.5">+{((lpbToReturnRate(77) - lpbToReturnRate(18)) * 100).toFixed(1)}% RR</div>
-          <div className="text-[10px] text-zinc-600 mt-1">Over base (no spec, no city)</div>
+          <div className="text-[10px] text-zinc-600 mt-1">Over base (no city)</div>
         </div>
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
           <div className="text-[10px] uppercase tracking-wider text-zinc-500">City bonus adds</div>
           <div className="text-sm font-bold text-green-400 mt-0.5">+{((lpbToReturnRate(117) - lpbToReturnRate(77)) * 100).toFixed(1)}% RR</div>
           <div className="text-[10px] text-zinc-600 mt-1">On top of focus</div>
         </div>
+      </div>
+
+      <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl px-4 py-3 text-[11px] text-zinc-500 leading-relaxed">
+        <strong className="text-zinc-300">Note:</strong> Refining <strong>specialization</strong> (e.g. Wood Plank 100) does <em>not</em> add LPB. It only reduces focus cost. The only LPB sources are base station (18), matching refining city (+40), and focus (+59). Royal-city <strong>weapon/armor</strong> specialization is different — it applies a flat +9.6% RR on top of the LPB-derived rate when crafting items in that city.
       </div>
     </div>
   );
