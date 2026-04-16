@@ -405,7 +405,7 @@ export default function SimpleRefine() {
   if (!recipe) return null;
 
   return (
-    <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
+    <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 pb-28">
       {/* Page header */}
       <div className="relative overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-bg-raised)] to-[color:var(--color-bg-overlay)] px-5 sm:px-7 py-5">
         <div className="absolute top-0 right-0 w-64 h-32 rounded-full bg-cyan-500/5 blur-3xl pointer-events-none" />
@@ -420,6 +420,32 @@ export default function SimpleRefine() {
               Auto-calc with reinvest chain. Focus consumed pass-by-pass. Station fees on every craft. Daily bonus supported.
             </p>
           </div>
+          {result && (
+            <div className="flex items-center gap-5 bg-[color:var(--color-bg-elevated)] border border-[color:var(--color-border-light)] rounded-xl px-5 py-3 shrink-0">
+              <div>
+                <div className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-semibold">Profit</div>
+                <div className={`text-xl font-bold tabular-nums ${result.profit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {result.profit > 0 ? '+' : ''}{formatSilver(result.profit)}
+                </div>
+              </div>
+              <div className="w-px h-10 bg-[color:var(--color-border)]" />
+              <div>
+                <div className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-semibold">ROI</div>
+                <div className={`text-xl font-bold tabular-nums ${result.roi > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {formatPercent(result.roi)}
+                </div>
+              </div>
+              {simulation && (
+                <>
+                  <div className="w-px h-10 bg-[color:var(--color-border)]" />
+                  <div>
+                    <div className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-semibold">Output</div>
+                    <div className="text-xl font-bold text-cyan-300 tabular-nums">{simulation.totalOutput}</div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
