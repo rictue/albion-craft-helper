@@ -393,12 +393,7 @@ export default function SuggestedCrafts({ blackMarketOnly = false }: Props) {
             {settings.hasPremium && <span className="text-[10px] bg-gold/20 text-gold px-2 py-1 rounded font-semibold">PREMIUM</span>}
             {settings.useFocus && <span className="text-[10px] bg-blue-900/30 text-blue-400 px-2 py-1 rounded font-semibold">FOCUS</span>}
             {/* Daily station bonus intentionally NOT shown here — it's
-                per-station and would mislead the scanner results */
-            false && (
-              <span className="text-[10px] bg-amber-900/30 text-amber-300 px-2 py-1 rounded font-semibold">
-                DAILY
-              </span>
-            )}
+                per-station and would mislead the scanner results. */}
           </div>
           <button
             onClick={scan}

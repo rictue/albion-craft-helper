@@ -150,6 +150,14 @@ export default function SimpleRefine() {
     return () => clearInterval(interval);
   }, [liveMode, doFetch]);
 
+  // Tick every 5s so the "Updated Xs ago" label refreshes. Using a state
+  // bump instead of reading Date.now() during render (React purity rule).
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, []);
+
   // Clear custom price overrides AND sticky cities only when resource changes
   // (tier/enchant keeps sticky city selection so user doesn't have to re-pick)
   useEffect(() => {
@@ -548,7 +556,7 @@ export default function SimpleRefine() {
             </div>
             {lastFetchAt && (
               <div className="text-[10px] text-zinc-600 text-center">
-                Updated {Math.max(0, Math.floor((Date.now() - lastFetchAt) / 1000))}s ago
+                Updated {Math.max(0, Math.floor((nowTick - lastFetchAt) / 1000))}s ago
               </div>
             )}
             {staleWarning && !liveMode && (

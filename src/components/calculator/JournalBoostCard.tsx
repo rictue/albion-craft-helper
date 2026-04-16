@@ -88,8 +88,6 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
     return () => { cancelled = true; };
   }, [profession, tier]);
 
-  if (!profession) return null;
-
   // Fame per craft is recipe-value-based — larger recipes yield more fame.
   // Used to be a flat per-tier lookup that ignored recipe size entirely,
   // which is why a shoes craft looked like it needed hundreds of crafts
@@ -122,13 +120,17 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
   const totalFillFraction = capacity > 0 ? totalFame / capacity : 0;
   const buyCost = (emptyPrice || 0) * journalsNeeded;
   const fullSellTotal = (fullPrice || 0) * totalFillFraction;
-  const netGain = fullSellTotal - buyCost;
+  const netGain = profession ? fullSellTotal - buyCost : 0;
 
   // Bubble the net gain up to the parent so ProfitSummary can show a combined
-  // (craft + journal) total profit figure.
+  // (craft + journal) total profit figure. MUST be called unconditionally to
+  // satisfy React's rules of hooks — the early `if (!profession) return null`
+  // used to live above this line and caused a conditional-hook lint error.
   useEffect(() => {
     onNetChange?.(netGain);
   }, [netGain, onNetChange]);
+
+  if (!profession) return null;
 
   const emptyId = `T${tier}_JOURNAL_${profession.id}_EMPTY`;
   const fullId  = `T${tier}_JOURNAL_${profession.id}_FULL`;

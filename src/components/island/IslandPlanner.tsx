@@ -201,100 +201,119 @@ export default function IslandPlanner() {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
-      {/* Page header */}
-      <div className="relative overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-bg-raised)] to-[color:var(--color-bg-overlay)] px-5 sm:px-7 py-5">
-        <div className="absolute top-0 right-0 w-72 h-40 rounded-full bg-lime-500/5 blur-3xl pointer-events-none" />
-        <div className="relative">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-6 h-px bg-lime-400/60" />
-            <span className="text-[10px] uppercase tracking-[0.2em] text-lime-300 font-semibold">Island Planner</span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-zinc-100 tracking-tight">Realistic crop profit for farm islands</h1>
-          <p className="text-xs text-zinc-500 mt-1.5 max-w-2xl leading-relaxed">
-            8 vegetables (<strong className="text-green-300">T1 Carrot → T8 Pumpkin</strong>) + 7 herbs
-            (<strong className="text-purple-300">T2 Agaric → T8 Yarrow</strong>). Factors in market depth,
-            seed return, yield per plot, tax, and 1 / 7 / 30-day projections.
-          </p>
-          <div className="mt-3 text-[11px] text-amber-300/80 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2">
-            ⚠ Crops rarely appear on AH. Click any price cell to override with your actual in-game selling prices.
-          </div>
-        </div>
+    <div className="max-w-[1500px] mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-10">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 mb-4 text-[10px] uppercase tracking-[0.22em] text-zinc-600 font-semibold">
+        <span className="w-6 h-px bg-lime-400/60" />
+        <span className="text-lime-300">Island Planner</span>
+        <span className="text-zinc-700">/</span>
+        <span>
+          {categoryFilter === 'all' ? 'All crops' : categoryFilter === 'veg' ? 'Vegetables' : 'Herbs'} · {plots} plots
+        </span>
       </div>
 
-      {/* Controls */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Total Plots</label>
-            <input type="number" min={1} value={plots} onChange={(e) => setPlots(parseInt(e.target.value) || 1)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-lime-500/40" />
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 cursor-pointer bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 w-full">
-              <input type="checkbox" checked={watered} onChange={(e) => setWatered(e.target.checked)} className="accent-lime-500" />
-              <span className="text-sm text-zinc-200">Watered</span>
-            </label>
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 cursor-pointer bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 w-full">
-              <input type="checkbox" checked={premium} onChange={(e) => setPremium(e.target.checked)} className="accent-lime-500" />
-              <span className="text-sm text-zinc-200">Premium</span>
-            </label>
-          </div>
-          <div className="col-span-2">
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Show</label>
-            <div className="grid grid-cols-3 gap-1 bg-zinc-800 border border-zinc-700 rounded-lg p-1">
-              {(['all', 'veg', 'herb'] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setCategoryFilter(f)}
-                  className={`px-2 py-1.5 rounded text-xs font-semibold transition-colors ${
-                    categoryFilter === f
-                      ? f === 'veg' ? 'bg-green-500/25 text-green-200' : f === 'herb' ? 'bg-purple-500/25 text-purple-200' : 'bg-lime-500/25 text-lime-200'
-                      : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
-                >
-                  {f === 'all' ? 'All' : f === 'veg' ? '🥬 Vegetables' : '🌿 Herbs'}
-                </button>
-              ))}
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5 items-start">
+        {/* ==================== SIDEBAR ==================== */}
+        <aside className="space-y-3 lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1">
+          {/* Step 1 — Plot setup */}
+          <div className="surface p-4 space-y-3">
+            <IslandStepHeader num={1} label="Plot setup" />
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Total plots</label>
+              <input type="number" min={1} value={plots} onChange={(e) => setPlots(parseInt(e.target.value) || 1)} className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-lime-500/40" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className={`flex items-center justify-center gap-1.5 cursor-pointer border rounded-lg px-2 py-2 text-xs font-semibold transition-all ${watered ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' : 'bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border)] text-zinc-400 hover:text-zinc-200'}`}>
+                <input type="checkbox" checked={watered} onChange={(e) => setWatered(e.target.checked)} className="accent-cyan-500" />
+                💧 Watered
+              </label>
+              <label className={`flex items-center justify-center gap-1.5 cursor-pointer border rounded-lg px-2 py-2 text-xs font-semibold transition-all ${premium ? 'bg-gold/15 border-gold/40 text-gold' : 'bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border)] text-zinc-400 hover:text-zinc-200'}`}>
+                <input type="checkbox" checked={premium} onChange={(e) => setPremium(e.target.checked)} className="accent-amber-500" />
+                ★ Premium
+              </label>
             </div>
           </div>
-          <div className="flex items-end">
-            <button onClick={analyze} disabled={loading} className="w-full px-3 py-2.5 rounded-lg text-sm font-bold bg-lime-500/20 hover:bg-lime-500/30 text-lime-300 border border-lime-500/30 disabled:opacity-50 transition-colors">
-              {loading ? 'Loading...' : '🔍 Refresh'}
-            </button>
-          </div>
-        </div>
 
-        {/* Focus + Daily bonus hint row */}
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-zinc-800/60">
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 cursor-pointer bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 flex-1">
+          {/* Step 2 — Filter */}
+          <div className="surface p-4 space-y-3">
+            <IslandStepHeader num={2} label="What to grow" />
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Category filter</label>
+              <div className="grid grid-cols-3 gap-1 bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg p-1">
+                {(['all', 'veg', 'herb'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setCategoryFilter(f)}
+                    className={`px-2 py-1.5 rounded text-[11px] font-semibold transition-colors ${
+                      categoryFilter === f
+                        ? f === 'veg' ? 'bg-green-500/25 text-green-200' : f === 'herb' ? 'bg-purple-500/25 text-purple-200' : 'bg-lime-500/25 text-lime-200'
+                        : 'text-zinc-500 hover:text-zinc-200'
+                    }`}
+                  >
+                    {f === 'all' ? 'All' : f === 'veg' ? '🥬 Veg' : '🌿 Herb'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Step 3 — Bonuses */}
+          <div className="surface p-4 space-y-3">
+            <IslandStepHeader num={3} label="Bonuses" />
+            <label className={`flex items-center gap-2 cursor-pointer border rounded-lg px-3 py-2 text-xs font-semibold transition-all ${useFocus ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300' : 'bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border)] text-zinc-400 hover:text-zinc-200'}`}>
               <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-cyan-500" />
-              <span className="text-sm text-zinc-200">Use Focus on Harvest</span>
+              Use focus on harvest
             </label>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Focus yield %</label>
+              <input
+                type="number"
+                min={0} max={80} step={5}
+                value={focusYieldBonusPct}
+                onChange={(e) => setFocusYieldBonusPct(Math.max(0, Math.min(80, parseFloat(e.target.value) || 0)))}
+                disabled={!useFocus}
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${useFocus ? 'bg-cyan-500/5 border-cyan-500/40 text-cyan-300 font-semibold tabular-nums' : 'bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border)] text-zinc-600'}`}
+              />
+            </div>
+            <div className="text-[10px] text-zinc-500 bg-[color:var(--color-bg)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-2 leading-snug">
+              💡 Click the <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-bold">+20%</span> chip next to each crop in the table to mark today's Daily Production Bonuses.
+              {bonusCrops.size > 0 && <span className="block mt-1 text-amber-400 font-semibold">{bonusCrops.size} bonus{bonusCrops.size !== 1 ? 'es' : ''} active</span>}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold w-24 shrink-0">Focus Yield%</label>
-            <input
-              type="number"
-              min={0}
-              max={80}
-              step={5}
-              value={focusYieldBonusPct}
-              onChange={(e) => setFocusYieldBonusPct(Math.max(0, Math.min(80, parseFloat(e.target.value) || 0)))}
-              disabled={!useFocus}
-              className={`w-full bg-zinc-800 border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${useFocus ? 'border-cyan-500/40 text-cyan-300 font-semibold' : 'border-zinc-700 text-zinc-500'}`}
-            />
-          </div>
-          <div className="flex items-center gap-2 text-[10px] text-zinc-500 px-2">
-            💡 Click the <span className="mx-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-bold">+20%</span> icon next to each crop in the table below to mark today's Daily Production Bonuses.
-            {bonusCrops.size > 0 && <span className="ml-1 text-amber-400 font-semibold">({bonusCrops.size} active)</span>}
-          </div>
-        </div>
 
-        {scannedAt && <div className="mt-3 text-[10px] text-zinc-600">Live price check at {scannedAt} · {Object.keys(livePrices).length} crops had market data</div>}
-      </div>
+          {/* Data freshness */}
+          <div className="surface-flat p-3 space-y-2">
+            <button onClick={analyze} disabled={loading} className="w-full px-3 py-2 rounded-lg text-[11px] font-semibold bg-lime-500/15 hover:bg-lime-500/25 text-lime-300 border border-lime-500/30 disabled:opacity-50 transition-colors">
+              {loading ? 'Loading…' : '↻ Refresh prices'}
+            </button>
+            {scannedAt && (
+              <div className="text-[10px] text-zinc-600 text-center">
+                {Object.keys(livePrices).length} had market data · {scannedAt}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* ==================== MAIN ==================== */}
+        <main className="space-y-4 min-w-0">
+          {/* Intro band */}
+          <div className="relative overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-bg-raised)] to-[color:var(--color-bg-overlay)] px-5 py-4">
+            <div className="absolute top-0 right-0 w-72 h-32 rounded-full bg-lime-500/5 blur-3xl pointer-events-none" />
+            <div className="relative">
+              <h1 className="text-lg font-bold text-zinc-100 tracking-tight">
+                Realistic crop profit for farm islands
+              </h1>
+              <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                8 vegetables (<strong className="text-green-300">T1 Carrot → T8 Pumpkin</strong>) + 7 herbs
+                (<strong className="text-purple-300">T2 Agaric → T8 Yarrow</strong>). Market depth · seed return ·
+                yield per plot · tax · 1/7/30-day projections.
+              </p>
+              <div className="mt-2.5 text-[11px] text-amber-300/80 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-1.5">
+                ⚠ Crops rarely appear on AH. Click any price cell to override with your actual in-game prices.
+              </div>
+            </div>
+          </div>
 
       {/* Top 3 */}
       {topThree.length > 0 && (
@@ -442,6 +461,20 @@ export default function IslandPlanner() {
           <div>• <strong className="text-amber-400">Tip</strong>: Don't commit all plots to one crop. Mix top 2-3 to avoid flooding the market with one type</div>
         </div>
       </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/** Step marker for the Island Planner sidebar */
+function IslandStepHeader({ num, label }: { num: number; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-5 h-5 rounded-full bg-lime-500/15 border border-lime-500/30 flex items-center justify-center text-[10px] font-bold text-lime-300">
+        {num}
+      </span>
+      <span className="text-[11px] uppercase tracking-[0.14em] text-zinc-300 font-semibold">{label}</span>
     </div>
   );
 }
