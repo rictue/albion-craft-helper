@@ -405,15 +405,26 @@ export default function SimpleRefine() {
   if (!recipe) return null;
 
   return (
-    <div className="max-w-[1200px] mx-auto px-4 py-6 space-y-4">
-      {/* Header banner */}
-      <div className="bg-gradient-to-r from-cyan-500/10 to-transparent rounded-xl border border-cyan-500/20 px-4 py-3">
-        <div className="text-zinc-100 font-bold text-base">Refine Calculator</div>
-        <div className="text-xs text-zinc-500">Buy cheapest → refine with bonus → sell highest. Auto-calc with reinvest loop.</div>
+    <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
+      {/* Page header */}
+      <div className="relative overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-bg-raised)] to-[color:var(--color-bg-overlay)] px-5 sm:px-7 py-5">
+        <div className="absolute top-0 right-0 w-64 h-32 rounded-full bg-cyan-500/5 blur-3xl pointer-events-none" />
+        <div className="relative flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-6 h-px bg-cyan-400/60" />
+              <span className="text-[10px] uppercase tracking-[0.2em] text-cyan-300 font-semibold">Refining</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold text-zinc-100 tracking-tight">Buy raw → refine with bonus → sell refined</h1>
+            <p className="text-xs text-zinc-500 mt-1.5 max-w-xl">
+              Auto-calc with reinvest chain. Focus consumed pass-by-pass. Station fees on every craft. Daily bonus supported.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Main config */}
-      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-4">
+      <div className="surface p-5 space-y-4">
         {/* Resource + Tier + Enchant */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>

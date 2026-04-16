@@ -201,14 +201,24 @@ export default function IslandPlanner() {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 py-6 space-y-4">
-      {/* Info banner */}
-      <div className="bg-gradient-to-r from-lime-500/10 via-green-500/5 to-transparent rounded-xl border border-lime-500/20 px-4 py-3">
-        <div className="text-zinc-100 font-bold text-base">🌾 Island Planner</div>
-        <div className="text-xs text-zinc-400 mt-1 space-y-0.5">
-          <div>Realistic profit analysis for <strong className="text-green-300">8 vegetables</strong> (T1 Carrot → T8 Pumpkin) + <strong className="text-purple-300">7 herbs</strong> (T2 Agaric → T8 Yarrow).</div>
-          <div>Factors: <strong className="text-lime-400">market depth</strong> · <strong className="text-lime-400">seed return</strong> · <strong className="text-lime-400">yield per plot</strong> · <strong className="text-lime-400">tax</strong> · <strong className="text-lime-400">1/7/30 day projections</strong></div>
-          <div className="text-amber-400/80 mt-1">⚠ Crops are rarely traded on AH. Sell prices below are in-game estimates — click any price cell to override with your actual selling prices.</div>
+    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
+      {/* Page header */}
+      <div className="relative overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-bg-raised)] to-[color:var(--color-bg-overlay)] px-5 sm:px-7 py-5">
+        <div className="absolute top-0 right-0 w-72 h-40 rounded-full bg-lime-500/5 blur-3xl pointer-events-none" />
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-6 h-px bg-lime-400/60" />
+            <span className="text-[10px] uppercase tracking-[0.2em] text-lime-300 font-semibold">Island Planner</span>
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-zinc-100 tracking-tight">Realistic crop profit for farm islands</h1>
+          <p className="text-xs text-zinc-500 mt-1.5 max-w-2xl leading-relaxed">
+            8 vegetables (<strong className="text-green-300">T1 Carrot → T8 Pumpkin</strong>) + 7 herbs
+            (<strong className="text-purple-300">T2 Agaric → T8 Yarrow</strong>). Factors in market depth,
+            seed return, yield per plot, tax, and 1 / 7 / 30-day projections.
+          </p>
+          <div className="mt-3 text-[11px] text-amber-300/80 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2">
+            ⚠ Crops rarely appear on AH. Click any price cell to override with your actual in-game selling prices.
+          </div>
         </div>
       </div>
 
