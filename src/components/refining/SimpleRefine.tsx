@@ -13,9 +13,18 @@ const CITY_LPB = 40;
 const FOCUS_LPB = 59;
 const TAX_RATE = 0.065; // Premium
 
-// Base focus cost per tier (from game data)
+// Base focus cost per tier (from game data, BASE / .0 enchant).
+// Enchanted refining multiplies this by the item-value enchant multiplier
+// (.1 = 2x, .2 = 4x, .3 = 8x, .4 = 16x) — see FOCUS_ENCHANT_MULT below.
 const BASE_FOCUS: Record<number, number> = {
   2: 6, 3: 18, 4: 48, 5: 101, 6: 201, 7: 402, 8: 604,
+};
+
+// Focus cost multiplier per enchant level. Matches the item-value ratio, so
+// T4.4 refining is 16× more expensive than T4.0 refining (before spec
+// discount). This is why .4 refining burns focus so fast.
+const FOCUS_ENCHANT_MULT: Record<number, number> = {
+  0: 1, 1: 2, 2: 4, 3: 8, 4: 16,
 };
 
 // Raw resources + refined materials weight (Albion: all raw 0.1 kg, refined 0.2 kg)
@@ -251,85 +260,117 @@ export default function SimpleRefine() {
   const lpb = useFocus ? lpbFocus : lpbNoFocus;
   const rr = useFocus ? rrFocus : rrNoFocus;
 
-  // Focus cost per craft
+  // Sum of user's specs across ALL tiers of this resource (loaded from
+  // localStorage). Albion's official formula applies a 0.3× bonus per
+  // total-tier spec in addition to the 2.5× bonus for the current tier.
+  // Missing tier specs simply contribute 0 — user can set them via the
+  // "Your Spec" input while switching tiers.
+  const totalResourceSpec = useMemo(() => {
+    const rt = RESOURCE_TYPES.find(r => r.id === resource);
+    if (!rt) return 0;
+    let sum = 0;
+    for (let t = 2; t <= 8; t++) {
+      const s = t === tier ? specInput : getRefineSpec(rt.refinedPrefix, t);
+      sum += s;
+    }
+    return sum;
+  }, [resource, tier, specInput]);
+
+  // Focus cost per craft. Real Albion formula:
+  //   cost = base_focus × enchant_mult × 0.5^((sumSpecs·0.3 + tierSpec·2.5) / 100)
+  // The old code missed BOTH the enchant multiplier (16× for .4!) and the
+  // cross-tier sum bonus, which made .4 refining look ~15× cheaper than it
+  // really is and produced phantom planks in the reinvest chain.
   const focusCostPerCraft = useMemo(() => {
     if (!recipe) return 0;
     const base = BASE_FOCUS[tier] || 0;
-    return Math.round(base * Math.pow(0.5, (specInput * 2.5) / 100));
-  }, [tier, specInput, recipe]);
+    const enchantMult = FOCUS_ENCHANT_MULT[enchant] ?? 1;
+    const exponent = (totalResourceSpec * 0.3 + specInput * 2.5) / 100;
+    const discount = Math.pow(0.5, exponent);
+    return Math.max(1, Math.round(base * enchantMult * discount));
+  }, [tier, enchant, specInput, totalResourceSpec, recipe]);
 
-  // Split crafts into focus-eligible and no-focus segments based on budget
-  const focusSplit = useMemo(() => {
-    if (!recipe) return { focusCrafts: 0, noFocusCrafts: 0, usedFocus: 0 };
-    const initialCrafts = Math.floor(rawCount / recipe.rawPerCraft);
-    if (!useFocus || focusCostPerCraft <= 0) {
-      return { focusCrafts: 0, noFocusCrafts: initialCrafts, usedFocus: 0 };
-    }
-    const maxFocusCrafts = Math.floor(focusBudget / focusCostPerCraft);
-    const focusCrafts = Math.min(initialCrafts, maxFocusCrafts);
-    const noFocusCrafts = initialCrafts - focusCrafts;
-    const usedFocus = focusCrafts * focusCostPerCraft;
-    return { focusCrafts, noFocusCrafts, usedFocus };
-  }, [recipe, rawCount, useFocus, focusCostPerCraft, focusBudget]);
-
-  // Reinvest loop simulation — runs two separate chains (focus + no-focus) and combines
+  // Reinvest loop simulation — single unified chain that consumes focus
+  // pass-by-pass. Previously the code pre-split initial crafts into focus
+  // vs no-focus and ran two parallel chains, which (a) ignored focus spent
+  // on chain crafts and (b) treated reinvest crafts as free focus. That
+  // over-reported output by 15-30% on enchanted refining.
   const simulation = useMemo(() => {
     if (!recipe) return null;
     const rawPerCraft = recipe.rawPerCraft;
     const prevPerCraft = recipe.prevPerCraft;
+    const initialCrafts = Math.floor(rawCount / rawPerCraft);
 
-    function runChain(initialCrafts: number, rate: number) {
-      if (initialCrafts <= 0) return { total: 0, passes: [] as Array<{ pass: number; crafts: number; rawUsed: number; prevUsed: number; rawBack: number; prevBack: number }>, leftoverRaw: 0, leftoverPrev: 0 };
-      let raw = initialCrafts * rawPerCraft;
-      let prev = initialCrafts * prevPerCraft;
-      let total = 0;
-      const passes: Array<{ pass: number; crafts: number; rawUsed: number; prevUsed: number; rawBack: number; prevBack: number }> = [];
+    let raw = initialCrafts * rawPerCraft;
+    let prev = initialCrafts * prevPerCraft;
+    let focusRemaining = useFocus && focusCostPerCraft > 0 ? focusBudget : 0;
+    let totalFocusCrafts = 0;
+    let totalNoFocusCrafts = 0;
+    const passes: Array<{ pass: number; crafts: number; focusCrafts: number; noFocusCrafts: number; rawUsed: number; prevUsed: number; rawBack: number; prevBack: number; mode: 'focus' | 'normal' | 'mixed' }> = [];
 
-      for (let pass = 1; pass <= 30; pass++) {
-        const fromRaw = Math.floor(raw / rawPerCraft);
-        const fromPrev = prevPerCraft > 0 ? Math.floor(prev / prevPerCraft) : Infinity;
-        const crafts = Math.min(fromRaw, fromPrev);
-        if (crafts <= 0) break;
+    for (let pass = 1; pass <= 30; pass++) {
+      const fromRaw = Math.floor(raw / rawPerCraft);
+      const fromPrev = prevPerCraft > 0 ? Math.floor(prev / prevPerCraft) : Infinity;
+      const crafts = Math.min(fromRaw, fromPrev);
+      if (crafts <= 0) break;
 
-        const rawUsed = crafts * rawPerCraft;
-        const prevUsed = crafts * prevPerCraft;
-        const rawBack = rawUsed * rate;
-        const prevBack = prevUsed * rate;
+      // Split this pass by remaining focus budget
+      const focusCraftsThisPass = focusCostPerCraft > 0
+        ? Math.min(crafts, Math.floor(focusRemaining / focusCostPerCraft))
+        : 0;
+      const noFocusCraftsThisPass = crafts - focusCraftsThisPass;
 
-        raw = raw - rawUsed + rawBack;
-        prev = prev - prevUsed + prevBack;
-        total += crafts;
+      const rawUsed = crafts * rawPerCraft;
+      const prevUsed = crafts * prevPerCraft;
+      // Return materials at the rate matching how each sub-segment crafted
+      const rawBack = focusCraftsThisPass * rawPerCraft * rrFocus + noFocusCraftsThisPass * rawPerCraft * rrNoFocus;
+      const prevBack = focusCraftsThisPass * prevPerCraft * rrFocus + noFocusCraftsThisPass * prevPerCraft * rrNoFocus;
 
-        passes.push({ pass, crafts, rawUsed, prevUsed, rawBack, prevBack });
-        if (crafts < 1) break;
-      }
+      raw = raw - rawUsed + rawBack;
+      prev = prev - prevUsed + prevBack;
+      focusRemaining -= focusCraftsThisPass * focusCostPerCraft;
+      totalFocusCrafts += focusCraftsThisPass;
+      totalNoFocusCrafts += noFocusCraftsThisPass;
 
-      return { total, passes, leftoverRaw: raw, leftoverPrev: prev };
+      const mode: 'focus' | 'normal' | 'mixed' =
+        focusCraftsThisPass === crafts ? 'focus'
+        : focusCraftsThisPass === 0 ? 'normal'
+        : 'mixed';
+
+      passes.push({
+        pass, crafts,
+        focusCrafts: focusCraftsThisPass,
+        noFocusCrafts: noFocusCraftsThisPass,
+        rawUsed, prevUsed, rawBack, prevBack, mode,
+      });
     }
 
-    const focusChain = runChain(focusSplit.focusCrafts, rrFocus);
-    const noFocusChain = runChain(focusSplit.noFocusCrafts, rrNoFocus);
-
-    const initialCrafts = focusSplit.focusCrafts + focusSplit.noFocusCrafts;
-    const totalOutput = focusChain.total + noFocusChain.total;
-    // Combine passes for breakdown (label focus vs no-focus)
-    const passes = [
-      ...focusChain.passes.map(p => ({ ...p, mode: 'focus' as const })),
-      ...noFocusChain.passes.map(p => ({ ...p, mode: 'normal' as const })),
-    ];
+    const totalOutput = totalFocusCrafts + totalNoFocusCrafts;
+    const usedFocus = totalFocusCrafts * focusCostPerCraft;
 
     return {
       initialCrafts,
-      focusCrafts: focusSplit.focusCrafts,
-      noFocusCrafts: focusSplit.noFocusCrafts,
-      focusOutput: focusChain.total,
-      noFocusOutput: noFocusChain.total,
+      focusCrafts: totalFocusCrafts,
+      noFocusCrafts: totalNoFocusCrafts,
+      focusOutput: totalFocusCrafts,
+      noFocusOutput: totalNoFocusCrafts,
       totalOutput,
+      usedFocus,
       passes,
-      leftoverRaw: focusChain.leftoverRaw + noFocusChain.leftoverRaw,
-      leftoverPrev: focusChain.leftoverPrev + noFocusChain.leftoverPrev,
+      leftoverRaw: raw,
+      leftoverPrev: prev,
     };
-  }, [recipe, focusSplit, rrFocus, rrNoFocus]);
+  }, [recipe, rawCount, useFocus, focusBudget, focusCostPerCraft, rrFocus, rrNoFocus]);
+
+  // Back-compat view for UI — derives from simulation instead of pre-computing
+  const focusSplit = useMemo(() => {
+    if (!simulation) return { focusCrafts: 0, noFocusCrafts: 0, usedFocus: 0 };
+    return {
+      focusCrafts: simulation.focusCrafts,
+      noFocusCrafts: simulation.noFocusCrafts,
+      usedFocus: simulation.usedFocus,
+    };
+  }, [simulation]);
 
   // Financial results
   const result = useMemo(() => {
@@ -340,7 +381,10 @@ export default function SimpleRefine() {
 
     const rawCost = initialRaw * rawPrice;
     const prevCost = initialPrev * prevPrice;
-    const feeTotal = simulation.initialCrafts * feePerCraft;
+    // Station fee is paid per craft ACTION, including reinvest passes.
+    // Previously we only charged initial crafts, which understated fees by
+    // ~2× when RR is high. Now we charge all chain crafts.
+    const feeTotal = simulation.totalOutput * feePerCraft;
     const totalCost = rawCost + prevCost + feeTotal;
 
     // Sell revenue with mode-specific pricing
@@ -470,7 +514,7 @@ export default function SimpleRefine() {
             </div>
             <div className="col-span-1 md:col-span-3 flex items-end">
               <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg px-4 py-2.5 w-full">
-                <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Focus Split</div>
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Chain breakdown (total across all passes)</div>
                 <div className="text-xs text-zinc-300">
                   <span className="text-cyan-400 font-bold">{focusSplit.focusCrafts}</span> crafts with focus
                   <span className="text-zinc-600"> (RR {formatPercent(rrFocus * 100)})</span>
@@ -480,7 +524,7 @@ export default function SimpleRefine() {
                 </div>
                 <div className="text-[10px] text-zinc-600 mt-0.5">
                   Using <span className="text-cyan-400">{focusSplit.usedFocus.toLocaleString()}</span> / {focusBudget.toLocaleString()} focus
-                  {focusSplit.noFocusCrafts > 0 && <span className="text-amber-400 ml-2">⚠ Budget exceeded, remainder runs without focus</span>}
+                  {focusSplit.noFocusCrafts > 0 && <span className="text-amber-400 ml-2">⚠ Budget exhausted mid-chain — remainder runs at no-focus RR</span>}
                 </div>
               </div>
             </div>
