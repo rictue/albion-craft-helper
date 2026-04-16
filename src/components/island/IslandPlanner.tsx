@@ -54,6 +54,7 @@ interface Row {
   seedPrice: number;
   cropPrice: number;
   hasLiveData: boolean;
+  hasBonus: boolean;
   totalYieldPerPlot: number;
   revenuePerPlot: number;
   netSeedCostPerPlot: number;
@@ -76,6 +77,23 @@ export default function IslandPlanner() {
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'veg' | 'herb'>('all');
   const [loading, setLoading] = useState(false);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
+  // Daily Production Bonus: Albion rotates a random 2-3 crops each day
+  // that get +20% yield. User toggles the bonus per crop via the table
+  // row icon — state is a set of outputIds with bonus active today.
+  const [bonusCrops, setBonusCrops] = useState<Set<string>>(new Set());
+  // Focus bonus: spending focus while harvesting gives +extra yield per
+  // seed (scales with crop spec). Global toggle + magnitude in %.
+  const [useFocus, setUseFocus] = useState(false);
+  const [focusYieldBonusPct, setFocusYieldBonusPct] = useState(30);
+
+  const toggleBonus = (outputId: string) => {
+    setBonusCrops(prev => {
+      const next = new Set(prev);
+      if (next.has(outputId)) next.delete(outputId);
+      else next.add(outputId);
+      return next;
+    });
+  };
 
   const analyze = useCallback(async () => {
     setLoading(true);
@@ -113,9 +131,16 @@ export default function IslandPlanner() {
       // Priority: user custom > live API > hardcoded default
       const cropPrice = customPrices[c.outputId] ?? livePrices[c.outputId] ?? c.defaultCropPrice;
       const hasLiveData = livePrices[c.outputId] != null && customPrices[c.outputId] == null;
+      const hasBonus = bonusCrops.has(c.outputId);
 
       const baseYield = watered ? c.yieldWatered : c.yieldUnwatered;
-      const yieldPerSeed = premium ? baseYield * 2 : baseYield;
+      let yieldPerSeed = premium ? baseYield * 2 : baseYield;
+      // Daily Production Bonus: in-game the station/station banner shows
+      // "+20% <crop>" for a rotating selection. Flat +20% to yield.
+      if (hasBonus) yieldPerSeed *= 1.2;
+      // Focus on farming: harvesting with focus gives a flat +yield bonus
+      // (typical 25-40% depending on spec). Applied globally when focus on.
+      if (useFocus) yieldPerSeed *= 1 + focusYieldBonusPct / 100;
       const totalYieldPerPlot = SEEDS_PER_PLOT * yieldPerSeed;
 
       const seedReturnRate = watered ? 1.0 : 0.8;
@@ -149,6 +174,7 @@ export default function IslandPlanner() {
         seedPrice: c.npcSeed,
         cropPrice,
         hasLiveData,
+        hasBonus,
         totalYieldPerPlot,
         revenuePerPlot,
         netSeedCostPerPlot,
@@ -162,7 +188,7 @@ export default function IslandPlanner() {
     }
     out.sort((a, b) => b.profit7Days - a.profit7Days);
     return out;
-  }, [plots, watered, premium, customPrices, livePrices, categoryFilter]);
+  }, [plots, watered, premium, customPrices, livePrices, categoryFilter, bonusCrops, useFocus, focusYieldBonusPct]);
 
   const topThree = results.slice(0, 3);
   const updateCustom = (outputId: string, val: number | null) => {
@@ -229,6 +255,34 @@ export default function IslandPlanner() {
             </button>
           </div>
         </div>
+
+        {/* Focus + Daily bonus hint row */}
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-zinc-800/60">
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 cursor-pointer bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 flex-1">
+              <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-cyan-500" />
+              <span className="text-sm text-zinc-200">Use Focus on Harvest</span>
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold w-24 shrink-0">Focus Yield%</label>
+            <input
+              type="number"
+              min={0}
+              max={80}
+              step={5}
+              value={focusYieldBonusPct}
+              onChange={(e) => setFocusYieldBonusPct(Math.max(0, Math.min(80, parseFloat(e.target.value) || 0)))}
+              disabled={!useFocus}
+              className={`w-full bg-zinc-800 border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${useFocus ? 'border-cyan-500/40 text-cyan-300 font-semibold' : 'border-zinc-700 text-zinc-500'}`}
+            />
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-zinc-500 px-2">
+            💡 Click the <span className="mx-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-bold">+20%</span> icon next to each crop in the table below to mark today's Daily Production Bonuses.
+            {bonusCrops.size > 0 && <span className="ml-1 text-amber-400 font-semibold">({bonusCrops.size} active)</span>}
+          </div>
+        </div>
+
         {scannedAt && <div className="mt-3 text-[10px] text-zinc-600">Live price check at {scannedAt} · {Object.keys(livePrices).length} crops had market data</div>}
       </div>
 
@@ -315,6 +369,17 @@ export default function IslandPlanner() {
                       <span className={`text-[9px] px-1 py-0.5 rounded font-semibold uppercase ${r.category === 'veg' ? 'bg-green-500/15 text-green-300' : 'bg-purple-500/15 text-purple-300'}`}>
                         {r.category === 'veg' ? 'Veg' : 'Herb'}
                       </span>
+                      <button
+                        onClick={() => toggleBonus(r.outputId)}
+                        title="Toggle today's Daily Production Bonus (+20% yield)"
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition-colors ${
+                          r.hasBonus
+                            ? 'bg-amber-500/25 text-amber-200 border border-amber-400/40'
+                            : 'bg-zinc-800 text-zinc-600 border border-zinc-700 hover:text-zinc-300'
+                        }`}
+                      >
+                        {r.hasBonus ? '⚡ +20%' : '+20%'}
+                      </button>
                     </div>
                     <div className="text-[10px] text-zinc-600">{r.marginPct < 9999 ? r.marginPct.toFixed(0) : '∞'}% margin</div>
                   </td>
