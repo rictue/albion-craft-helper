@@ -57,6 +57,10 @@ export default function SimpleRefine() {
   const [useFocus, setUseFocus] = useState(false);
   const [focusBudget, setFocusBudget] = useState(30000);
   const [premium, setPremium] = useState(true);
+  // Daily Production Bonus — shown on the island/station UI in-game. Rotates
+  // daily per category (+20% for the listed items). It is a FLAT additive to
+  // return rate, NOT an LPB add, so we add it after lpbToReturnRate().
+  const [dailyBonus, setDailyBonus] = useState(0);
   const [customRaw, setCustomRaw] = useState<number | null>(null);
   const [customPrev, setCustomPrev] = useState<number | null>(null);
   const [customSell, setCustomSell] = useState<number | null>(null);
@@ -240,8 +244,9 @@ export default function SimpleRefine() {
   const cityBonusActive = (CITY_REFINE_BONUS[refineCity] || []).includes(resource);
   const lpbNoFocus = BASE_LPB + (cityBonusActive ? CITY_LPB : 0);
   const lpbFocus = lpbNoFocus + FOCUS_LPB;
-  const rrNoFocus = lpbToReturnRate(lpbNoFocus);
-  const rrFocus = lpbToReturnRate(lpbFocus);
+  const dailyBonusFrac = Math.max(0, dailyBonus) / 100;
+  const rrNoFocus = Math.min(0.999, lpbToReturnRate(lpbNoFocus) + dailyBonusFrac);
+  const rrFocus = Math.min(0.999, lpbToReturnRate(lpbFocus) + dailyBonusFrac);
   // Effective RR shown in UI (if focus used AND budget > 0, show focus rate; else no-focus)
   const lpb = useFocus ? lpbFocus : lpbNoFocus;
   const rr = useFocus ? rrFocus : rrNoFocus;
@@ -409,8 +414,8 @@ export default function SimpleRefine() {
           </div>
         </div>
 
-        {/* Raw count + Refine city + Spec + Focus */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Raw count + Refine city + Spec + Focus + Daily Bonus */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div>
             <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2">Raw Logs</label>
             <input type="number" min={1} value={rawCount} onChange={(e) => setRawCount(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
@@ -437,6 +442,21 @@ export default function SimpleRefine() {
                 Premium
               </label>
             </div>
+          </div>
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-2" title="Daily Production Bonus — shown at the refining station in-game (+20% / etc). Rotates daily per resource.">
+              Daily Bonus %
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={60}
+              step={5}
+              value={dailyBonus}
+              onChange={(e) => setDailyBonus(Math.max(0, Math.min(60, parseFloat(e.target.value) || 0)))}
+              placeholder="0"
+              className={`w-full bg-zinc-800 border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${dailyBonus > 0 ? 'border-amber-500/40 text-amber-300 font-semibold' : 'border-zinc-700 text-zinc-200'}`}
+            />
           </div>
         </div>
 
@@ -481,6 +501,11 @@ export default function SimpleRefine() {
           {useFocus && (
             <div className="px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 font-semibold">
               Focus/craft: {focusCostPerCraft}
+            </div>
+          )}
+          {dailyBonus > 0 && (
+            <div className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-semibold">
+              ⚡ Daily +{dailyBonus}%
             </div>
           )}
           {loading && <span className="text-[10px] text-zinc-500">Loading...</span>}
