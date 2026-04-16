@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { getTopKillFame } from '../../services/gameinfo';
 import type { PlayerSearchResult } from '../../services/gameinfo';
 import { formatSilver } from '../../utils/formatters';
@@ -9,15 +9,25 @@ export default function TopKillFame() {
   const [range, setRange] = useState<Range>('week');
   const [players, setPlayers] = useState<PlayerSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
+  // Reset loading/players when the range changes — adjust state during render
+  // instead of setState-in-effect (React's "reset on prop change" pattern).
+  const [prevRange, setPrevRange] = useState(range);
+  if (prevRange !== range) {
+    setPrevRange(range);
     setLoading(true);
-    const data = await getTopKillFame(range, 50);
-    setPlayers(data || []);
-    setLoading(false);
-  }, [range]);
+    setPlayers([]);
+  }
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const data = await getTopKillFame(range, 50);
+      if (cancelled) return;
+      setPlayers(data || []);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [range]);
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-6 space-y-4">

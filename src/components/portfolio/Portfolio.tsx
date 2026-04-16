@@ -40,7 +40,9 @@ function loadPortfolio(): { cash: number; items: PortfolioItem[] } {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch {
+    // Corrupt JSON or localStorage unavailable — fall through to empty default.
+  }
   return { cash: 0, items: [] };
 }
 function savePortfolio(cash: number, items: PortfolioItem[]) {
@@ -50,7 +52,9 @@ function loadSnapshots(): Snapshot[] {
   try {
     const raw = localStorage.getItem(LS_SNAPSHOTS_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch {
+    // Corrupt JSON or localStorage unavailable — start fresh.
+  }
   return [];
 }
 function saveSnapshots(snaps: Snapshot[]) {

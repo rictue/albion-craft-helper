@@ -46,7 +46,9 @@ try {
       }
     }
   }
-} catch {}
+} catch {
+  // localStorage unavailable (e.g. private mode) — cache stays in-memory only.
+}
 
 function persistCache() {
   try {
@@ -64,7 +66,9 @@ function persistCache() {
       const obj: Record<string, CacheEntry> = {};
       for (const [k, v] of entries) obj[k] = v;
       localStorage.setItem(LS_CACHE_KEY, JSON.stringify(obj));
-    } catch {}
+    } catch {
+      // Still over quota after halving — skip persistence this round.
+    }
   }
 }
 
@@ -75,7 +79,11 @@ export function getLastFetchTime(): number | null { return lastFetchTime; }
 // Clear cache to force fresh fetch
 export function clearPriceCache(): void {
   priceCache.clear();
-  try { localStorage.removeItem(LS_CACHE_KEY); } catch {}
+  try {
+    localStorage.removeItem(LS_CACHE_KEY);
+  } catch {
+    // localStorage unavailable — in-memory cache already cleared above.
+  }
 }
 
 // In-flight request deduplication: if the same cacheKey is already being fetched,

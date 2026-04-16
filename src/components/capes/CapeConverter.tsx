@@ -221,7 +221,7 @@ export default function CapeConverter() {
     setRows(out);
     setScannedAt(new Date().toLocaleTimeString());
     setLoading(false);
-  }, [tier, enchant, premium]);
+  }, [tier, enchant, premium, customPrices]);
 
   const displayed = hideNegative ? rows.filter(r => r.profit > 0) : rows;
   const profitCount = rows.filter(r => r.profit > 0).length;

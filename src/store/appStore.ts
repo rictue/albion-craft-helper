@@ -109,7 +109,9 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ customPrices: { ...state.customPrices, [key]: price } })),
       removeCustomPrice: (key) =>
         set((state) => {
-          const { [key]: _, ...rest } = state.customPrices;
+          // Destructure the key out to drop it; rest gets the remaining entries.
+          const rest = { ...state.customPrices };
+          delete rest[key];
           return { customPrices: rest };
         }),
       clearCustomPrices: () => set({ customPrices: {} }),

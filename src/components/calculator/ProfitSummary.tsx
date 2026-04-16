@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import type { CraftingResult } from '../../utils/profitCalculator';
 import type { MarketPrice } from '../../types';
 import { formatSilver } from '../../utils/formatters';
@@ -51,8 +51,14 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
   // the best real-data city).
   const [pinnedCityName, setPinnedCityName] = useState<string | null>(null);
   // Reset the pin whenever the item/tier/enchant changes so we don't carry
-  // an irrelevant pick across items.
-  useEffect(() => { setPinnedCityName(null); }, [itemId]);
+  // an irrelevant pick across items. Adjust state during render (React's
+  // official "reset on prop change" pattern) instead of useEffect → setState,
+  // which trips react-hooks/set-state-in-effect and double-renders.
+  const [prevItemId, setPrevItemId] = useState(itemId);
+  if (prevItemId !== itemId) {
+    setPrevItemId(itemId);
+    setPinnedCityName(null);
+  }
 
   const { settings } = useAppStore();
   const qty = settings.quantity || 1;

@@ -128,7 +128,7 @@ export default function MarketFlipper() {
     setRows(out);
     setScannedAt(new Date().toLocaleTimeString());
     setLoading(false);
-  }, [tier, enchant, minProfit, minMargin, premium, sellMode]);
+  }, [tier, enchant, minProfit, minMargin, premium, sellMode, maxAgeHours]);
 
   const sortedRows = useMemo(() => {
     const copy = [...rows];

@@ -66,10 +66,18 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
 
   const profession = getProfession(selectedItem.subcategory);
 
+  // Reset loading state when profession/tier change — adjust state during
+  // render so we don't trip set-state-in-effect on the initial setLoading.
+  const requestKey = profession ? `${profession.id}|${tier}` : '';
+  const [prevRequestKey, setPrevRequestKey] = useState(requestKey);
+  if (prevRequestKey !== requestKey) {
+    setPrevRequestKey(requestKey);
+    if (requestKey) setLoading(true);
+  }
+
   useEffect(() => {
     if (!profession) return;
     let cancelled = false;
-    setLoading(true);
     (async () => {
       const emptyId = `T${tier}_JOURNAL_${profession.id}_EMPTY`;
       const fullId  = `T${tier}_JOURNAL_${profession.id}_FULL`;

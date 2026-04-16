@@ -44,10 +44,11 @@ export default function CraftingCalculator() {
 
   // Timestamp of the last successful fetch, so we can show "Updated Xm ago"
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
-  // Re-render clock so the "Xm ago" label stays fresh without mutating state
-  const [, tick] = useState(0);
+  // "Now" tick so the "Xm ago" label stays fresh without reading Date.now()
+  // during render (React purity rule). Bumps every 30s.
+  const [nowTick, setNowTick] = useState(() => Date.now());
   useEffect(() => {
-    const id = window.setInterval(() => tick(n => n + 1), 30_000);
+    const id = window.setInterval(() => setNowTick(Date.now()), 30_000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -100,17 +101,18 @@ export default function CraftingCalculator() {
     loadPrices(false);
   }, [loadPrices]);
 
-  // Format "Xm ago" / "just now" label for the last fetch timestamp
+  // Format "Xm ago" / "just now" label for the last fetch timestamp.
+  // Reads from nowTick instead of Date.now() so it's a pure computation.
   const fetchedAgoLabel = useMemo(() => {
     if (!fetchedAt) return '';
-    const sec = Math.floor((Date.now() - fetchedAt) / 1000);
+    const sec = Math.floor((nowTick - fetchedAt) / 1000);
     if (sec < 5) return 'just now';
     if (sec < 60) return `${sec}s ago`;
     const min = Math.floor(sec / 60);
     if (min < 60) return `${min}m ago`;
     const hr = Math.floor(min / 60);
     return `${hr}h ago`;
-  }, [fetchedAt, pricesLoading]); // pricesLoading triggers recompute on refresh
+  }, [fetchedAt, nowTick]);
 
   const craftedItemId = useMemo(() => {
     if (!selectedItem) return '';
@@ -189,7 +191,10 @@ export default function CraftingCalculator() {
     });
 
     return map;
-  }, [prices, settings.craftingCity, settings.sellingLocation, customPrices, selectedItem, craftedItemId]);
+    // settings.craftingCity used to be a dep back when the craft-city price
+    // overrode the cross-city cheapest — that override has been removed
+    // (see comment above) so craftingCity no longer affects this map.
+  }, [prices, settings.sellingLocation, customPrices, selectedItem, craftedItemId]);
 
   const returnRate = useMemo(() => {
     if (settings.returnRateOverride !== null) return settings.returnRateOverride / 100;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { formatSilver } from '../../utils/formatters';
 
 interface GoldPrice {
@@ -10,22 +10,28 @@ export default function GoldPrices() {
   const [prices, setPrices] = useState<GoldPrice[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const server = localStorage.getItem('albion-server') || 'europe';
-      const res = await fetch(`https://${server}.albion-online-data.com/api/v2/stats/gold?count=168`);
-      if (res.ok) {
-        const data = await res.json();
-        setPrices(data || []);
+  // Fetch once on mount. No refresh button on this page — gold prices are
+  // slow-moving so weekly-ish freshness is fine. setState only fires from
+  // inside async callbacks so react-hooks/set-state-in-effect stays happy.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const server = localStorage.getItem('albion-server') || 'europe';
+        const res = await fetch(`https://${server}.albion-online-data.com/api/v2/stats/gold?count=168`);
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) setPrices(data || []);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch (err) {
-      console.error(err);
-    }
-    setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, []);
-
-  useEffect(() => { load(); }, [load]);
 
   const current = prices[0]?.price || 0;
   const oldest = prices[prices.length - 1]?.price || 0;

@@ -31,7 +31,9 @@ function loadHistory(): CraftEntry[] {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch {
+    // Corrupt JSON or localStorage unavailable — start with empty history.
+  }
   return [];
 }
 function saveHistory(entries: CraftEntry[]) {

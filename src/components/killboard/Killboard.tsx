@@ -54,16 +54,27 @@ export default function Killboard() {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     setLoading(true);
-    const data = await getRecentEvents(51, 0);
-    setEvents(data || []);
-    setLastRefresh(new Date());
-    setLoading(false);
+    setRefreshKey(k => k + 1);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Fetch on mount and whenever load() bumps refreshKey (manual refresh).
+  // setState only happens in the async callback, never synchronously in the
+  // effect body, which keeps the react-hooks/set-state-in-effect rule happy.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const data = await getRecentEvents(51, 0);
+      if (cancelled) return;
+      setEvents(data || []);
+      setLastRefresh(new Date());
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [refreshKey]);
 
   const getMainHand = (equipment: KillEvent['Killer']['Equipment']) => {
     return (equipment as Record<string, { Type: string; Count: number; Quality: number } | null>)?.MainHand || null;

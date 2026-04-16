@@ -48,22 +48,33 @@ function SpecInput({ label, value, onChange, accent = 'zinc' }: SpecInputProps) 
   );
 }
 
+// Lazy initializers — read localStorage once during first render instead of
+// via useEffect + setState. The old pattern tripped React's purity rules
+// (setState inside effect body) and caused a double-render on mount.
+function readInitialSpecs(): Record<string, number> {
+  try {
+    const data = localStorage.getItem('albion-specs');
+    if (data) return JSON.parse(data);
+  } catch {
+    // Corrupt JSON or localStorage unavailable — start empty.
+  }
+  return {};
+}
+function readInitialCharacterName(): string {
+  try {
+    return localStorage.getItem('albion-character-name') || '';
+  } catch {
+    return '';
+  }
+}
+
 export default function Profile() {
   const { user, signInWithDiscord, signOut } = useAuth();
-  const [characterName, setCharacterName] = useState('');
-  const [specs, setSpecs] = useState<Record<string, number>>({});
+  const [characterName, setCharacterName] = useState(readInitialCharacterName);
+  const [specs, setSpecs] = useState<Record<string, number>>(readInitialSpecs);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    try {
-      const data = localStorage.getItem('albion-specs');
-      if (data) setSpecs(JSON.parse(data));
-      const name = localStorage.getItem('albion-character-name');
-      if (name) setCharacterName(name);
-    } catch {}
-  }, []);
 
   const updateSpec = (key: string, value: number) => {
     const next = { ...specs, [key]: Math.max(0, Math.min(120, value)) };

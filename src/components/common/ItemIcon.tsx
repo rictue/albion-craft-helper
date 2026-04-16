@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getItemIconUrl } from '../../utils/itemIdParser';
 
 interface Props {
@@ -48,14 +48,19 @@ export default function ItemIcon({ itemId, size = 64, quality = 1, className = '
   const [currentId, setCurrentId] = useState(itemId);
   const [fallbackIndex, setFallbackIndex] = useState(0);
   const [error, setError] = useState(false);
-  const apiSize = getApiSize(size);
-  const url = getItemIconUrl(currentId, quality, apiSize);
-
-  useEffect(() => {
+  // Track the itemId we were rendered with so we can reset fallback state
+  // when the parent swaps the item. React's official "reset state on prop
+  // change" pattern — adjust state during render instead of inside an
+  // effect so we avoid the double-render and the set-state-in-effect lint.
+  const [prevItemId, setPrevItemId] = useState(itemId);
+  if (prevItemId !== itemId) {
+    setPrevItemId(itemId);
     setCurrentId(itemId);
     setFallbackIndex(0);
     setError(false);
-  }, [itemId]);
+  }
+  const apiSize = getApiSize(size);
+  const url = getItemIconUrl(currentId, quality, apiSize);
 
   const handleError = () => {
     const fallbacks = getFallbackIds(itemId);
