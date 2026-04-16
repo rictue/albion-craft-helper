@@ -2,12 +2,11 @@ import { Link } from 'react-router-dom';
 
 /**
  * Landing page — silver-making strategies grouped by effort/risk profile.
- * Professional card layout: subtle accent per strategy family, consistent
- * typography hierarchy, no rainbow gradient noise. Each card opens the
- * specific tool for that path.
+ * Overhauled visual: hero with brand emphasis, grouped strategy sections,
+ * uniform card language, restrained accent palette.
  */
 
-type Risk = 'low' | 'medium' | 'high';
+type Level = 'low' | 'medium' | 'high';
 
 interface Strategy {
   icon: string;
@@ -15,8 +14,9 @@ interface Strategy {
   route: string;
   tagline: string;
   when: string;
-  risk: Risk;
-  effort: Risk;
+  risk: Level;
+  effort: Level;
+  highlight?: boolean;
 }
 
 interface Group {
@@ -38,6 +38,7 @@ const GROUPS: Group[] = [
         when: 'You have focus or a matching refining city (Fort Sterling = wood, etc).',
         risk: 'low',
         effort: 'low',
+        highlight: true,
       },
       {
         icon: '⚔',
@@ -129,7 +130,7 @@ const GROUPS: Group[] = [
 
 const SECONDARY_LINKS: Array<{ to: string; label: string; icon: string }> = [
   { to: '/planner', label: 'Craft Planner', icon: '📋' },
-  { to: '/portfolio', label: 'Portfolio Tracker', icon: '💼' },
+  { to: '/portfolio', label: 'Portfolio', icon: '💼' },
   { to: '/craft-history', label: 'Craft History', icon: '📓' },
   { to: '/compare', label: 'Compare Tiers', icon: '⚖' },
   { to: '/prices', label: 'Market Prices', icon: '💰' },
@@ -142,14 +143,19 @@ const SECONDARY_LINKS: Array<{ to: string; label: string; icon: string }> = [
   { to: '/journals', label: 'Journals', icon: '📚' },
 ];
 
-function RiskChip({ label, level }: { label: string; level: Risk }) {
-  const color =
-    level === 'low' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-    : level === 'medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-    : 'text-rose-400 bg-rose-500/10 border-rose-500/20';
+const RISK_STYLES: Record<Level, { text: string; bg: string; border: string }> = {
+  low:    { text: 'text-emerald-300', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  medium: { text: 'text-amber-300',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20'   },
+  high:   { text: 'text-rose-300',    bg: 'bg-rose-500/10',    border: 'border-rose-500/20'    },
+};
+
+function Chip({ label, value, level }: { label: string; value: Level; level?: 'risk' | 'effort' }) {
+  const s = RISK_STYLES[value];
+  const icon = level === 'effort' ? '◷' : '◉';
   return (
-    <span className={`text-[9px] uppercase tracking-[0.12em] px-1.5 py-0.5 rounded border font-semibold ${color}`}>
-      {label} · {level}
+    <span className={`chip ${s.text} ${s.bg} ${s.border}`}>
+      <span className="opacity-60">{icon}</span>
+      {label} · {value}
     </span>
   );
 }
@@ -158,27 +164,42 @@ function StrategyCard({ s }: { s: Strategy }) {
   return (
     <Link
       to={s.route}
-      className="group relative flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-900 hover:border-zinc-700 transition-colors p-5"
+      className={`group relative flex flex-col rounded-2xl border p-5 transition-all hover:-translate-y-0.5 ${
+        s.highlight
+          ? 'border-gold/30 bg-gradient-to-br from-gold/[0.07] via-transparent to-transparent hover:border-gold/50'
+          : 'border-[color:var(--color-border)] bg-[color:var(--color-bg-raised)] hover:border-[color:var(--color-border-light)]'
+      }`}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="text-2xl leading-none" aria-hidden>{s.icon}</div>
-        <div className="flex gap-1">
-          <RiskChip label="risk" level={s.risk} />
+      {s.highlight && (
+        <span className="absolute -top-2 right-4 chip text-gold bg-gold/10 border-gold/30">
+          ★ Top path
+        </span>
+      )}
+
+      <div className="flex items-start justify-between mb-4">
+        <div className="w-11 h-11 rounded-xl bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] flex items-center justify-center text-xl">
+          {s.icon}
         </div>
+        <Chip label="risk" value={s.risk} />
       </div>
-      <div className="text-base font-semibold text-zinc-100 mb-1.5">{s.name}</div>
-      <div className="text-xs text-zinc-400 leading-relaxed mb-3 flex-1">
+
+      <div className="text-lg font-semibold text-zinc-100 mb-2 tracking-tight">{s.name}</div>
+      <div className="text-sm text-zinc-400 leading-relaxed mb-4 flex-1">
         {s.tagline}
       </div>
-      <div className="text-[11px] text-zinc-500 leading-relaxed border-t border-zinc-800 pt-3 mb-2">
-        <span className="text-zinc-600 uppercase text-[9px] tracking-[0.12em] font-semibold">Use when</span>
-        <br />
+
+      <div className="text-[12px] text-zinc-500 leading-relaxed border-t border-[color:var(--color-border)] pt-3 mb-3">
+        <span className="text-zinc-600 uppercase text-[9px] tracking-[0.14em] font-semibold block mb-1">Use when</span>
         {s.when}
       </div>
-      <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.12em]">
-        <span className="text-zinc-600">effort · {s.effort}</span>
-        <span className="text-gold font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
-          Open →
+
+      <div className="flex items-center justify-between">
+        <Chip label="effort" value={s.effort} level="effort" />
+        <span className="text-xs font-medium text-zinc-500 group-hover:text-gold transition-colors flex items-center gap-1">
+          Open
+          <svg className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
         </span>
       </div>
     </Link>
@@ -187,44 +208,70 @@ function StrategyCard({ s }: { s: Strategy }) {
 
 export default function MoneyHub() {
   return (
-    <div className="max-w-[1200px] mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
-      <header className="space-y-2">
-        <div className="text-[10px] uppercase tracking-[0.2em] text-gold/70 font-semibold">AlbionCrafts</div>
-        <h1 className="text-3xl font-bold text-zinc-100 tracking-tight">Silver-making strategies</h1>
-        <p className="text-sm text-zinc-500 max-w-2xl">
-          Pick the path that matches your focus, silver, and risk tolerance. Each tile opens a dedicated
-          calculator for that strategy. Everything is also in the top menu.
-        </p>
+    <div className="relative max-w-[1280px] mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-10">
+      {/* Hero */}
+      <header className="relative overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-bg-raised)] via-[color:var(--color-bg-raised)] to-[color:var(--color-bg-overlay)] px-6 sm:px-10 py-10 sm:py-14">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-gold/5 blur-3xl -translate-y-1/2 translate-x-1/4" />
+          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-blue-500/5 blur-3xl translate-y-1/2 -translate-x-1/4" />
+        </div>
+        <div className="relative max-w-2xl">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-8 h-px bg-gold/60" />
+            <span className="text-[10px] uppercase tracking-[0.25em] text-gold font-semibold">AlbionCrafts</span>
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-bold text-zinc-50 tracking-tight leading-[1.05] mb-4">
+            Make silver in Albion Online,<br />
+            <span className="text-gold">with the math on your side.</span>
+          </h1>
+          <p className="text-base text-zinc-400 leading-relaxed max-w-xl">
+            Nine strategies, one tool for each. Real game formulas verified against in-game data — no hand-waving,
+            no "trust me bro." Pick a path below or use the menu to jump to any tool.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2 text-[11px]">
+            <span className="chip text-zinc-300 bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border-light)]">
+              Live AODP prices
+            </span>
+            <span className="chip text-zinc-300 bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border-light)]">
+              Focus + spec modeling
+            </span>
+            <span className="chip text-zinc-300 bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border-light)]">
+              5 servers
+            </span>
+            <span className="chip text-zinc-300 bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border-light)]">
+              Free
+            </span>
+          </div>
+        </div>
       </header>
 
       {/* Strategy groups */}
       {GROUPS.map((g) => (
-        <section key={g.heading} className="space-y-3">
-          <div className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
-            <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-[0.12em]">{g.heading}</h2>
-            <span className="text-xs text-zinc-500">{g.description}</span>
+        <section key={g.heading} className="space-y-4">
+          <div className="section-heading">
+            <h2>{g.heading}</h2>
+            <span className="hint hidden sm:inline">{g.description}</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {g.strategies.map((s) => <StrategyCard key={s.route} s={s} />)}
           </div>
         </section>
       ))}
 
       {/* Secondary links */}
-      <section className="space-y-3">
-        <div className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
-          <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-[0.12em]">Other tools</h2>
-          <span className="text-xs text-zinc-500">Trackers, references, side activities</span>
+      <section className="space-y-4">
+        <div className="section-heading">
+          <h2>Other tools</h2>
+          <span className="hint hidden sm:inline">Trackers, references, side activities</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
           {SECONDARY_LINKS.map((l) => (
             <Link
               key={l.to}
               to={l.to}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800 hover:border-gold/40 hover:text-gold text-zinc-400 text-xs font-medium transition-colors"
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[color:var(--color-bg-raised)] border border-[color:var(--color-border)] hover:border-gold/40 hover:text-gold text-zinc-400 text-xs font-medium transition-all hover:-translate-y-0.5"
             >
-              <span className="text-sm" aria-hidden>{l.icon}</span>
+              <span className="text-base" aria-hidden>{l.icon}</span>
               <span className="truncate">{l.label}</span>
             </Link>
           ))}

@@ -40,22 +40,22 @@ function NavDropdown({ label, groups }: { label: string; groups: DropdownGroup[]
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className={`px-3 py-2 rounded-md text-xs uppercase tracking-wider font-semibold transition-colors flex items-center gap-1 ${
-          isActive
-            ? 'text-gold'
-            : 'text-zinc-400 hover:text-zinc-100'
+        className={`px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-[0.14em] font-semibold transition-all flex items-center gap-1.5 ${
+          isActive || open
+            ? 'text-gold bg-gold/10'
+            : 'text-zinc-400 hover:text-zinc-100 hover:bg-[color:var(--color-bg-overlay)]'
         }`}
       >
         {label}
         <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       {open && (
-        <div className="absolute top-full mt-1 left-0 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl p-2 z-50 animate-fade-in flex gap-2">
+        <div className="absolute top-full mt-2 left-0 bg-[color:var(--color-bg-raised)]/95 backdrop-blur-xl border border-[color:var(--color-border-light)] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.5)] p-3 z-50 animate-fade-in flex gap-3">
           {groups.map(group => (
-            <div key={group.title} className="min-w-[160px]">
-              <div className="px-3 pt-1 pb-2 text-[9px] uppercase tracking-widest text-zinc-600 font-bold border-b border-zinc-800 mb-1">
+            <div key={group.title} className="min-w-[170px]">
+              <div className="px-3 pt-0.5 pb-2 text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-semibold border-b border-[color:var(--color-border)] mb-1.5">
                 {group.title}
               </div>
               {group.items.map(item => (
@@ -64,8 +64,10 @@ function NavDropdown({ label, groups }: { label: string; groups: DropdownGroup[]
                   to={item.to}
                   onClick={() => setOpen(false)}
                   className={({ isActive }) =>
-                    `block px-3 py-2 rounded text-xs uppercase tracking-wider font-semibold transition-colors ${
-                      isActive ? 'text-gold bg-gold/10' : 'text-zinc-300 hover:bg-zinc-800 hover:text-gold'
+                    `block px-3 py-2 rounded-lg text-[11px] uppercase tracking-[0.1em] font-semibold transition-colors ${
+                      isActive
+                        ? 'text-gold bg-gold/10'
+                        : 'text-zinc-300 hover:bg-[color:var(--color-bg-overlay)] hover:text-gold'
                     }`
                   }
                 >
@@ -183,38 +185,40 @@ export default function Header() {
   };
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `px-3 py-2 rounded-md text-xs uppercase tracking-wider font-semibold transition-colors ${
+    `px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-[0.14em] font-semibold transition-all ${
       isActive
-        ? 'text-gold'
-        : 'text-zinc-400 hover:text-zinc-100'
+        ? 'text-gold bg-gold/10'
+        : 'text-zinc-400 hover:text-zinc-100 hover:bg-[color:var(--color-bg-overlay)]'
     }`;
 
   return (
     <header className="sticky top-0 z-50">
       {/* Top bar: server time + server selector + auth */}
-      <div className="bg-zinc-950 border-b border-zinc-800">
-        <div className="max-w-[1400px] mx-auto px-4 h-8 flex items-center justify-between">
+      <div className="bg-[color:var(--color-bg)]/95 backdrop-blur-md border-b border-[color:var(--color-border)]">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-8 flex items-center justify-between">
           <ServerTime />
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               {(Object.keys(SERVER_LABELS) as AlbionServer[]).map(s => (
                 <button
                   key={s}
                   onClick={() => handleServer(s)}
-                  className={`text-[10px] uppercase tracking-wider font-semibold transition-colors ${
-                    server === s ? 'text-gold' : 'text-zinc-600 hover:text-zinc-400'
+                  className={`text-[10px] uppercase tracking-[0.12em] font-semibold px-2 py-0.5 rounded transition-colors flex items-center gap-1 ${
+                    server === s
+                      ? 'text-gold bg-gold/10'
+                      : 'text-zinc-600 hover:text-zinc-400 hover:bg-[color:var(--color-bg-raised)]'
                   }`}
                 >
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1"></span>
+                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${server === s ? 'bg-green-400' : 'bg-zinc-700'}`}></span>
                   {SERVER_LABELS[s]}
                 </button>
               ))}
             </div>
             {!authLoading && (
               user ? (
-                <div className="flex items-center gap-2 pl-3 border-l border-zinc-800">
+                <div className="flex items-center gap-2 pl-3 border-l border-[color:var(--color-border)]">
                   {user.user_metadata?.avatar_url && (
-                    <img src={user.user_metadata.avatar_url} alt="" className="w-5 h-5 rounded-full" />
+                    <img src={user.user_metadata.avatar_url} alt="" className="w-5 h-5 rounded-full ring-1 ring-gold/30" />
                   )}
                   <NavLink to="/profile" className="text-[11px] text-zinc-300 hover:text-gold transition-colors">
                     {user.user_metadata?.full_name || 'Profile'}
@@ -224,12 +228,12 @@ export default function Header() {
               ) : (
                 <button
                   onClick={signInWithDiscord}
-                  className="pl-3 border-l border-zinc-800 flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-[#5865F2] transition-colors"
+                  className="pl-3 border-l border-[color:var(--color-border)] flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-[#5865F2] transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
                   </svg>
-                  LOGIN
+                  Login
                 </button>
               )
             )}
@@ -238,15 +242,17 @@ export default function Header() {
       </div>
 
       {/* Main nav bar */}
-      <div className="bg-zinc-900/95 backdrop-blur-md border-b border-zinc-800">
-        <div className="max-w-[1400px] mx-auto px-4 h-14 flex items-center justify-between">
-          <NavLink to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 rounded-md bg-gold/20 border border-gold/40 flex items-center justify-center">
-              <span className="text-gold font-black text-sm">AC</span>
+      <div className="bg-[color:var(--color-bg-raised)]/90 backdrop-blur-xl border-b border-[color:var(--color-border)]">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          <NavLink to="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
+            <div className="relative w-9 h-9 rounded-lg bg-gradient-to-br from-gold/30 via-gold/15 to-transparent border border-gold/40 flex items-center justify-center shadow-[0_2px_12px_rgba(224,176,80,0.15)]">
+              <span className="text-gold font-black text-sm tracking-tighter">AC</span>
             </div>
             <div>
-              <div className="text-sm font-black text-gold tracking-wider leading-none">ALBIONCRAFTS</div>
-              <div className="text-[9px] text-zinc-500 tracking-widest uppercase">Market Tools</div>
+              <div className="text-sm font-bold text-zinc-100 tracking-tight leading-none">
+                Albion<span className="text-gold">Crafts</span>
+              </div>
+              <div className="text-[9px] text-zinc-500 tracking-[0.2em] uppercase mt-0.5">Market Tools</div>
             </div>
           </NavLink>
 
