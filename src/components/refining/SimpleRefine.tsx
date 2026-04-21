@@ -176,6 +176,11 @@ export default function SimpleRefine() {
     setCustomSell(null);
   }, [tier, enchant]);
 
+  // T2/T3 have no enchanted variants — reset to .0 when dropping below T4
+  useEffect(() => {
+    if (tier < 4) setEnchant(0);
+  }, [tier]);
+
   // Buy prices: default from refine city if available, otherwise cheapest
   const bestBuy = useMemo(() => {
     if (!prices) return null;
@@ -437,8 +442,8 @@ export default function SimpleRefine() {
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Tier</label>
-              <div className="grid grid-cols-5 gap-1">
-                {[4, 5, 6, 7, 8].map(t => (
+              <div className="grid grid-cols-7 gap-1">
+                {[2, 3, 4, 5, 6, 7, 8].map(t => (
                   <button key={t} onClick={() => setTier(t)} className={`h-9 rounded-lg text-xs font-bold transition-all ${tier === t ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'}`}>
                     T{t}
                   </button>
@@ -446,17 +451,27 @@ export default function SimpleRefine() {
               </div>
             </div>
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Enchant</label>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">
+                Enchant
+                {tier < 4 && <span className="ml-2 text-zinc-600 normal-case">(T2/T3 has no enchants)</span>}
+              </label>
               <div className="grid grid-cols-5 gap-1">
                 {[0, 1, 2, 3, 4].map(e => (
-                  <button key={e} onClick={() => setEnchant(e)} className={`h-9 rounded-lg text-xs font-bold transition-all ${enchant === e ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'}`}>
+                  <button
+                    key={e}
+                    onClick={() => setEnchant(e)}
+                    disabled={tier < 4 && e > 0}
+                    className={`h-9 rounded-lg text-xs font-bold transition-all
+                      ${enchant === e ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'}
+                      ${tier < 4 && e > 0 ? 'opacity-25 cursor-not-allowed' : ''}`}
+                  >
                     .{e}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Raw logs you have</label>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Raw resource amount</label>
               <input type="number" min={1} value={rawCount} onChange={(e) => setRawCount(parseInt(e.target.value) || 0)} className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
             </div>
           </div>
