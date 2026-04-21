@@ -53,7 +53,7 @@ interface ItemStat {
 }
 
 const MIN_PARTICIPANT_OPTIONS = [
-  { label: '2+', value: 2 },
+  { label: 'All', value: 1 },
   { label: '5+', value: 5 },
   { label: '10+', value: 10 },
   { label: '20+', value: 20 },
@@ -67,7 +67,7 @@ export default function MetaItems() {
   const [groupEventsFound, setGroupEventsFound] = useState(0);
   const [fetchKey, setFetchKey] = useState(0);
 
-  const [minParticipants, setMinParticipants] = useState(10);
+  const [minParticipants, setMinParticipants] = useState(1);
   const [selectedSlot, setSelectedSlot] = useState<string>('MainHand');
   const [minTier, setMinTier] = useState(4);
 
@@ -97,7 +97,12 @@ export default function MetaItems() {
         if (page) allEvents.push(...page);
       }
 
-      const groupEvents = allEvents.filter(e => (e.numberOfParticipants ?? 1) >= minParticipants);
+      // numberOfParticipants is 0 for many solo kills — treat 0 as 1.
+      // Only exclude events we KNOW are too small.
+      const groupEvents = allEvents.filter(e => {
+        const n = e.numberOfParticipants || e.GroupMemberCount || 1;
+        return n >= minParticipants;
+      });
 
       // Aggregate item usage from both killer AND victim equipment
       const itemMap = new Map<string, ItemStat>();
@@ -164,10 +169,11 @@ export default function MetaItems() {
                 <span>{eventsAnalyzed} events fetched</span>
                 <span className="text-zinc-700">·</span>
                 <span className={groupEventsFound > 0 ? 'text-emerald-500' : 'text-red-400'}>
-                  {groupEventsFound} group fights ({minParticipants}+ players)
+                  {groupEventsFound} kills matched
+                  {minParticipants > 1 ? ` (${minParticipants}+ players)` : ''}
                 </span>
                 {groupEventsFound === 0 && (
-                  <span className="text-amber-500">— lower the player count filter</span>
+                  <span className="text-amber-500">— lower the fight size filter</span>
                 )}
               </div>
             )}
