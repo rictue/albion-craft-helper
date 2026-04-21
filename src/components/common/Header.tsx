@@ -126,6 +126,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
         { to: '/guilds', label: 'Guilds' },
         { to: '/killboard', label: 'Killboard' },
         { to: '/top-fame', label: 'Top Fame' },
+        { to: '/meta', label: 'Meta Items' },
       ],
     },
     {
@@ -318,6 +319,7 @@ export default function Header() {
                 items: [
                   { to: '/killboard', label: 'Killboard' },
                   { to: '/top-fame', label: 'Top Kill Fame' },
+                  { to: '/meta', label: 'Meta Items' },
                 ],
               },
             ]} />
