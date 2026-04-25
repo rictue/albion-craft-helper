@@ -1,28 +1,29 @@
 /**
  * Cooking calculator — single-recipe deep-dive + bulk scan modes.
  *
- * The single-recipe view mirrors SimpleRefine's sidebar layout: numbered
- * config steps on the left, full breakdown on the right. The bulk scan
- * mode falls back to the old "scan all recipes ranked by profit" flow.
+ * Each cooking craft outputs 10 meals (verified against ao-bin-dumps).
+ * Recipes only exist at specific tiers per category — see cooking.ts.
  *
  * Math:
  *   - RR uses the LPB formula shared with refining: rr = lpb / (100 + lpb)
- *   - Focus cost uses computeFocusCost (cooking shares the same per-tier
- *     base values as refining/crafting)
+ *   - Focus base values come from the recipe directly (focusForEnchant),
+ *     then we apply the spec discount: cost × 0.5^((sumSpec·0.3 + tierSpec·2.5)/100)
  *   - Tax: 6.5% premium / 10.5% non-premium (setup + sales)
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { fetchPrices } from '../../services/api';
-import { COOKING_RECIPES, COOKING_CATEGORIES, COOKING_CITY_BONUS, BASE_COOKING_FOCUS } from '../../data/cooking';
+import {
+  COOKING_RECIPES, COOKING_CATEGORIES,
+  mealIdWithEnchant, ingredientsForEnchant, focusForEnchant,
+} from '../../data/cooking';
 import type { CookingRecipe } from '../../data/cooking';
 import { lpbToReturnRate } from '../../utils/returnRate';
-import { computeFocusCost } from '../../utils/focusCost';
 import { formatSilver, formatPercent } from '../../utils/formatters';
 import { getRefineSpec, setRefineSpec } from '../../data/specs';
 import {
-  TAX_PREMIUM, TAX_NON_PREMIUM, BASE_LPB, REFINE_CITY_LPB, FOCUS_LPB,
-  ROYAL_CITIES, DEFAULT_STATION_FEE,
+  TAX_PREMIUM, TAX_NON_PREMIUM, BASE_LPB, FOCUS_LPB,
+  DEFAULT_STATION_FEE,
 } from '../../data/constants';
 import SidebarLayout from '../common/SidebarLayout';
 import StepHeader from '../common/StepHeader';
@@ -30,6 +31,14 @@ import ItemIcon from '../common/ItemIcon';
 
 // Cooking accent matches in-game station: warm orange/amber
 const COOKING_ACCENT = { ring: 'orange-500', text: 'orange-300' };
+
+// Apply spec discount to a recipe's focus base, mirroring the refining formula.
+// totalSpec only contributes a 0.3× exponent factor; tier-specific spec is 2.5×.
+function applyFocusSpecDiscount(rawFocus: number, tierSpec: number, totalSpec: number): number {
+  const exponent = (totalSpec * 0.3 + tierSpec * 2.5) / 100;
+  const discount = Math.pow(0.5, exponent);
+  return Math.max(1, Math.round(rawFocus * discount));
+}
 
 // ============================================================================
 // PRICING HELPERS — module-level so useMemo deps stay clean
@@ -49,7 +58,7 @@ function cheapestFromMap(prices: PriceMap, itemId: string): { price: number; cit
 function bestSellFromMap(prices: PriceMap, itemId: string): { price: number; city: string } | null {
   const cityMap = prices.get(itemId);
   if (!cityMap || cityMap.size === 0) return null;
-  // Outlier filter: drop > 3× median to avoid 9.9M troll listings
+  // Outlier filter: drop > 3× median to avoid troll listings
   const sorted = [...cityMap.values()].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)] || 0;
   const cutoff = median * 3 || Infinity;
@@ -61,21 +70,28 @@ function bestSellFromMap(prices: PriceMap, itemId: string): { price: number; cit
   return best.price === 0 ? null : best;
 }
 
-// ============================================================================
-// SCAN RESULT TYPE (bulk mode)
-// ============================================================================
+// Recipes available for a given category (some categories don't have all tiers)
+function tiersForCategory(category: string): number[] {
+  const set = new Set<number>();
+  for (const r of COOKING_RECIPES) if (r.category === category) set.add(r.tier);
+  return [...set].sort();
+}
+function enchantsForRecipe(r: CookingRecipe): number[] {
+  return [0, ...r.enchants.map(e => e.level)];
+}
+
 interface ScanResult {
   mealId: string;
   mealName: string;
   category: string;
   tier: number;
   enchant: number;
-  totalCost: number;
-  effectiveCost: number;
-  sellPrice: number;
-  sellCity: string;
-  profit: number;
+  perCraftCost: number;
+  perCraftEffective: number;
+  perMealRevenue: number;
+  perCraftProfit: number;
   margin: number;
+  sellCity: string;
   hasMissing: boolean;
 }
 
@@ -127,35 +143,39 @@ function ModeSwitcher({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => v
 function SingleRecipe() {
   // Step 1 — What to cook
   const [category, setCategory] = useState<string>('Omelette');
-  const [tier, setTier] = useState(6);
+  const availableTiers = useMemo(() => tiersForCategory(category), [category]);
+  const [tier, setTier] = useState(() => availableTiers.find(t => t === 5) ?? availableTiers[0] ?? 3);
   const [enchant, setEnchant] = useState(0);
-  const [batchSize, setBatchSize] = useState(100);
+  const [batchSize, setBatchSize] = useState(100); // crafts (each = 10 meals)
 
   // Step 2 — Where & how
-  // (No cookCity state for SingleRecipe — Royal cities all neutral for cooking,
-  //  Caerleon excluded site-wide. The Where step is pure focus/spec/tax config.)
   const [useFocus, setUseFocus] = useState(true);
   const [premium, setPremium] = useState(true);
-  const [spec, setSpec] = useState(() => getRefineSpec('COOKING', 6));
+  const [spec, setSpec] = useState(() => getRefineSpec('COOKING', 5));
   const [feePerCraft, setFeePerCraft] = useState(DEFAULT_STATION_FEE);
 
   // Step 3 — Overrides
-  const [rrOverride, setRrOverride] = useState<number | null>(null); // 0-100 % override
+  const [rrOverride, setRrOverride] = useState<number | null>(null);
   const [customSell, setCustomSell] = useState<number | null>(null);
 
-  // Recipe
+  // Recipe lookup
   const recipe = useMemo<CookingRecipe | null>(() => {
-    return COOKING_RECIPES.find(
-      r => r.category === category && r.tier === tier && r.enchant === enchant
-    ) || null;
-  }, [category, tier, enchant]);
+    return COOKING_RECIPES.find(r => r.category === category && r.tier === tier) ?? null;
+  }, [category, tier]);
 
-  // Reset enchant if T2/T3 selected
+  // If category changes, snap tier to a valid value for that category
   useEffect(() => {
-    if (tier < 4) setEnchant(0);
-  }, [tier]);
+    if (!availableTiers.includes(tier)) setTier(availableTiers[0] ?? 3);
+  }, [category, availableTiers, tier]);
 
-  // Persist spec input
+  // Reset enchant if recipe doesn't have it
+  useEffect(() => {
+    if (!recipe) return;
+    const allowed = enchantsForRecipe(recipe);
+    if (!allowed.includes(enchant)) setEnchant(0);
+  }, [recipe, enchant]);
+
+  // Persist spec input — keyed by tier
   useEffect(() => {
     setSpec(getRefineSpec('COOKING', tier));
   }, [tier]);
@@ -166,24 +186,25 @@ function SingleRecipe() {
     setRefineSpec('COOKING', tier, v);
   };
 
-  // Cross-tier spec sum for the focus discount. Cooking uses the same
-  // formula as refining: 0.3× per other-tier spec point.
+  // Cross-tier spec sum (other cooking tiers contribute 0.3× to focus discount)
   const totalSpec = useMemo(() => {
     let sum = 0;
-    for (const t of [2, 3, 4, 5, 6, 7, 8]) {
+    for (const t of [1, 2, 3, 4, 5, 6, 7, 8]) {
       sum += t === tier ? spec : getRefineSpec('COOKING', t);
     }
     return sum;
   }, [tier, spec]);
 
   // Prices
-  const [prices, setPrices] = useState<Map<string, Map<string, number>>>(new Map());
+  const [prices, setPrices] = useState<PriceMap>(new Map());
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!recipe) return;
     setLoading(true);
-    const ids = [recipe.mealId, ...recipe.ingredients.map(i => i.itemId)];
+    const fullMealId = mealIdWithEnchant(recipe.mealId, enchant);
+    const ingredients = ingredientsForEnchant(recipe, enchant);
+    const ids = [fullMealId, recipe.mealId, ...ingredients.map(i => i.itemId)];
     const data = await fetchPrices(ids);
     const map = new Map<string, Map<string, number>>();
     for (const p of data) {
@@ -193,37 +214,31 @@ function SingleRecipe() {
     }
     setPrices(map);
     setLoading(false);
-  }, [recipe]);
+  }, [recipe, enchant]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
   // ============================== MATH ==============================
-  // No city bonus on Royal cities for cooking (only Caerleon, which we
-  // exclude site-wide for safety). LPB = base + focus only.
+  // Royal cities have no cooking bonus — only Caerleon (excluded), so
+  // LPB is base 18 + 59 (focus) at most.
   const lpb = BASE_LPB + (useFocus ? FOCUS_LPB : 0);
   const autoRr = lpbToReturnRate(lpb);
   const rr = rrOverride != null ? rrOverride / 100 : autoRr;
 
-  const focusCost = useMemo(() => {
-    if (!recipe) return 0;
-    return computeFocusCost({
-      tier: recipe.tier,
-      enchant: recipe.enchant,
-      tierSpec: spec,
-      totalResourceSpec: totalSpec,
-      baseOverride: BASE_COOKING_FOCUS[recipe.tier] ?? 0,
-    });
-  }, [recipe, spec, totalSpec]);
+  const rawFocus = recipe ? focusForEnchant(recipe, enchant) : 0;
+  const focusPerCraft = useFocus ? applyFocusSpecDiscount(rawFocus, spec, totalSpec) : 0;
 
   const taxRate = premium ? TAX_PREMIUM : TAX_NON_PREMIUM;
 
   const calc = useMemo(() => {
     if (!recipe) return null;
+    const fullMealId = mealIdWithEnchant(recipe.mealId, enchant);
+    const ingredients = ingredientsForEnchant(recipe, enchant);
 
     // Per-craft material cost (raw, before RR)
     let perCraftRaw = 0;
     const ingredientDetail: Array<{ name: string; itemId: string; count: number; unit: number; total: number; city: string; missing: boolean }> = [];
-    for (const ing of recipe.ingredients) {
+    for (const ing of ingredients) {
       const cheap = cheapestFromMap(prices, ing.itemId);
       const unit = cheap?.price ?? 0;
       const totalIng = unit * ing.count;
@@ -236,30 +251,33 @@ function SingleRecipe() {
 
     const sellInfo = customSell != null
       ? { price: customSell, city: 'Custom' }
-      : bestSellFromMap(prices, recipe.mealId) ?? { price: 0, city: '-' };
+      : bestSellFromMap(prices, fullMealId) ?? { price: 0, city: '-' };
 
-    // Effective per-craft cost after return rate (RR returns ingredients)
+    // Effective per-craft cost after return rate
     const effectivePerCraft = perCraftRaw * (1 - rr);
 
-    // Sell after tax
-    const sellAfterTax = sellInfo.price * (1 - taxRate);
+    // Sell after tax — per single meal (each craft outputs `amountCrafted`)
+    const sellAfterTaxPerMeal = sellInfo.price * (1 - taxRate);
 
-    // Per-craft profit (excluding station fee)
-    const profitPerCraft = sellAfterTax - effectivePerCraft - feePerCraft;
+    // Per craft: cost = ingredients × (1 - RR) + station fee
+    //           revenue = amountCrafted × sell × (1 - tax)
+    const revenuePerCraft = sellAfterTaxPerMeal * recipe.amountCrafted;
+    const profitPerCraft = revenuePerCraft - effectivePerCraft - feePerCraft;
+    const profitPerMeal = profitPerCraft / recipe.amountCrafted;
 
     // Batch math
     const batchProfit = profitPerCraft * batchSize;
-    const batchRevenue = sellAfterTax * batchSize;
+    const batchMeals = recipe.amountCrafted * batchSize;
     const batchCost = (effectivePerCraft + feePerCraft) * batchSize;
-    const focusForBatch = useFocus ? focusCost * batchSize : 0;
+    const focusForBatch = useFocus ? focusPerCraft * batchSize : 0;
     const profitPerFocus = focusForBatch > 0 ? batchProfit / focusForBatch : 0;
 
     return {
-      ingredientDetail, perCraftRaw, effectivePerCraft, sellInfo, sellAfterTax,
-      profitPerCraft, batchProfit, batchRevenue, batchCost, focusForBatch,
-      profitPerFocus,
+      ingredientDetail, perCraftRaw, effectivePerCraft, sellInfo, sellAfterTaxPerMeal,
+      revenuePerCraft, profitPerCraft, profitPerMeal,
+      batchProfit, batchCost, batchMeals, focusForBatch, profitPerFocus,
     };
-  }, [recipe, prices, customSell, rr, feePerCraft, taxRate, batchSize, focusCost, useFocus]);
+  }, [recipe, prices, customSell, rr, feePerCraft, taxRate, batchSize, focusPerCraft, useFocus, enchant]);
 
   if (!recipe) {
     return (
@@ -268,6 +286,8 @@ function SingleRecipe() {
       </div>
     );
   }
+
+  const allEnchants = enchantsForRecipe(recipe);
 
   const sidebar = (
     <>
@@ -285,20 +305,40 @@ function SingleRecipe() {
           </select>
         </div>
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Tier</label>
-          <div className="grid grid-cols-7 gap-1">
-            {[2, 3, 4, 5, 6, 7, 8].map(t => {
-              const exists = COOKING_RECIPES.some(r => r.category === category && r.tier === t);
+          <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">
+            Tier <span className="text-zinc-700 normal-case ml-1">{availableTiers.length} available</span>
+          </label>
+          <div className="grid grid-cols-3 gap-1">
+            {availableTiers.map(t => (
+              <button
+                key={t}
+                onClick={() => setTier(t)}
+                className={`h-9 rounded-lg text-xs font-bold transition-all
+                  ${tier === t ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'}`}
+              >
+                T{t}
+              </button>
+            ))}
+          </div>
+          <div className="text-[10px] text-zinc-600 mt-1.5">{recipe.mealName}</div>
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">
+            Enchant
+          </label>
+          <div className="grid grid-cols-4 gap-1">
+            {[0, 1, 2, 3].map(e => {
+              const allowed = allEnchants.includes(e);
               return (
                 <button
-                  key={t}
-                  onClick={() => setTier(t)}
-                  disabled={!exists}
+                  key={e}
+                  onClick={() => allowed && setEnchant(e)}
+                  disabled={!allowed}
                   className={`h-9 rounded-lg text-xs font-bold transition-all
-                    ${tier === t ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'}
-                    ${!exists ? 'opacity-25 cursor-not-allowed' : ''}`}
+                    ${enchant === e ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'}
+                    ${!allowed ? 'opacity-25 cursor-not-allowed' : ''}`}
                 >
-                  T{t}
+                  .{e}
                 </button>
               );
             })}
@@ -306,37 +346,21 @@ function SingleRecipe() {
         </div>
         <div>
           <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">
-            Enchant {tier < 4 && <span className="ml-2 text-zinc-600 normal-case">(T2/T3 has no enchants)</span>}
+            Crafts to do <span className="text-zinc-700 normal-case">×{recipe.amountCrafted} meals each</span>
           </label>
-          <div className="grid grid-cols-4 gap-1">
-            {[0, 1, 2, 3].map(e => (
-              <button
-                key={e}
-                onClick={() => setEnchant(e)}
-                disabled={tier < 4 && e > 0}
-                className={`h-9 rounded-lg text-xs font-bold transition-all
-                  ${enchant === e ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'}
-                  ${tier < 4 && e > 0 ? 'opacity-25 cursor-not-allowed' : ''}`}
-              >
-                .{e}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Batch size (crafts)</label>
           <input
             type="number" min={1}
             value={batchSize}
             onChange={(e) => setBatchSize(Math.max(1, parseInt(e.target.value) || 1))}
             className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-orange-500/40"
           />
+          <div className="text-[10px] text-zinc-600 mt-1">= {(batchSize * recipe.amountCrafted).toLocaleString()} meals</div>
         </div>
       </div>
 
       {/* Step 2 — Where */}
       <div className="surface p-4 space-y-3">
-        <StepHeader num={2} label="Where & how" accent={COOKING_ACCENT} />
+        <StepHeader num={2} label="How to cook" accent={COOKING_ACCENT} />
         <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg px-3 py-2 text-[10px] text-zinc-500 leading-relaxed">
           <span className="text-zinc-300 font-semibold">No Royal city cooking bonus.</span>{' '}
           Caerleon is the only city with a cook-station bonus and we exclude it
@@ -344,7 +368,7 @@ function SingleRecipe() {
         </div>
         <div>
           <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">
-            Your spec (T{tier} {category}): {spec}
+            Your cooking spec (T{tier}): {spec}
           </label>
           <input
             type="range" min={0} max={100}
@@ -355,7 +379,7 @@ function SingleRecipe() {
         </div>
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-orange-500" />
-          <span className="text-xs text-zinc-300">Use focus <span className="text-zinc-600">({focusCost} per craft)</span></span>
+          <span className="text-xs text-zinc-300">Use focus <span className="text-zinc-600">({focusPerCraft} per craft)</span></span>
         </label>
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={premium} onChange={(e) => setPremium(e.target.checked)} className="accent-orange-500" />
@@ -392,7 +416,7 @@ function SingleRecipe() {
         </div>
         <div>
           <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">
-            Custom sell price <span className="text-zinc-700 normal-case">{calc?.sellInfo.price ? `(market: ${formatSilver(calc.sellInfo.price)})` : ''}</span>
+            Custom sell price (per meal) <span className="text-zinc-700 normal-case">{calc?.sellInfo.price ? `(market: ${formatSilver(calc.sellInfo.price)})` : ''}</span>
           </label>
           <input
             type="number" min={0}
@@ -416,12 +440,13 @@ function SingleRecipe() {
     </>
   );
 
+  const fullMealId = mealIdWithEnchant(recipe.mealId, enchant);
   const breadcrumb = (
     <>
       <span className="w-6 h-px bg-orange-400/60" />
       <span className="text-orange-300">Cooking</span>
       <span className="text-zinc-700">/</span>
-      <span>{recipe.mealName}</span>
+      <span>{recipe.mealName}{enchant > 0 && ` .${enchant}`}</span>
     </>
   );
 
@@ -430,14 +455,15 @@ function SingleRecipe() {
       {/* Recipe info */}
       <div className="surface p-5">
         <div className="flex items-start gap-4">
-          <ItemIcon itemId={recipe.mealId} size={64} />
+          <ItemIcon itemId={fullMealId} size={64} />
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-bold text-zinc-100">{recipe.mealName}</h2>
             <div className="flex items-center gap-2 mt-1 text-xs">
-              <span className="text-gold font-bold">T{recipe.tier}{recipe.enchant > 0 && `.${recipe.enchant}`}</span>
+              <span className="text-gold font-bold">T{recipe.tier}{enchant > 0 && `.${enchant}`}</span>
               <span className="text-zinc-600">·</span>
               <span className="text-zinc-400">{recipe.category}</span>
-              {/* city bonus indicator removed — Royal cities have no cooking bonus */}
+              <span className="text-zinc-600">·</span>
+              <span className="text-emerald-400">×{recipe.amountCrafted} per craft</span>
             </div>
           </div>
           <div className="text-right">
@@ -445,7 +471,9 @@ function SingleRecipe() {
             <div className="text-base font-bold text-zinc-100 tabular-nums">
               {calc?.sellInfo.price ? formatSilver(calc.sellInfo.price) : '—'}
             </div>
-            <div className="text-[10px] text-zinc-600">after {(taxRate * 100).toFixed(1)}% tax: {calc?.sellAfterTax ? formatSilver(calc.sellAfterTax) : '—'}</div>
+            <div className="text-[10px] text-zinc-600">
+              after {(taxRate * 100).toFixed(1)}% tax: {calc?.sellAfterTaxPerMeal ? formatSilver(calc.sellAfterTaxPerMeal) : '—'} / meal
+            </div>
           </div>
         </div>
       </div>
@@ -453,7 +481,7 @@ function SingleRecipe() {
       {/* Ingredients */}
       <div className="surface overflow-hidden">
         <div className="px-4 py-2.5 border-b border-zinc-800 text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
-          Ingredients per craft
+          Ingredients per craft (makes {recipe.amountCrafted} meals)
         </div>
         <div className="divide-y divide-zinc-800/60">
           {calc?.ingredientDetail.map(ing => (
@@ -480,6 +508,10 @@ function SingleRecipe() {
             <span className="text-xs text-emerald-400/80 uppercase tracking-wider">After RR ({(rr * 100).toFixed(1)}%)</span>
             <span className="text-sm font-semibold tabular-nums text-emerald-300">{formatSilver(calc?.effectivePerCraft || 0)}</span>
           </div>
+          <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-900/40">
+            <span className="text-xs text-zinc-500 uppercase tracking-wider">Revenue / craft (×{recipe.amountCrafted})</span>
+            <span className="text-sm font-semibold tabular-nums text-zinc-100">{formatSilver(calc?.revenuePerCraft || 0)}</span>
+          </div>
         </div>
       </div>
 
@@ -488,38 +520,34 @@ function SingleRecipe() {
         <div className="space-y-1.5">
           <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">Return rate</div>
           <Row label="Base LPB" value={`${BASE_LPB}`} />
-          {/* city bonus row hidden — no Royal cooking bonus exists */}
           {useFocus && <Row label="Focus" value={`+${FOCUS_LPB}`} accent="orange" />}
           <Row label="Total LPB" value={`${lpb}`} bold />
           <Row label="→ Return rate" value={`${(rr * 100).toFixed(1)}%`} bold accent="emerald" />
         </div>
         <div className="space-y-1.5">
           <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">Focus</div>
-          <Row label={`Base T${recipe.tier}`} value={`${BASE_COOKING_FOCUS[recipe.tier]}`} />
-          {recipe.enchant > 0 && <Row label={`Enchant ×${[1,2,4,8][recipe.enchant]}`} value="" />}
+          <Row label="Recipe base" value={`${rawFocus}`} />
           <Row label={`Spec ${spec}`} value="" />
-          <Row label="Per craft" value={useFocus ? `${focusCost}` : '—'} bold accent="orange" />
+          <Row label={`Cross-tier sum ${totalSpec}`} value="" />
+          <Row label="Per craft" value={useFocus ? `${focusPerCraft}` : '—'} bold accent="orange" />
         </div>
       </div>
 
       {/* Profit summary */}
       <div className={`rounded-xl border-2 px-5 py-4 ${(calc?.profitPerCraft ?? 0) >= 0 ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-red-500/5 border-red-500/30'}`}>
-        <div className="flex items-start justify-between mb-3">
+        <div className="grid grid-cols-2 gap-4 mb-3">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Profit / craft</div>
+            <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Profit / craft <span className="text-zinc-700">(×{recipe.amountCrafted} meals)</span></div>
             <div className={`text-2xl font-bold tabular-nums ${(calc?.profitPerCraft ?? 0) >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
               {(calc?.profitPerCraft ?? 0) >= 0 ? '+' : ''}{formatSilver(calc?.profitPerCraft ?? 0)}
             </div>
           </div>
-          {useFocus && (calc?.profitPerFocus ?? 0) > 0 && (
-            <div className="text-right">
-              <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Per focus</div>
-              <div className="text-lg font-bold tabular-nums text-orange-300">
-                {formatSilver(calc?.profitPerFocus ?? 0)}
-              </div>
-              <div className="text-[10px] text-zinc-600">silver / focus</div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Profit / meal</div>
+            <div className={`text-2xl font-bold tabular-nums ${(calc?.profitPerMeal ?? 0) >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+              {(calc?.profitPerMeal ?? 0) >= 0 ? '+' : ''}{formatSilver(calc?.profitPerMeal ?? 0)}
             </div>
-          )}
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3 pt-3 border-t border-zinc-800">
@@ -528,16 +556,18 @@ function SingleRecipe() {
             <div className={`text-base font-bold tabular-nums ${(calc?.batchProfit ?? 0) >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
               {(calc?.batchProfit ?? 0) >= 0 ? '+' : ''}{formatSilver(calc?.batchProfit ?? 0)}
             </div>
-            <div className="text-[9px] text-zinc-600">{batchSize} crafts</div>
-          </div>
-          <div>
-            <div className="text-[9px] uppercase tracking-wider text-zinc-500">Batch cost</div>
-            <div className="text-base font-bold tabular-nums text-zinc-300">{formatSilver(calc?.batchCost ?? 0)}</div>
+            <div className="text-[9px] text-zinc-600">{batchSize} crafts → {(calc?.batchMeals ?? 0).toLocaleString()} meals</div>
           </div>
           <div>
             <div className="text-[9px] uppercase tracking-wider text-zinc-500">Focus needed</div>
             <div className="text-base font-bold tabular-nums text-orange-300">
-              {useFocus ? (calc?.focusForBatch ?? 0).toLocaleString() : '—'}
+              {useFocus ? Math.round(calc?.focusForBatch ?? 0).toLocaleString() : '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] uppercase tracking-wider text-zinc-500">Per focus</div>
+            <div className="text-base font-bold tabular-nums text-orange-300">
+              {useFocus && (calc?.profitPerFocus ?? 0) > 0 ? formatSilver(calc?.profitPerFocus ?? 0) : '—'}
             </div>
           </div>
         </div>
@@ -557,11 +587,10 @@ function Row({ label, value, bold, accent }: { label: string; value: string; bol
 }
 
 // ============================================================================
-// BULK SCAN MODE — kept simple, ranked profit list
+// BULK SCAN MODE — ranked by profit per craft
 // ============================================================================
 
 function BulkScan() {
-  const [cookCity, setCookCity] = useState('Lymhurst');
   const [useFocus, setUseFocus] = useState(true);
   const [premium, setPremium] = useState(true);
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -576,14 +605,21 @@ function BulkScan() {
     setScanning(true);
     setResults([]);
     try {
-      const recipes = COOKING_RECIPES.filter(r =>
-        (filterCategory === 'all' || r.category === filterCategory) &&
-        (filterEnchant === 'all' || r.enchant === filterEnchant)
-      );
+      // Build the list of (recipe, enchant) pairs to scan
+      const pairs: Array<{ recipe: CookingRecipe; enchant: number }> = [];
+      for (const r of COOKING_RECIPES) {
+        if (filterCategory !== 'all' && r.category !== filterCategory) continue;
+        const allowedEnchants = filterEnchant === 'all' ? enchantsForRecipe(r) : [filterEnchant];
+        for (const e of allowedEnchants) {
+          if (e > 0 && !r.enchants.find(x => x.level === e)) continue;
+          pairs.push({ recipe: r, enchant: e });
+        }
+      }
+
       const idSet = new Set<string>();
-      for (const r of recipes) {
-        idSet.add(r.mealId);
-        for (const ing of r.ingredients) idSet.add(ing.itemId);
+      for (const { recipe, enchant } of pairs) {
+        idSet.add(mealIdWithEnchant(recipe.mealId, enchant));
+        for (const ing of ingredientsForEnchant(recipe, enchant)) idSet.add(ing.itemId);
       }
       const data = await fetchPrices([...idSet]);
 
@@ -598,10 +634,10 @@ function BulkScan() {
       }
 
       const out: ScanResult[] = [];
-      for (const r of recipes) {
-        const cityMap = sellMap.get(r.mealId);
+      for (const { recipe, enchant } of pairs) {
+        const fullMealId = mealIdWithEnchant(recipe.mealId, enchant);
+        const cityMap = sellMap.get(fullMealId);
         if (!cityMap || cityMap.size === 0) continue;
-        // Outlier filter on sell side
         const sorted = [...cityMap.values()].sort((a, b) => a - b);
         const median = sorted[Math.floor(sorted.length / 2)];
         let bestSell = { price: 0, city: '' };
@@ -613,29 +649,31 @@ function BulkScan() {
 
         let totalRaw = 0;
         let hasMissing = false;
-        for (const ing of r.ingredients) {
+        for (const ing of ingredientsForEnchant(recipe, enchant)) {
           const cheap = cheapMap.get(ing.itemId);
           if (!cheap) { hasMissing = true; continue; }
           totalRaw += cheap.price * ing.count;
         }
         if (totalRaw === 0) continue;
 
-        const cityBonus = (COOKING_CITY_BONUS[cookCity] || []).includes(r.category);
-        const lpb = BASE_LPB + (cityBonus ? REFINE_CITY_LPB : 0) + (useFocus ? FOCUS_LPB : 0);
+        const lpb = BASE_LPB + (useFocus ? FOCUS_LPB : 0);
         const rr = lpbToReturnRate(lpb);
         const effectiveCost = totalRaw * (1 - rr);
-        const sellAfterTax = bestSell.price * (1 - taxRate);
-        const profit = sellAfterTax - effectiveCost;
-        const margin = sellAfterTax > 0 ? (profit / sellAfterTax) * 100 : 0;
+        const sellAfterTaxPerMeal = bestSell.price * (1 - taxRate);
+        const revenuePerCraft = sellAfterTaxPerMeal * recipe.amountCrafted;
+        const profit = revenuePerCraft - effectiveCost;
+        const margin = revenuePerCraft > 0 ? (profit / revenuePerCraft) * 100 : 0;
 
         out.push({
-          mealId: r.mealId, mealName: r.mealName, category: r.category,
-          tier: r.tier, enchant: r.enchant, totalCost: totalRaw, effectiveCost,
-          sellPrice: bestSell.price, sellCity: bestSell.city, profit, margin, hasMissing,
+          mealId: fullMealId, mealName: recipe.mealName, category: recipe.category,
+          tier: recipe.tier, enchant,
+          perCraftCost: totalRaw, perCraftEffective: effectiveCost,
+          perMealRevenue: sellAfterTaxPerMeal,
+          perCraftProfit: profit, margin, sellCity: bestSell.city, hasMissing,
         });
       }
 
-      out.sort((a, b) => b.profit - a.profit);
+      out.sort((a, b) => b.perCraftProfit - a.perCraftProfit);
       setResults(out);
       setScannedAt(new Date().toLocaleTimeString());
     } catch (err) {
@@ -643,17 +681,11 @@ function BulkScan() {
     } finally {
       setScanning(false);
     }
-  }, [cookCity, useFocus, filterCategory, filterEnchant, taxRate]);
+  }, [useFocus, filterCategory, filterEnchant, taxRate]);
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-6 space-y-4">
       <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 flex flex-wrap items-end gap-4">
-        <div>
-          <label className="text-[10px] uppercase tracking-wider text-zinc-500 block mb-1.5">Cooking City</label>
-          <select value={cookCity} onChange={(e) => setCookCity(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200">
-            {ROYAL_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
         <div>
           <label className="text-[10px] uppercase tracking-wider text-zinc-500 block mb-1.5">Category</label>
           <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200">
@@ -710,9 +742,9 @@ function BulkScan() {
                 <th className="text-left px-4 py-3 w-8">#</th>
                 <th className="text-left px-4 py-3">Meal</th>
                 <th className="text-right px-4 py-3">Tier</th>
-                <th className="text-right px-4 py-3">Sell</th>
-                <th className="text-right px-4 py-3">Cost</th>
-                <th className="text-right px-4 py-3">Profit</th>
+                <th className="text-right px-4 py-3">Sell/meal</th>
+                <th className="text-right px-4 py-3">Cost/craft</th>
+                <th className="text-right px-4 py-3">Profit/craft</th>
                 <th className="text-right px-4 py-3">Margin</th>
               </tr>
             </thead>
@@ -725,17 +757,17 @@ function BulkScan() {
                       <ItemIcon itemId={r.mealId} size={32} />
                       <div>
                         <div className="text-xs font-semibold text-zinc-200">{r.mealName}</div>
-                        <div className="text-[10px] text-zinc-600">@ {r.sellCity}</div>
+                        <div className="text-[10px] text-zinc-600">@ {r.sellCity} · ×10 per craft</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-right text-xs text-gold font-bold">T{r.tier}{r.enchant > 0 && `.${r.enchant}`}</td>
-                  <td className="px-4 py-2.5 text-right text-xs text-zinc-300 tabular-nums">{formatSilver(r.sellPrice)}</td>
-                  <td className="px-4 py-2.5 text-right text-xs text-zinc-500 tabular-nums">{formatSilver(r.effectiveCost)}</td>
-                  <td className={`px-4 py-2.5 text-right text-sm font-bold tabular-nums ${r.profit >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
-                    {r.profit >= 0 ? '+' : ''}{formatSilver(r.profit)}
+                  <td className="px-4 py-2.5 text-right text-xs text-zinc-300 tabular-nums">{formatSilver(r.perMealRevenue)}</td>
+                  <td className="px-4 py-2.5 text-right text-xs text-zinc-500 tabular-nums">{formatSilver(r.perCraftEffective)}</td>
+                  <td className={`px-4 py-2.5 text-right text-sm font-bold tabular-nums ${r.perCraftProfit >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+                    {r.perCraftProfit >= 0 ? '+' : ''}{formatSilver(r.perCraftProfit)}
                   </td>
-                  <td className={`px-4 py-2.5 text-right text-xs tabular-nums ${r.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <td className={`px-4 py-2.5 text-right text-xs tabular-nums ${r.perCraftProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {formatPercent(r.margin)}
                   </td>
                 </tr>
