@@ -218,24 +218,16 @@ export const COOKING_CATEGORIES = ['Soup', 'Salad', 'Omelette', 'Sandwich', 'Pie
 /**
  * Cooking station bonuses by city.
  *
- * IMPORTANT: This map is currently empty because the previous values
- * (e.g. "Lymhurst → Omelette") were uncorroborated guesses copied from
- * old code. The user verified in-game that Lymhurst does NOT show an
- * Omelette bonus, and three external sources we tried (wiki, fandom,
- * grind guides) didn't return cooking-specific city bonus data.
+ * Verified by the user in-game (2026-04-22): NONE of the five Royal
+ * cities give a cooking station bonus. The only city with a +bonus
+ * cooking station is Caerleon, which is excluded site-wide because it
+ * sits in a full PvP zone — too risky for a crafter to commit to.
  *
- * If your in-game cook station tooltip lists a meal-category bonus
- * for a Royal city, add it here. Mapping is `city → [category1, ...]`
- * where category matches one of COOKING_CATEGORIES. The +REFINE_CITY_LPB
- * (40 LPB) is applied when the active recipe's category is in the list.
+ * Map left empty by design. Royal cities all run at base 18 LPB
+ * (+59 with focus = max ~43.5% return rate). If SBI ever adds Royal
+ * cooking bonuses in a patch, fill this in then.
  */
-export const COOKING_CITY_BONUS: Record<string, string[]> = {
-  // Bridgewatch:   [],
-  // 'Fort Sterling': [],
-  // Lymhurst:      [],
-  // Martlock:      [],
-  // Thetford:      [],
-};
+export const COOKING_CITY_BONUS: Record<string, string[]> = {};
 
 // ===================== FOCUS COST =====================
 

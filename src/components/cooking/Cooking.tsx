@@ -132,7 +132,8 @@ function SingleRecipe() {
   const [batchSize, setBatchSize] = useState(100);
 
   // Step 2 — Where & how
-  const [cookCity, setCookCity] = useState<string>('Lymhurst');
+  // (No cookCity state for SingleRecipe — Royal cities all neutral for cooking,
+  //  Caerleon excluded site-wide. The Where step is pure focus/spec/tax config.)
   const [useFocus, setUseFocus] = useState(true);
   const [premium, setPremium] = useState(true);
   const [spec, setSpec] = useState(() => getRefineSpec('COOKING', 6));
@@ -197,8 +198,9 @@ function SingleRecipe() {
   useEffect(() => { refresh(); }, [refresh]);
 
   // ============================== MATH ==============================
-  const cityBonusActive = recipe ? (COOKING_CITY_BONUS[cookCity] || []).includes(category) : false;
-  const lpb = BASE_LPB + (cityBonusActive ? REFINE_CITY_LPB : 0) + (useFocus ? FOCUS_LPB : 0);
+  // No city bonus on Royal cities for cooking (only Caerleon, which we
+  // exclude site-wide for safety). LPB = base + focus only.
+  const lpb = BASE_LPB + (useFocus ? FOCUS_LPB : 0);
   const autoRr = lpbToReturnRate(lpb);
   const rr = rrOverride != null ? rrOverride / 100 : autoRr;
 
@@ -335,24 +337,10 @@ function SingleRecipe() {
       {/* Step 2 — Where */}
       <div className="surface p-4 space-y-3">
         <StepHeader num={2} label="Where & how" accent={COOKING_ACCENT} />
-        <div>
-          <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Cooking city</label>
-          <div className="grid grid-cols-1 gap-1">
-            {ROYAL_CITIES.map(c => {
-              const bonus = (COOKING_CITY_BONUS[c] || []).includes(category);
-              return (
-                <button
-                  key={c}
-                  onClick={() => setCookCity(c)}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition
-                    ${cookCity === c ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-400 border border-[color:var(--color-border)] hover:text-zinc-200'}`}
-                >
-                  <span>{c}</span>
-                  {bonus && <span className="text-[9px] text-emerald-400">★ {category} bonus</span>}
-                </button>
-              );
-            })}
-          </div>
+        <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg px-3 py-2 text-[10px] text-zinc-500 leading-relaxed">
+          <span className="text-zinc-300 font-semibold">No Royal city cooking bonus.</span>{' '}
+          Caerleon is the only city with a cook-station bonus and we exclude it
+          (full-PvP zone). Cook anywhere safe — RR is the same.
         </div>
         <div>
           <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">
@@ -449,7 +437,7 @@ function SingleRecipe() {
               <span className="text-gold font-bold">T{recipe.tier}{recipe.enchant > 0 && `.${recipe.enchant}`}</span>
               <span className="text-zinc-600">·</span>
               <span className="text-zinc-400">{recipe.category}</span>
-              {cityBonusActive && <span className="text-emerald-400">· ★ {cookCity} bonus</span>}
+              {/* city bonus indicator removed — Royal cities have no cooking bonus */}
             </div>
           </div>
           <div className="text-right">
@@ -500,7 +488,7 @@ function SingleRecipe() {
         <div className="space-y-1.5">
           <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1">Return rate</div>
           <Row label="Base LPB" value={`${BASE_LPB}`} />
-          {cityBonusActive && <Row label={`${cookCity} bonus`} value={`+${REFINE_CITY_LPB}`} accent="emerald" />}
+          {/* city bonus row hidden — no Royal cooking bonus exists */}
           {useFocus && <Row label="Focus" value={`+${FOCUS_LPB}`} accent="orange" />}
           <Row label="Total LPB" value={`${lpb}`} bold />
           <Row label="→ Return rate" value={`${(rr * 100).toFixed(1)}%`} bold accent="emerald" />
