@@ -216,19 +216,25 @@ export const COOKING_CATEGORIES = ['Soup', 'Salad', 'Omelette', 'Sandwich', 'Pie
 // ===================== CITY BONUSES =====================
 
 /**
- * Cooking station bonuses by city. Each city in Albion has a +X% LPB bonus
- * for one or two specialty meal categories (effectively +40 LPB on top of
- * the 18 base, mirroring the refining specialty system).
+ * Cooking station bonuses by city.
  *
- * Note: this mapping is the user-reported in-game arrangement; if SBI
- * shifts patches, regenerate from the wiki.
+ * IMPORTANT: This map is currently empty because the previous values
+ * (e.g. "Lymhurst → Omelette") were uncorroborated guesses copied from
+ * old code. The user verified in-game that Lymhurst does NOT show an
+ * Omelette bonus, and three external sources we tried (wiki, fandom,
+ * grind guides) didn't return cooking-specific city bonus data.
+ *
+ * If your in-game cook station tooltip lists a meal-category bonus
+ * for a Royal city, add it here. Mapping is `city → [category1, ...]`
+ * where category matches one of COOKING_CATEGORIES. The +REFINE_CITY_LPB
+ * (40 LPB) is applied when the active recipe's category is in the list.
  */
 export const COOKING_CITY_BONUS: Record<string, string[]> = {
-  'Martlock':      ['Stew', 'Roast'],
-  'Lymhurst':      ['Salad', 'Omelette'],
-  'Bridgewatch':   ['Sandwich', 'Pie'],
-  'Fort Sterling': ['Soup'],
-  'Thetford':      ['Soup', 'Salad'],
+  // Bridgewatch:   [],
+  // 'Fort Sterling': [],
+  // Lymhurst:      [],
+  // Martlock:      [],
+  // Thetford:      [],
 };
 
 // ===================== FOCUS COST =====================
