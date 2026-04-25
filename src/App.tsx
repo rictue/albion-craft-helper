@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import Header from './components/common/Header';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Keep the landing page (MoneyHub) eager so initial paint is instant.
 // The hub is a simple 'pick a strategy' page that onboards new users
@@ -58,6 +59,7 @@ export default function App() {
     <HashRouter>
       <div className="min-h-screen bg-bg">
         <Header />
+        <ErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<MoneyHub />} />
@@ -95,6 +97,7 @@ export default function App() {
             <Route path="/database" element={<CustomDatabase />} />
           </Routes>
         </Suspense>
+        </ErrorBoundary>
       </div>
     </HashRouter>
   );
