@@ -32,6 +32,36 @@ import ItemIcon from '../common/ItemIcon';
 const COOKING_ACCENT = { ring: 'orange-500', text: 'orange-300' };
 
 // ============================================================================
+// PRICING HELPERS — module-level so useMemo deps stay clean
+// ============================================================================
+type PriceMap = Map<string, Map<string, number>>;
+
+function cheapestFromMap(prices: PriceMap, itemId: string): { price: number; city: string } | null {
+  const cityMap = prices.get(itemId);
+  if (!cityMap || cityMap.size === 0) return null;
+  let best = { price: Infinity, city: '' };
+  for (const [city, price] of cityMap.entries()) {
+    if (price < best.price) best = { price, city };
+  }
+  return best.price === Infinity ? null : best;
+}
+
+function bestSellFromMap(prices: PriceMap, itemId: string): { price: number; city: string } | null {
+  const cityMap = prices.get(itemId);
+  if (!cityMap || cityMap.size === 0) return null;
+  // Outlier filter: drop > 3× median to avoid 9.9M troll listings
+  const sorted = [...cityMap.values()].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] || 0;
+  const cutoff = median * 3 || Infinity;
+  let best = { price: 0, city: '' };
+  for (const [city, price] of cityMap.entries()) {
+    if (price > cutoff) continue;
+    if (price > best.price) best = { price, city };
+  }
+  return best.price === 0 ? null : best;
+}
+
+// ============================================================================
 // SCAN RESULT TYPE (bulk mode)
 // ============================================================================
 interface ScanResult {
@@ -166,32 +196,6 @@ function SingleRecipe() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Pricing helpers — cheapest buy for ingredients, best sell for meal
-  const cheapestPrice = (itemId: string): { price: number; city: string } | null => {
-    const cityMap = prices.get(itemId);
-    if (!cityMap || cityMap.size === 0) return null;
-    let best = { price: Infinity, city: '' };
-    for (const [city, price] of cityMap.entries()) {
-      if (price < best.price) best = { price, city };
-    }
-    return best.price === Infinity ? null : best;
-  };
-
-  const bestSellPrice = (itemId: string): { price: number; city: string } | null => {
-    const cityMap = prices.get(itemId);
-    if (!cityMap || cityMap.size === 0) return null;
-    // Outlier filter: drop > 3× median
-    const sorted = [...cityMap.values()].sort((a, b) => a - b);
-    const median = sorted[Math.floor(sorted.length / 2)] || 0;
-    const cutoff = median * 3 || Infinity;
-    let best = { price: 0, city: '' };
-    for (const [city, price] of cityMap.entries()) {
-      if (price > cutoff) continue;
-      if (price > best.price) best = { price, city };
-    }
-    return best.price === 0 ? null : best;
-  };
-
   // ============================== MATH ==============================
   const cityBonusActive = recipe ? (COOKING_CITY_BONUS[cookCity] || []).includes(category) : false;
   const lpb = BASE_LPB + (cityBonusActive ? REFINE_CITY_LPB : 0) + (useFocus ? FOCUS_LPB : 0);
@@ -218,7 +222,7 @@ function SingleRecipe() {
     let perCraftRaw = 0;
     const ingredientDetail: Array<{ name: string; itemId: string; count: number; unit: number; total: number; city: string; missing: boolean }> = [];
     for (const ing of recipe.ingredients) {
-      const cheap = cheapestPrice(ing.itemId);
+      const cheap = cheapestFromMap(prices, ing.itemId);
       const unit = cheap?.price ?? 0;
       const totalIng = unit * ing.count;
       perCraftRaw += totalIng;
@@ -230,7 +234,7 @@ function SingleRecipe() {
 
     const sellInfo = customSell != null
       ? { price: customSell, city: 'Custom' }
-      : bestSellPrice(recipe.mealId) ?? { price: 0, city: '-' };
+      : bestSellFromMap(prices, recipe.mealId) ?? { price: 0, city: '-' };
 
     // Effective per-craft cost after return rate (RR returns ingredients)
     const effectivePerCraft = perCraftRaw * (1 - rr);
@@ -651,7 +655,7 @@ function BulkScan() {
     } finally {
       setScanning(false);
     }
-  }, [cookCity, useFocus, premium, filterCategory, filterEnchant, taxRate]);
+  }, [cookCity, useFocus, filterCategory, filterEnchant, taxRate]);
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-6 space-y-4">

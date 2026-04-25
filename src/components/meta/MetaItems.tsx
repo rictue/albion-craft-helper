@@ -65,21 +65,22 @@ export default function MetaItems() {
   const [loading, setLoading] = useState(true);
   const [eventsAnalyzed, setEventsAnalyzed] = useState(0);
   const [groupEventsFound, setGroupEventsFound] = useState(0);
-  const [fetchKey, setFetchKey] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [minParticipants, setMinParticipants] = useState(1);
   const [selectedSlot, setSelectedSlot] = useState<string>('MainHand');
   const [minTier, setMinTier] = useState(4);
 
   const load = useCallback(() => {
-    setFetchKey(k => k + 1);
+    setLoading(true);
+    setRefreshKey(k => k + 1);
   }, []);
 
+  // Fetch on mount and whenever filters or refreshKey change. setState only
+  // happens inside the async callback (after await), never synchronously in
+  // the effect body — keeps react-hooks/set-state-in-effect happy.
   useEffect(() => {
-    if (fetchKey === 0) return; // skip initial effect trigger — useCallback handles first load
     let cancelled = false;
-    setLoading(true);
-
     (async () => {
       // Fetch 5 pages × 51 = up to 255 recent kill events in parallel
       const pages = await Promise.all([
@@ -132,6 +133,7 @@ export default function MetaItems() {
         }
       }
 
+      if (cancelled) return;
       const sorted = [...itemMap.values()].sort((a, b) => b.count - a.count);
 
       setStats(sorted);
@@ -141,10 +143,7 @@ export default function MetaItems() {
     })();
 
     return () => { cancelled = true; };
-  }, [fetchKey, minParticipants, minTier]);
-
-  // Initial load
-  useEffect(() => { setFetchKey(1); }, []);
+  }, [refreshKey, minParticipants, minTier]);
 
   const filtered = (selectedSlot === 'All'
     ? stats
@@ -197,7 +196,7 @@ export default function MetaItems() {
             {MIN_PARTICIPANT_OPTIONS.map(opt => (
               <button
                 key={opt.value}
-                onClick={() => { setMinParticipants(opt.value); load(); }}
+                onClick={() => setMinParticipants(opt.value)}
                 className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
                   minParticipants === opt.value
                     ? 'bg-gold text-zinc-900'
@@ -237,7 +236,7 @@ export default function MetaItems() {
             {[1, 4, 6, 7, 8].map(t => (
               <button
                 key={t}
-                onClick={() => { setMinTier(t); load(); }}
+                onClick={() => setMinTier(t)}
                 className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
                   minTier === t
                     ? 'bg-gold text-zinc-900'
