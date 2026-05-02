@@ -199,11 +199,15 @@ export default function CraftingCalculator() {
   const returnRate = useMemo(() => {
     if (settings.returnRateOverride !== null) return settings.returnRateOverride / 100;
     if (!selectedItem) return 0.152;
-    const base = calculateReturnRate(settings.craftingCity, selectedItem.subcategory, settings.useFocus);
-    // Today's station / production bonus is a flat RR add-on on top of
-    // whatever the city + focus combo gives. User enters it as a percent.
-    const daily = (settings.dailyStationBonusPct || 0) / 100;
-    return Math.min(0.999, base + daily);
+    // Today's station / production bonus is part of the same LPB pool as city
+    // bonus and focus, then the combined value is converted to RR.
+    return calculateReturnRate(
+      settings.craftingCity,
+      selectedItem.subcategory,
+      settings.useFocus,
+      0,
+      settings.dailyStationBonusPct || 0,
+    );
   }, [settings.craftingCity, settings.useFocus, settings.returnRateOverride, settings.dailyStationBonusPct, selectedItem]);
 
   const result = useMemo(() => {

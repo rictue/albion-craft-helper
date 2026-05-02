@@ -8,10 +8,10 @@ interface Props {
 }
 
 const variantStyles = {
-  default: 'bg-bg-raised border-border',
-  profit: 'bg-green-950/20 border-green-900/30',
-  loss: 'bg-red-950/20 border-red-900/30',
-  highlight: 'bg-gold/5 border-gold/20',
+  default: 'medieval-panel',
+  profit: 'bg-green-950/20 border-green-700/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
+  loss: 'bg-red-950/25 border-red-800/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
+  highlight: 'bg-gold/10 border-gold/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
 };
 
 const paddingStyles = {
@@ -22,7 +22,7 @@ const paddingStyles = {
 
 export default function Card({ children, className = '', variant = 'default', padding = 'md' }: Props) {
   return (
-    <div className={`rounded-xl border ${variantStyles[variant]} ${paddingStyles[padding]} ${className}`}>
+    <div className={`rounded-lg border ${variantStyles[variant]} ${paddingStyles[padding]} ${className}`}>
       {children}
     </div>
   );
@@ -30,7 +30,7 @@ export default function Card({ children, className = '', variant = 'default', pa
 
 export function CardHeader({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`text-xs text-zinc-500 uppercase tracking-wider font-medium mb-3 ${className}`}>
+    <div className={`text-xs text-gold uppercase tracking-wider font-semibold mb-3 ${className}`}>
       {children}
     </div>
   );

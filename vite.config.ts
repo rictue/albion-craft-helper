@@ -1,7 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { resolve } from 'path'
+import { copyFileSync, existsSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const projectRoot = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [
@@ -11,10 +15,9 @@ export default defineConfig({
     {
       name: 'copy-index-to-200',
       closeBundle() {
-        const fs = require('fs')
-        const src = resolve(__dirname, 'dist/index.html')
-        const dest = resolve(__dirname, 'dist/200.html')
-        if (fs.existsSync(src)) fs.copyFileSync(src, dest)
+        const src = resolve(projectRoot, 'dist/index.html')
+        const dest = resolve(projectRoot, 'dist/200.html')
+        if (existsSync(src)) copyFileSync(src, dest)
       }
     }
   ],

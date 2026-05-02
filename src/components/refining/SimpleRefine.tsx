@@ -53,9 +53,8 @@ export default function SimpleRefine() {
   const [useFocus, setUseFocus] = useState(false);
   const [focusBudget, setFocusBudget] = useState(30000);
   const [premium, setPremium] = useState(true);
-  // Daily Production Bonus — shown on the island/station UI in-game. Rotates
-  // daily per category (+20% for the listed items). It is a FLAT additive to
-  // return rate, NOT an LPB add, so we add it after lpbToReturnRate().
+  // Daily Production Bonus shown on the station UI. Like AFM, treat it as an
+  // LPB-style production bonus, then convert the combined value to RR.
   const [dailyBonus, setDailyBonus] = useState(0);
   const [customRaw, setCustomRaw] = useState<number | null>(null);
   const [customPrev, setCustomPrev] = useState<number | null>(null);
@@ -251,11 +250,11 @@ export default function SimpleRefine() {
 
   // LPB + RR: two variants for split focus/no-focus
   const cityBonusActive = (CITY_REFINE_BONUS[refineCity] || []).includes(resource);
-  const lpbNoFocus = BASE_LPB + (cityBonusActive ? CITY_LPB : 0);
+  const dailyBonusLPB = Math.max(0, dailyBonus);
+  const lpbNoFocus = BASE_LPB + (cityBonusActive ? CITY_LPB : 0) + dailyBonusLPB;
   const lpbFocus = lpbNoFocus + FOCUS_LPB;
-  const dailyBonusFrac = Math.max(0, dailyBonus) / 100;
-  const rrNoFocus = Math.min(0.999, lpbToReturnRate(lpbNoFocus) + dailyBonusFrac);
-  const rrFocus = Math.min(0.999, lpbToReturnRate(lpbFocus) + dailyBonusFrac);
+  const rrNoFocus = Math.min(0.999, lpbToReturnRate(lpbNoFocus));
+  const rrFocus = Math.min(0.999, lpbToReturnRate(lpbFocus));
   // Effective RR shown in UI (if focus used AND budget > 0, show focus rate; else no-focus)
   const lpb = useFocus ? lpbFocus : lpbNoFocus;
   const rr = useFocus ? rrFocus : rrNoFocus;

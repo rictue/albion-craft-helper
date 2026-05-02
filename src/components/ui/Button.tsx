@@ -7,10 +7,10 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles = {
-  primary: 'bg-gold/20 hover:bg-gold/30 text-gold border border-gold/30',
-  secondary: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700',
-  ghost: 'hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200',
-  danger: 'bg-red-900/20 hover:bg-red-900/30 text-red-400 border border-red-900/30',
+  primary: 'bg-gold/20 hover:bg-gold/30 text-gold-light border border-gold/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]',
+  secondary: 'bg-[color:var(--color-bg-overlay)] hover:bg-[color:var(--color-bg-elevated)] text-zinc-200 border border-[color:var(--color-border)]',
+  ghost: 'hover:bg-[color:var(--color-bg-overlay)] text-zinc-400 hover:text-gold',
+  danger: 'bg-red-950/30 hover:bg-red-950/45 text-red-300 border border-red-800/40',
 };
 
 const sizeStyles = {
@@ -22,7 +22,7 @@ const sizeStyles = {
 export default function Button({ children, variant = 'primary', size = 'md', className = '', disabled, ...props }: Props) {
   return (
     <button
-      className={`rounded-lg font-medium transition-all ${variantStyles[variant]} ${sizeStyles[size]} ${
+      className={`rounded-lg font-semibold transition-all ${variantStyles[variant]} ${sizeStyles[size]} ${
         disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
       } ${className}`}
       disabled={disabled}

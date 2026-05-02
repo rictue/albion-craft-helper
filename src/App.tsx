@@ -46,9 +46,9 @@ function RouteFallback() {
   return (
     <div className="max-w-[1200px] mx-auto px-4 py-10">
       <div className="animate-pulse space-y-3">
-        <div className="h-10 bg-zinc-900 border border-zinc-800 rounded-xl" />
-        <div className="h-28 bg-zinc-900 border border-zinc-800 rounded-xl" />
-        <div className="h-48 bg-zinc-900 border border-zinc-800 rounded-xl" />
+        <div className="h-10 medieval-panel" />
+        <div className="h-28 medieval-panel" />
+        <div className="h-48 medieval-panel" />
       </div>
     </div>
   );
@@ -57,7 +57,7 @@ function RouteFallback() {
 export default function App() {
   return (
     <HashRouter>
-      <div className="min-h-screen bg-bg">
+      <div className="app-shell bg-bg">
         <Header />
         <ErrorBoundary>
         <Suspense fallback={<RouteFallback />}>

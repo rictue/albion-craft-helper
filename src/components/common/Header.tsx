@@ -40,10 +40,10 @@ function NavDropdown({ label, groups }: { label: string; groups: DropdownGroup[]
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className={`px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-[0.14em] font-semibold transition-all flex items-center gap-1.5 ${
+        className={`px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-[0.14em] font-bold transition-all flex items-center gap-1.5 border ${
           isActive || open
-            ? 'text-gold bg-gold/10'
-            : 'text-zinc-400 hover:text-zinc-100 hover:bg-[color:var(--color-bg-overlay)]'
+            ? 'text-gold-light bg-gold/15 border-gold/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
+            : 'text-zinc-400 border-transparent hover:text-gold hover:bg-[color:var(--color-bg-overlay)] hover:border-[color:var(--color-border)]'
         }`}
       >
         {label}
@@ -52,10 +52,10 @@ function NavDropdown({ label, groups }: { label: string; groups: DropdownGroup[]
         </svg>
       </button>
       {open && (
-        <div className="absolute top-full mt-2 left-0 bg-[color:var(--color-bg-raised)]/95 backdrop-blur-xl border border-[color:var(--color-border-light)] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.5)] p-3 z-50 animate-fade-in flex gap-3">
+        <div className="absolute top-full mt-2 left-0 medieval-panel backdrop-blur-xl p-3 z-50 animate-fade-in flex gap-3">
           {groups.map(group => (
             <div key={group.title} className="min-w-[170px]">
-              <div className="px-3 pt-0.5 pb-2 text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-semibold border-b border-[color:var(--color-border)] mb-1.5">
+              <div className="px-3 pt-0.5 pb-2 text-[9px] uppercase tracking-[0.2em] text-gold/70 font-bold border-b border-[color:var(--color-border)] mb-1.5">
                 {group.title}
               </div>
               {group.items.map(item => (
@@ -66,7 +66,7 @@ function NavDropdown({ label, groups }: { label: string; groups: DropdownGroup[]
                   className={({ isActive }) =>
                     `block px-3 py-2 rounded-lg text-[11px] uppercase tracking-[0.1em] font-semibold transition-colors ${
                       isActive
-                        ? 'text-gold bg-gold/10'
+                        ? 'text-gold-light bg-gold/15'
                         : 'text-zinc-300 hover:bg-[color:var(--color-bg-overlay)] hover:text-gold'
                     }`
                   }
@@ -141,15 +141,15 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <>
       <div className="fixed inset-0 bg-black/80 z-40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed top-0 right-0 h-full w-72 bg-zinc-950 border-l border-zinc-800 z-50 animate-fade-in overflow-y-auto">
-        <div className="flex justify-between items-center p-4 border-b border-zinc-800">
-          <span className="text-sm font-bold text-gold uppercase tracking-wider">Menu</span>
+      <div className="fixed top-0 right-0 h-full w-72 nav-forge border-l border-[color:var(--color-border-light)] z-50 animate-fade-in overflow-y-auto">
+        <div className="flex justify-between items-center p-4 border-b border-[color:var(--color-border)]">
+          <span className="text-sm font-bold text-gold uppercase tracking-wider">Guild Menu</span>
           <button onClick={onClose} className="text-zinc-400 hover:text-gold text-xl">&#10005;</button>
         </div>
         <nav className="p-4 space-y-4">
           {sections.map(section => (
             <div key={section.title}>
-              <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold mb-2 px-3">
+              <div className="text-[10px] uppercase tracking-widest text-gold/60 font-bold mb-2 px-3">
                 {section.title}
               </div>
               {section.links.map(link => (
@@ -159,7 +159,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
                   onClick={onClose}
                   className={({ isActive }) =>
                     `block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive ? 'bg-gold/15 text-gold' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
+                      isActive ? 'bg-gold/15 text-gold-light' : 'text-zinc-400 hover:bg-[color:var(--color-bg-overlay)] hover:text-gold'
                     }`
                   }
                 >
@@ -186,16 +186,16 @@ export default function Header() {
   };
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-[0.14em] font-semibold transition-all ${
+    `px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-[0.14em] font-bold transition-all border ${
       isActive
-        ? 'text-gold bg-gold/10'
-        : 'text-zinc-400 hover:text-zinc-100 hover:bg-[color:var(--color-bg-overlay)]'
+        ? 'text-gold-light bg-gold/15 border-gold/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
+        : 'text-zinc-400 border-transparent hover:text-gold hover:bg-[color:var(--color-bg-overlay)] hover:border-[color:var(--color-border)]'
     }`;
 
   return (
     <header className="sticky top-0 z-50">
       {/* Top bar: server time + server selector + auth */}
-      <div className="bg-[color:var(--color-bg)]/95 backdrop-blur-md border-b border-[color:var(--color-border)]">
+      <div className="top-forge backdrop-blur-md">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-8 flex items-center justify-between">
           <ServerTime />
           <div className="flex items-center gap-3">
@@ -206,8 +206,8 @@ export default function Header() {
                   onClick={() => handleServer(s)}
                   className={`text-[10px] uppercase tracking-[0.12em] font-semibold px-2 py-0.5 rounded transition-colors flex items-center gap-1 ${
                     server === s
-                      ? 'text-gold bg-gold/10'
-                      : 'text-zinc-600 hover:text-zinc-400 hover:bg-[color:var(--color-bg-raised)]'
+                      ? 'text-gold-light bg-gold/15 border border-gold/25'
+                      : 'text-zinc-600 hover:text-zinc-400 hover:bg-[color:var(--color-bg-raised)] border border-transparent'
                   }`}
                 >
                   <span className={`inline-block w-1.5 h-1.5 rounded-full ${server === s ? 'bg-green-400' : 'bg-zinc-700'}`}></span>
@@ -243,17 +243,17 @@ export default function Header() {
       </div>
 
       {/* Main nav bar */}
-      <div className="bg-[color:var(--color-bg-raised)]/90 backdrop-blur-xl border-b border-[color:var(--color-border)]">
+      <div className="nav-forge backdrop-blur-xl">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <NavLink to="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-            <div className="relative w-9 h-9 rounded-lg bg-gradient-to-br from-gold/30 via-gold/15 to-transparent border border-gold/40 flex items-center justify-center shadow-[0_2px_12px_rgba(224,176,80,0.15)]">
-              <span className="text-gold font-black text-sm tracking-tighter">AC</span>
+          <NavLink to="/" className="flex items-center gap-2.5 hover:opacity-95 transition-opacity">
+            <div className="crest relative w-10 h-10 flex items-center justify-center shadow-[0_8px_20px_rgba(0,0,0,0.35)]">
+              <span className="text-gold-light font-black text-sm tracking-tighter drop-shadow">AC</span>
             </div>
             <div>
-              <div className="text-sm font-bold text-zinc-100 tracking-tight leading-none">
-                Albion<span className="text-gold">Crafts</span>
+              <div className="text-sm font-black text-zinc-100 tracking-tight leading-none">
+                Albion<span className="text-gold-light">Crafts</span>
               </div>
-              <div className="text-[9px] text-zinc-500 tracking-[0.2em] uppercase mt-0.5">Market Tools</div>
+              <div className="text-[9px] text-gold/55 tracking-[0.2em] uppercase mt-0.5">Market Hall</div>
             </div>
           </NavLink>
 

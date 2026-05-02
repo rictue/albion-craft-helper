@@ -20,6 +20,8 @@ export const DISCORD_DISCOUNT = 0.05;
 export const BASE_LPB = 18;
 /** Refining-specialty city contribution to LPB (Fort Sterling=Wood, Lymhurst=Fiber, etc.) */
 export const REFINE_CITY_LPB = 40;
+/** Crafting-specialty city contribution to LPB (royal city item-category bonus) */
+export const CRAFT_CITY_LPB = 15;
 /** Focus contribution to LPB (refining and crafting both) */
 export const FOCUS_LPB = 59;
 

@@ -1,15 +1,10 @@
 import { Link } from 'react-router-dom';
-
-/**
- * Landing page — silver-making strategies grouped by effort/risk profile.
- * Overhauled visual: hero with brand emphasis, grouped strategy sections,
- * uniform card language, restrained accent palette.
- */
+import ItemIcon from '../common/ItemIcon';
 
 type Level = 'low' | 'medium' | 'high';
 
 interface Strategy {
-  icon: string;
+  itemId: string;
   name: string;
   route: string;
   tagline: string;
@@ -28,33 +23,33 @@ interface Group {
 const GROUPS: Group[] = [
   {
     heading: 'Refining & Crafting',
-    description: 'Turn raw resources into refined goods. Highest ceiling with focus + specs.',
+    description: 'Focus, royal-city bonuses, journals, and material loops.',
     strategies: [
       {
-        icon: '🪵',
+        itemId: 'T6_PLANKS_LEVEL1@1',
         name: 'Refining',
         route: '/refining',
-        tagline: 'Buy raw, refine, sell planks / bars / cloth / leather / stone.',
-        when: 'You have focus or a matching refining city (Fort Sterling = wood, etc).',
+        tagline: 'Raw resources into planks, bars, cloth, leather, and stone.',
+        when: 'Best with focus or a matching refining city.',
         risk: 'low',
         effort: 'low',
         highlight: true,
       },
       {
-        icon: '⚔',
+        itemId: 'T6_2H_HALBERD',
         name: 'ZvZ Meta Crafting',
         route: '/suggested',
-        tagline: 'Craft gear that dies in 25-player fights. Guaranteed demand.',
-        when: 'You want items that sell FAST. Focus + city bonus recommended.',
+        tagline: 'Find gear with demand from large fights and Black Market churn.',
+        when: 'Use when you want items that move quickly.',
         risk: 'low',
         effort: 'medium',
       },
       {
-        icon: '🧮',
+        itemId: 'T6_MAIN_SWORD',
         name: 'Craft Calculator',
         route: '/calculator',
-        tagline: 'Profit calc for any specific item with full control over inputs.',
-        when: 'You know exactly what to craft and want precise numbers.',
+        tagline: 'Pick an item, city, focus state, taxes, and station fee.',
+        when: 'Use when you already know what you want to craft.',
         risk: 'low',
         effort: 'low',
       },
@@ -62,41 +57,41 @@ const GROUPS: Group[] = [
   },
   {
     heading: 'Market Movement',
-    description: 'Buy low, sell high. No crafting, just silver + a mount.',
+    description: 'City spreads, Black Market routes, and conversion plays.',
     strategies: [
       {
-        icon: '💱',
+        itemId: 'T6_BAG',
         name: 'Market Flipper',
         route: '/flipper',
-        tagline: 'Scan all cities for buy-low-sell-high margins per item.',
-        when: "You don't have focus / specs but have silver and can transport.",
+        tagline: 'Scan city-to-city spreads without crafting anything.',
+        when: 'Good with silver, patience, and transport capacity.',
         risk: 'medium',
         effort: 'medium',
       },
       {
-        icon: '🎯',
-        name: 'BM Running',
+        itemId: 'T6_2H_CROSSBOW',
+        name: 'BM Runner',
         route: '/bm-runner',
-        tagline: 'Buy gear, transport to Caerleon Black Market, sell to buy orders.',
-        when: 'You have a transport mount and accept red-zone gank risk.',
+        tagline: 'Buy gear, haul to Caerleon, and compare Black Market orders.',
+        when: 'For higher-risk routes and faster liquidation.',
         risk: 'high',
         effort: 'medium',
       },
       {
-        icon: '✨',
+        itemId: 'T6_METALBAR',
         name: 'Transmutation',
         route: '/transmute',
-        tagline: 'Convert lower-tier refined resources up a tier with focus.',
-        when: 'Focus is burning a hole in your pocket; pure silver/focus conversion.',
+        tagline: 'Turn lower-tier materials into higher-tier resources.',
+        when: 'Useful when focus has no better home.',
         risk: 'low',
         effort: 'low',
       },
       {
-        icon: '🧥',
+        itemId: 'T6_CAPE',
         name: 'Cape Converter',
         route: '/capes',
-        tagline: 'Plain capes → faction capes via faction points.',
-        when: 'You have faction rep from missions stockpiled.',
+        tagline: 'Plain capes into faction capes with point costs included.',
+        when: 'Use when faction points are sitting idle.',
         risk: 'low',
         effort: 'low',
       },
@@ -104,23 +99,23 @@ const GROUPS: Group[] = [
   },
   {
     heading: 'Passive & Daily',
-    description: 'Low-effort income that runs alongside everything else.',
+    description: 'Routine income around islands, farms, food, and animals.',
     strategies: [
       {
-        icon: '🔪',
+        itemId: 'T5_MEAT',
         name: 'Butcher',
         route: '/butcher',
-        tagline: 'Buy grown animals, butcher into meat stacks, sell.',
-        when: 'Daily routine; pairs well with refining.',
+        tagline: 'Animal inputs, meat outputs, and market-side taxes.',
+        when: 'A good daily loop alongside refining.',
         risk: 'low',
         effort: 'low',
       },
       {
-        icon: '🌾',
+        itemId: 'T5_FARM_CARROT_SEED',
         name: 'Island Planner',
         route: '/island',
-        tagline: 'Crop yield + market-depth analysis for 79-plot islands.',
-        when: 'You farm on premium islands and want to know what actually pays.',
+        tagline: 'Crop and island returns with price depth in mind.',
+        when: 'For premium islands and repeatable farming routes.',
         risk: 'low',
         effort: 'low',
       },
@@ -128,151 +123,153 @@ const GROUPS: Group[] = [
   },
 ];
 
-const SECONDARY_LINKS: Array<{ to: string; label: string; icon: string }> = [
-  { to: '/planner', label: 'Craft Planner', icon: '📋' },
-  { to: '/portfolio', label: 'Portfolio', icon: '💼' },
-  { to: '/craft-history', label: 'Craft History', icon: '📓' },
-  { to: '/compare', label: 'Compare Tiers', icon: '⚖' },
-  { to: '/prices', label: 'Market Prices', icon: '💰' },
-  { to: '/history', label: 'Price History', icon: '📈' },
-  { to: '/focus', label: 'RR Reference', icon: '⭐' },
-  { to: '/mounts', label: 'Mount Breeding', icon: '🐎' },
-  { to: '/farmbreed', label: 'Farm & Breed', icon: '🌱' },
-  { to: '/cooking', label: 'Cooking', icon: '🍲' },
-  { to: '/fame', label: 'Crafting Fame', icon: '⚡' },
-  { to: '/journals', label: 'Journals', icon: '📚' },
+const SECONDARY_LINKS: Array<{ to: string; label: string; itemId: string }> = [
+  { to: '/planner', label: 'Craft Planner', itemId: 'T6_JOURNAL_WARRIOR_EMPTY' },
+  { to: '/portfolio', label: 'Portfolio', itemId: 'T6_BAG' },
+  { to: '/craft-history', label: 'Craft History', itemId: 'T6_OFF_BOOK' },
+  { to: '/compare', label: 'Compare Tiers', itemId: 'T6_ROCK' },
+  { to: '/prices', label: 'Market Prices', itemId: 'T6_SILVERBAG_NONTRADABLE' },
+  { to: '/history', label: 'Price History', itemId: 'T6_MAP' },
+  { to: '/focus', label: 'RR Reference', itemId: 'T6_POTION_ENERGY' },
+  { to: '/mounts', label: 'Mount Breeding', itemId: 'T5_MOUNT_OX' },
+  { to: '/farmbreed', label: 'Farm & Breed', itemId: 'T5_FARM_HORSE_BABY' },
+  { to: '/cooking', label: 'Cooking', itemId: 'T6_MEAL_SOUP' },
+  { to: '/fame', label: 'Crafting Fame', itemId: 'T6_JOURNAL_WARRIOR_FULL' },
+  { to: '/journals', label: 'Journals', itemId: 'T6_JOURNAL_MAGE_EMPTY' },
 ];
 
 const RISK_STYLES: Record<Level, { text: string; bg: string; border: string }> = {
-  low:    { text: 'text-emerald-300', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
-  medium: { text: 'text-amber-300',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20'   },
-  high:   { text: 'text-rose-300',    bg: 'bg-rose-500/10',    border: 'border-rose-500/20'    },
+  low: { text: 'text-emerald-300', bg: 'bg-emerald-500/10', border: 'border-emerald-500/25' },
+  medium: { text: 'text-amber-300', bg: 'bg-amber-500/10', border: 'border-amber-500/25' },
+  high: { text: 'text-rose-300', bg: 'bg-rose-500/10', border: 'border-rose-500/25' },
 };
 
-function Chip({ label, value, level }: { label: string; value: Level; level?: 'risk' | 'effort' }) {
+function Chip({ label, value }: { label: string; value: Level }) {
   const s = RISK_STYLES[value];
-  const icon = level === 'effort' ? '◷' : '◉';
   return (
     <span className={`chip ${s.text} ${s.bg} ${s.border}`}>
-      <span className="opacity-60">{icon}</span>
-      {label} · {value}
+      {label} / {value}
     </span>
   );
 }
 
-function StrategyCard({ s }: { s: Strategy }) {
+function StrategyCard({ strategy }: { strategy: Strategy }) {
   return (
     <Link
-      to={s.route}
-      className={`group relative flex flex-col rounded-2xl border p-5 transition-all hover:-translate-y-0.5 ${
-        s.highlight
-          ? 'border-gold/30 bg-gradient-to-br from-gold/[0.07] via-transparent to-transparent hover:border-gold/50'
-          : 'border-[color:var(--color-border)] bg-[color:var(--color-bg-raised)] hover:border-[color:var(--color-border-light)]'
+      to={strategy.route}
+      className={`tool-card group flex min-h-[260px] flex-col p-5 transition-all hover:-translate-y-0.5 ${
+        strategy.highlight ? 'border-gold/55 shadow-[0_18px_44px_rgba(214,166,74,0.12)]' : ''
       }`}
     >
-      {s.highlight && (
-        <span className="absolute -top-2 right-4 chip text-gold bg-gold/10 border-gold/30">
-          ★ Top path
-        </span>
-      )}
-
-      <div className="flex items-start justify-between mb-4">
-        <div className="w-11 h-11 rounded-xl bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] flex items-center justify-center text-xl">
-          {s.icon}
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="icon-frame h-16 w-16 rounded-lg">
+          <ItemIcon itemId={strategy.itemId} size={56} />
         </div>
-        <Chip label="risk" value={s.risk} />
+        <Chip label="risk" value={strategy.risk} />
       </div>
 
-      <div className="text-lg font-semibold text-zinc-100 mb-2 tracking-tight">{s.name}</div>
-      <div className="text-sm text-zinc-400 leading-relaxed mb-4 flex-1">
-        {s.tagline}
+      <div className="relative z-10 mt-5 flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-black tracking-tight text-zinc-50">{strategy.name}</h3>
+          {strategy.highlight && (
+            <span className="chip border-gold/40 bg-gold/15 text-gold-light">Prime</span>
+          )}
+        </div>
+        <p className="mt-2 text-sm leading-relaxed text-zinc-300">{strategy.tagline}</p>
+        <div className="mt-4 border-t border-[color:var(--color-border)] pt-3 text-[12px] leading-relaxed text-[#bba485]">
+          <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.18em] text-gold/70">Best used</span>
+          {strategy.when}
+        </div>
       </div>
 
-      <div className="text-[12px] text-zinc-500 leading-relaxed border-t border-[color:var(--color-border)] pt-3 mb-3">
-        <span className="text-zinc-600 uppercase text-[9px] tracking-[0.14em] font-semibold block mb-1">Use when</span>
-        {s.when}
-      </div>
-
-      <div className="flex items-center justify-between">
-        <Chip label="effort" value={s.effort} level="effort" />
-        <span className="text-xs font-medium text-zinc-500 group-hover:text-gold transition-colors flex items-center gap-1">
+      <div className="relative z-10 mt-4 flex items-center justify-between">
+        <Chip label="effort" value={strategy.effort} />
+        <span className="text-xs font-bold uppercase tracking-[0.12em] text-gold/70 transition-colors group-hover:text-gold-light">
           Open
-          <svg className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
         </span>
       </div>
     </Link>
   );
 }
 
+function HeroIcons() {
+  const ids = ['T6_PLANKS_LEVEL1@1', 'T6_MAIN_SWORD', 'T6_BAG', 'T6_CAPE'];
+  return (
+    <div className="hidden lg:grid grid-cols-2 gap-3">
+      {ids.map((id, index) => (
+        <div key={id} className={`icon-frame h-24 w-24 rounded-lg ${index % 2 === 1 ? 'translate-y-6' : ''}`}>
+          <ItemIcon itemId={id} size={82} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function MoneyHub() {
   return (
-    <div className="relative max-w-[1280px] mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-10">
-      {/* Hero */}
-      <header className="relative overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-bg-raised)] via-[color:var(--color-bg-raised)] to-[color:var(--color-bg-overlay)] px-6 sm:px-10 py-10 sm:py-14">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-gold/5 blur-3xl -translate-y-1/2 translate-x-1/4" />
-          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-blue-500/5 blur-3xl translate-y-1/2 -translate-x-1/4" />
-        </div>
-        <div className="relative max-w-2xl">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="w-8 h-px bg-gold/60" />
-            <span className="text-[10px] uppercase tracking-[0.25em] text-gold font-semibold">AlbionCrafts</span>
+    <div className="relative mx-auto max-w-[1320px] space-y-10 px-4 py-8 sm:px-6 sm:py-10">
+      <header className="medieval-hero rounded-lg px-6 py-9 sm:px-10 sm:py-12">
+        <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="max-w-3xl">
+            <div className="ornament-line mb-5 text-[10px] font-black uppercase tracking-[0.28em] text-gold-light">
+              Royal Market Hall
+            </div>
+            <h1 className="text-4xl font-black leading-[1.02] tracking-tight text-zinc-50 sm:text-6xl">
+              AlbionCrafts
+              <span className="block text-gold-light">silver ledger</span>
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-relaxed text-[#d7c7ad]">
+              Craft, refine, haul, and compare markets from one carved table. The math stays sharp;
+              the interface now feels closer to Albion's own market halls.
+            </p>
+            <div className="mt-7 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                ['AODP', 'Live prices'],
+                ['RRR', 'Return rate'],
+                ['BM', 'Black Market'],
+                ['Focus', 'Spec value'],
+              ].map(([label, value]) => (
+                <div key={label} className="stat-rune rounded-lg px-3 py-2">
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-gold/70">{label}</div>
+                  <div className="mt-0.5 text-sm font-bold text-zinc-100">{value}</div>
+                </div>
+              ))}
+            </div>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold text-zinc-50 tracking-tight leading-[1.05] mb-4">
-            Make silver in Albion Online,<br />
-            <span className="text-gold">with the math on your side.</span>
-          </h1>
-          <p className="text-base text-zinc-400 leading-relaxed max-w-xl">
-            Nine strategies, one tool for each. Real game formulas verified against in-game data — no hand-waving,
-            no "trust me bro." Pick a path below or use the menu to jump to any tool.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2 text-[11px]">
-            <span className="chip text-zinc-300 bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border-light)]">
-              Live AODP prices
-            </span>
-            <span className="chip text-zinc-300 bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border-light)]">
-              Focus + spec modeling
-            </span>
-            <span className="chip text-zinc-300 bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border-light)]">
-              5 servers
-            </span>
-            <span className="chip text-zinc-300 bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border-light)]">
-              Free
-            </span>
-          </div>
+          <HeroIcons />
         </div>
       </header>
 
-      {/* Strategy groups */}
-      {GROUPS.map((g) => (
-        <section key={g.heading} className="space-y-4">
+      {GROUPS.map(group => (
+        <section key={group.heading} className="space-y-4">
           <div className="section-heading">
-            <h2>{g.heading}</h2>
-            <span className="hint hidden sm:inline">{g.description}</span>
+            <h2>{group.heading}</h2>
+            <span className="hint hidden sm:inline">{group.description}</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {g.strategies.map((s) => <StrategyCard key={s.route} s={s} />)}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {group.strategies.map(strategy => (
+              <StrategyCard key={strategy.route} strategy={strategy} />
+            ))}
           </div>
         </section>
       ))}
 
-      {/* Secondary links */}
       <section className="space-y-4">
         <div className="section-heading">
           <h2>Other tools</h2>
-          <span className="hint hidden sm:inline">Trackers, references, side activities</span>
+          <span className="hint hidden sm:inline">Small ledgers for side jobs and references</span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-          {SECONDARY_LINKS.map((l) => (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          {SECONDARY_LINKS.map(link => (
             <Link
-              key={l.to}
-              to={l.to}
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[color:var(--color-bg-raised)] border border-[color:var(--color-border)] hover:border-gold/40 hover:text-gold text-zinc-400 text-xs font-medium transition-all hover:-translate-y-0.5"
+              key={link.to}
+              to={link.to}
+              className="tool-card group flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs font-bold text-zinc-300 transition-all hover:-translate-y-0.5 hover:text-gold-light"
             >
-              <span className="text-base" aria-hidden>{l.icon}</span>
-              <span className="truncate">{l.label}</span>
+              <span className="icon-frame h-8 w-8 shrink-0 rounded">
+                <ItemIcon itemId={link.itemId} size={28} />
+              </span>
+              <span className="relative z-10 truncate">{link.label}</span>
             </Link>
           ))}
         </div>
