@@ -60,27 +60,33 @@ function catalystForTarget(tier: number, targetEnchant: number): string {
   return `T${tier}_${kind}`;
 }
 
-function minSell(prices: MarketPrice[], itemId: string, city: string): number {
+function catalystLabel(targetEnchant: number): string {
+  if (targetEnchant === 1) return 'runes';
+  if (targetEnchant === 2) return 'souls';
+  return 'relics';
+}
+
+function minSell(prices: MarketPrice[], itemId: string, city: string, quality?: number): number {
   const values = prices
-    .filter(p => p.item_id === itemId && p.city === city && p.sell_price_min > 0)
+    .filter(p => p.item_id === itemId && p.city === city && p.sell_price_min > 0 && (!quality || p.quality === quality))
     .map(p => p.sell_price_min);
   return values.length ? Math.min(...values) : 0;
 }
 
-function maxBuy(prices: MarketPrice[], itemId: string, city: string): number {
+function maxBuy(prices: MarketPrice[], itemId: string, city: string, quality?: number): number {
   const values = prices
-    .filter(p => p.item_id === itemId && p.city === city && p.buy_price_max > 0)
+    .filter(p => p.item_id === itemId && p.city === city && p.buy_price_max > 0 && (!quality || p.quality === quality))
     .map(p => p.buy_price_max);
   return values.length ? Math.max(...values) : 0;
 }
 
-function buyPrice(prices: MarketPrice[], itemId: string, city: string, includeBuyOrderFee: boolean): number {
-  const price = minSell(prices, itemId, city);
+function buyPrice(prices: MarketPrice[], itemId: string, city: string, includeBuyOrderFee: boolean, quality?: number): number {
+  const price = minSell(prices, itemId, city, quality);
   return includeBuyOrderFee ? price * (1 + BUY_ORDER_FEE) : price;
 }
 
-function sellPrice(prices: MarketPrice[], itemId: string, city: string, premium: boolean): number {
-  const raw = city === 'Black Market' ? maxBuy(prices, itemId, city) : minSell(prices, itemId, city);
+function sellPrice(prices: MarketPrice[], itemId: string, city: string, premium: boolean, quality?: number): number {
+  const raw = city === 'Black Market' ? maxBuy(prices, itemId, city, quality) : minSell(prices, itemId, city, quality);
   const tax = premium ? SELL_TAX_PREMIUM : SELL_TAX_FREE;
   return raw * (1 - tax);
 }
@@ -161,6 +167,7 @@ function EnchantingCalculator() {
   const [baseId, setBaseId] = useState('T6_MAIN_SWORD');
   const [currentEnchant, setCurrentEnchant] = useState(2);
   const [targetEnchant, setTargetEnchant] = useState(3);
+  const [quality, setQuality] = useState(1);
   const [category, setCategory] = useState(CATEGORY_COUNTS[3].id);
   const [quantity, setQuantity] = useState(1);
   const [buyCity, setBuyCity] = useState('Martlock');
@@ -173,24 +180,49 @@ function EnchantingCalculator() {
   const selectedCategory = CATEGORY_COUNTS.find(c => c.id === category) ?? CATEGORY_COUNTS[3];
   const currentItem = suffixEnchant(baseId, currentEnchant);
   const targetItem = suffixEnchant(baseId, targetEnchant);
-  const catalystId = catalystForTarget(tier, targetEnchant);
+  const catalystLines = useMemo(() => {
+    const lines: Array<{ itemId: string; count: number; label: string }> = [];
+    for (let enchant = currentEnchant + 1; enchant <= targetEnchant; enchant++) {
+      lines.push({
+        itemId: catalystForTarget(tier, enchant),
+        count: selectedCategory.catalysts,
+        label: catalystLabel(enchant),
+      });
+    }
+    return lines;
+  }, [currentEnchant, selectedCategory.catalysts, targetEnchant, tier]);
 
   const scan = useCallback(async () => {
+    if (targetEnchant <= currentEnchant) {
+      setResult({
+        investment: 0,
+        revenue: 0,
+        profit: 0,
+        margin: 0,
+        missing: [],
+        details: [{ label: 'Invalid step', value: 'Target enchant must be higher than current enchant', tone: 'text-amber-300' }],
+      });
+      return;
+    }
+
     setLoading(true);
-    const ids = [currentItem, targetItem, catalystId];
+    const ids = [currentItem, targetItem, ...catalystLines.map(line => line.itemId)];
     const prices = await fetchPrices(ids, CITIES, true, true);
 
-    const current = buyPrice(prices, currentItem, buyCity, includeBuyFee);
-    const catalyst = buyPrice(prices, catalystId, buyCity, includeBuyFee);
-    const target = sellPrice(prices, targetItem, sellCity, premium);
-    const catalystCost = catalyst * selectedCategory.catalysts;
+    const current = buyPrice(prices, currentItem, buyCity, includeBuyFee, quality);
+    const target = sellPrice(prices, targetItem, sellCity, premium, quality);
+    const catalystCosts = catalystLines.map(line => ({
+      ...line,
+      price: buyPrice(prices, line.itemId, buyCity, includeBuyFee),
+    }));
+    const catalystCost = catalystCosts.reduce((sum, line) => sum + line.price * line.count, 0);
     const investment = (current + catalystCost) * quantity;
     const revenue = target * quantity;
     const profit = revenue - investment;
     const missing = [
       current <= 0 ? currentItem : '',
-      catalyst <= 0 ? catalystId : '',
       target <= 0 ? targetItem : '',
+      ...catalystCosts.filter(line => line.price <= 0).map(line => line.itemId),
     ].filter(Boolean);
 
     setResult({
@@ -202,12 +234,16 @@ function EnchantingCalculator() {
       details: [
         { label: 'Current item', value: `${formatSilver(current)} x ${quantity}` },
         { label: 'Target item', value: `${formatSilver(target)} x ${quantity}` },
-        { label: 'Catalyst', value: `${selectedCategory.catalysts} x ${formatSilver(catalyst)}` },
+        {
+          label: 'Catalysts',
+          value: catalystCosts.map(line => `${line.count} ${line.label} @ ${formatSilver(line.price)}`).join(' + '),
+        },
+        { label: 'Quality', value: ['Normal', 'Good', 'Outstanding', 'Excellent', 'Masterpiece'][quality - 1] ?? 'Normal' },
         { label: 'Step', value: `.${currentEnchant} -> .${targetEnchant}` },
       ],
     });
     setLoading(false);
-  }, [buyCity, catalystId, currentEnchant, currentItem, includeBuyFee, premium, quantity, selectedCategory.catalysts, sellCity, targetEnchant, targetItem]);
+  }, [buyCity, catalystLines, currentEnchant, currentItem, includeBuyFee, premium, quality, quantity, sellCity, targetEnchant, targetItem]);
 
   return (
     <CalculatorShell
@@ -233,13 +269,28 @@ function EnchantingCalculator() {
       </Field>
       <Field label="Current / target">
         <div className="grid grid-cols-2 gap-2">
-          <select value={currentEnchant} onChange={e => setCurrentEnchant(Number(e.target.value))} className={inputClass}>
+          <select
+            value={currentEnchant}
+            onChange={e => {
+              const next = Number(e.target.value);
+              setCurrentEnchant(next);
+              if (targetEnchant <= next) setTargetEnchant(Math.min(3, next + 1));
+            }}
+            className={inputClass}
+          >
             {[0, 1, 2].map(e => <option key={e} value={e}>.{e}</option>)}
           </select>
           <select value={targetEnchant} onChange={e => setTargetEnchant(Number(e.target.value))} className={inputClass}>
-            {[1, 2, 3].map(e => <option key={e} value={e}>.{e}</option>)}
+            {[1, 2, 3].filter(e => e > currentEnchant).map(e => <option key={e} value={e}>.{e}</option>)}
           </select>
         </div>
+      </Field>
+      <Field label="Quality">
+        <select value={quality} onChange={e => setQuality(Number(e.target.value))} className={inputClass}>
+          {['Normal', 'Good', 'Outstanding', 'Excellent', 'Masterpiece'].map((label, index) => (
+            <option key={label} value={index + 1}>{label}</option>
+          ))}
+        </select>
       </Field>
       <Field label="Quantity">
         <input type="number" min={1} value={quantity} onChange={e => setQuantity(Math.max(1, Number(e.target.value) || 1))} className={inputClass} />
