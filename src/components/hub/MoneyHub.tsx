@@ -95,6 +95,15 @@ const GROUPS: Group[] = [
         risk: 'low',
         effort: 'low',
       },
+      {
+        itemId: 'T6_RELIC',
+        name: 'Grind Calculators',
+        route: '/grind',
+        tagline: 'Enchanting, laborers, alchemy, and chopped fish in one ledger.',
+        when: 'Use when copying a specific economy routine from Albion Online Grind.',
+        risk: 'medium',
+        effort: 'medium',
+      },
     ],
   },
   {
@@ -136,6 +145,7 @@ const SECONDARY_LINKS: Array<{ to: string; label: string; itemId: string }> = [
   { to: '/cooking', label: 'Cooking', itemId: 'T6_MEAL_SOUP' },
   { to: '/fame', label: 'Crafting Fame', itemId: 'T6_JOURNAL_WARRIOR_FULL' },
   { to: '/journals', label: 'Journals', itemId: 'T6_JOURNAL_MAGE_EMPTY' },
+  { to: '/grind', label: 'Grind Calcs', itemId: 'T6_RELIC' },
 ];
 
 const RISK_STYLES: Record<Level, { text: string; bg: string; border: string }> = {

@@ -99,6 +99,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
         { to: '/gold', label: 'Gold Prices' },
         { to: '/transmute', label: 'Transmutation' },
         { to: '/capes', label: 'Cape Converter' },
+        { to: '/grind', label: 'Grind Calcs' },
       ],
     },
     {
@@ -270,6 +271,7 @@ export default function Header() {
                   { to: '/transmute', label: 'Transmutation' },
                   { to: '/capes', label: 'Cape Converter' },
                   { to: '/portfolio', label: 'Portfolio' },
+                  { to: '/grind', label: 'Grind Calculators' },
                 ],
               },
               {

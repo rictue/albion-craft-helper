@@ -41,6 +41,7 @@ const CraftHistory     = lazy(() => import('./components/history/CraftHistory'))
 const MountBreeding    = lazy(() => import('./components/mounts/MountBreeding'));
 const CapeConverter    = lazy(() => import('./components/capes/CapeConverter'));
 const MetaItems        = lazy(() => import('./components/meta/MetaItems'));
+const GrindCalculators = lazy(() => import('./components/grind/GrindCalculators'));
 
 function RouteFallback() {
   return (
@@ -93,6 +94,7 @@ export default function App() {
             <Route path="/mounts" element={<MountBreeding />} />
             <Route path="/capes" element={<CapeConverter />} />
             <Route path="/meta" element={<MetaItems />} />
+            <Route path="/grind" element={<GrindCalculators />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/database" element={<CustomDatabase />} />
           </Routes>
