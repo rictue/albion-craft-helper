@@ -18,8 +18,6 @@ import { getLastFetchTime } from '../../services/api';
 import {
   IconHammer,
   IconFurnace,
-  IconHoof,
-  IconIsland,
   IconLaborer,
   IconScales,
   IconLedger,
@@ -27,6 +25,7 @@ import {
   IconFlame,
   IconShield,
   IconCrown,
+  IconPouch,
 } from '../shell/navIcons';
 
 type CraftType = 'refining' | 'crafting' | 'butcher' | 'cooking' | 'farming' | 'flipping' | 'other';
@@ -65,11 +64,11 @@ function formatRelativeTime(ts: number): string {
 function ToolGrid() {
   const tools = [
     { to: '/calculator', title: 'Craft Calculator', description: 'Per-item profit with fees, focus, return rate.', icon: IconHammer },
-    { to: '/refining',   title: 'Refining',         description: 'Raw → refined with focus, RR + transport.',   icon: IconFurnace, prominent: true },
-    { to: '/mounts',     title: 'Mount Breeding',   description: 'Cub to mount expected value, food, saddles.', icon: IconHoof },
-    { to: '/island',     title: 'Island Planner',   description: 'Plot mix, premium yield, depth-aware.',       icon: IconIsland },
-    { to: '/laborers',   title: 'Laborers',         description: 'House, journals, happiness, ROI on upgrade.', icon: IconLaborer },
-    { to: '/flipper',    title: 'Market Watch',     description: 'City spread scan with ROI per 1M.',           icon: IconScales },
+    { to: '/refining',   title: 'Refining',         description: 'Raw → refined with focus, RR + transport.',     icon: IconFurnace, prominent: true },
+    { to: '/cooking',    title: 'Cooking',          description: 'Recipe-by-recipe meal profit with city bonus.', icon: IconFlame },
+    { to: '/laborers',   title: 'Laborers',         description: 'House, journals, happiness, ROI on upgrade.',   icon: IconLaborer },
+    { to: '/flipper',    title: 'Market Flipper',   description: 'City spread scan with ROI per 1M invested.',    icon: IconScales },
+    { to: '/bm-runner',  title: 'BM Runner',        description: 'Caerleon Black Market arbitrage routes.',       icon: IconPouch },
   ];
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -218,14 +217,14 @@ export default function Dashboard() {
           <section>
             <SectionDivider label="Quick Actions" />
             <div className="medieval-panel p-3 space-y-1.5">
-              <QuickRow to="/calculator" label="Calculate a craft"   icon={IconHammer} />
-              <QuickRow to="/refining"   label="Run refining"        icon={IconFurnace} />
-              <QuickRow to="/mounts"     label="Plan mount breeding" icon={IconHoof} />
-              <QuickRow to="/island"     label="Tune islands"        icon={IconIsland} />
-              <QuickRow to="/flipper"    label="Scan markets"        icon={IconScales} />
-              <QuickRow to="/laborers"   label="Check laborer ROI"   icon={IconLaborer} />
-              <QuickRow to="/craft-history" label="Log a finished run" icon={IconLedger} />
-              <QuickRow to="/settings"   label="Adjust defaults"     icon={IconCog} />
+              <QuickRow to="/calculator"    label="Calculate a craft"   icon={IconHammer} />
+              <QuickRow to="/refining"      label="Run refining"        icon={IconFurnace} />
+              <QuickRow to="/cooking"       label="Cook for profit"     icon={IconFlame} />
+              <QuickRow to="/flipper"       label="Scan markets"        icon={IconScales} />
+              <QuickRow to="/bm-runner"     label="Plan BM run"         icon={IconPouch} />
+              <QuickRow to="/laborers"      label="Check laborer ROI"   icon={IconLaborer} />
+              <QuickRow to="/craft-history" label="Log a finished run"  icon={IconLedger} />
+              <QuickRow to="/settings"      label="Adjust defaults"     icon={IconCog} />
             </div>
           </section>
 
@@ -235,7 +234,7 @@ export default function Dashboard() {
               <StrategyRow
                 to="/refining"
                 title="Refining loop"
-                blurb="Royal city + focus + journals — backbone of daily silver."
+                blurb="Royal city + focus — backbone of daily silver."
                 risk="low"
                 icon={IconFurnace}
               />
@@ -247,11 +246,11 @@ export default function Dashboard() {
                 icon={IconShield}
               />
               <StrategyRow
-                to="/mounts"
-                title="Mount breeding"
-                blurb="High-margin but capital-locked while animals grow."
+                to="/flipper"
+                title="Market Flipper"
+                blurb="City-to-city spreads without crafting anything."
                 risk="medium"
-                icon={IconHoof}
+                icon={IconScales}
               />
               <StrategyRow
                 to="/bm-runner"

@@ -11,20 +11,16 @@ import {
   IconDashboard,
   IconHammer,
   IconFurnace,
-  IconHoof,
-  IconIsland,
   IconLaborer,
   IconScales,
   IconLedger,
   IconCog,
   IconPouch,
   IconParchment,
-  IconAnvil,
   IconShield,
   IconFlame,
   IconCrown,
   IconBook,
-  IconCrate,
 } from './navIcons';
 
 export interface NavItem {
@@ -50,29 +46,10 @@ export const SIDEBAR_SECTIONS: NavSection[] = [
   {
     title: 'Crafting Hall',
     items: [
-      { to: '/calculator', label: 'Crafting Calculator', icon: IconHammer, hint: 'Per-item profit, fees, focus' },
+      { to: '/calculator', label: 'Crafting Calculator', icon: IconHammer,  hint: 'Per-item profit, fees, focus' },
       { to: '/refining',   label: 'Refining',            icon: IconFurnace, hint: 'Raw → refined with RR + focus' },
       { to: '/cooking',    label: 'Cooking',             icon: IconFlame,   hint: 'Recipe-by-recipe meal profit' },
-      { to: '/butcher',    label: 'Butcher',             icon: IconAnvil,   hint: 'Animal → meat with city bonus' },
-      { to: '/compare',    label: 'Compare Tiers',       icon: IconBook,    hint: 'Side-by-side tier P/L' },
-    ],
-  },
-  {
-    title: 'Beast & Field',
-    items: [
-      { to: '/mounts',     label: 'Mount Breeding',  icon: IconHoof,   hint: 'Cub → grown → mount expected value' },
-      { to: '/farmbreed',  label: 'Farm & Breed',    icon: IconCrate,  hint: 'Crops + animals plot planner' },
-      { to: '/island',     label: 'Island Planner',  icon: IconIsland, hint: 'Plot mix, premium, depth-aware' },
-      { to: '/farming',    label: 'Farming Yields',  icon: IconParchment, hint: 'Per-crop yield reference' },
-    ],
-  },
-  {
-    title: 'Income',
-    items: [
-      { to: '/laborers',     label: 'Laborers',         icon: IconLaborer, hint: 'House, journal, ROI on upgrade' },
-      { to: '/journals',     label: 'Journals',         icon: IconBook,    hint: 'Empty → full fame margin' },
-      { to: '/fame',         label: 'Crafting Fame',    icon: IconCrown,   hint: 'Fame per silver reference' },
-      { to: '/focus',        label: 'Focus Efficiency', icon: IconFlame,   hint: 'Focus value & RR table' },
+      { to: '/laborers',   label: 'Laborers',            icon: IconLaborer, hint: 'House, journal, ROI on upgrade' },
     ],
   },
   {
@@ -84,7 +61,7 @@ export const SIDEBAR_SECTIONS: NavSection[] = [
       { to: '/blackmarket',  label: 'Black Market',     icon: IconPouch,     hint: 'BM-only suggested crafts' },
       { to: '/transmute',    label: 'Transmutation',    icon: IconFurnace,   hint: 'Low-tier → high-tier resources' },
       { to: '/capes',        label: 'Cape Converter',   icon: IconShield,    hint: 'Faction cape upgrade margin' },
-      { to: '/grind',        label: 'Grind Calcs',      icon: IconAnvil,     hint: 'Enchanting, alchemy, etc.' },
+      { to: '/grind',        label: 'Grind Calcs',      icon: IconHammer,    hint: 'Enchanting, alchemy, etc.' },
       { to: '/prices',       label: 'Prices',           icon: IconParchment, hint: 'Browse live AODP prices' },
       { to: '/history',      label: 'Price History',    icon: IconLedger,    hint: 'Daily averages by item' },
       { to: '/gold',         label: 'Gold Prices',      icon: IconCrown,     hint: 'Premium gold spot history' },
