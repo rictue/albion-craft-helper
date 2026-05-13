@@ -10,7 +10,6 @@ import Dashboard from './components/dashboard/Dashboard';
 const CraftingCalculator = lazy(() => import('./components/calculator/CraftingCalculator'));
 const CraftingPlanner    = lazy(() => import('./components/planner/CraftingPlanner'));
 const CustomDatabase     = lazy(() => import('./components/database/CustomDatabase'));
-const SuggestedCrafts    = lazy(() => import('./components/suggester/SuggestedCrafts'));
 const SimpleRefine       = lazy(() => import('./components/refining/SimpleRefine'));
 const Profile            = lazy(() => import('./components/profile/Profile'));
 const Players            = lazy(() => import('./components/players/Players'));
@@ -22,13 +21,10 @@ const Cooking            = lazy(() => import('./components/cooking/Cooking'));
 const TopKillFame        = lazy(() => import('./components/killboard/TopKillFame'));
 const PriceHistory       = lazy(() => import('./components/history/PriceHistory'));
 const Transmutation      = lazy(() => import('./components/transmute/Transmutation'));
-const MarketFlipper      = lazy(() => import('./components/flipper/MarketFlipper'));
-const BMRunner           = lazy(() => import('./components/bmrunner/BMRunner'));
 const Portfolio          = lazy(() => import('./components/portfolio/Portfolio'));
 const CraftHistory       = lazy(() => import('./components/history/CraftHistory'));
 const CapeConverter      = lazy(() => import('./components/capes/CapeConverter'));
 const MetaItems          = lazy(() => import('./components/meta/MetaItems'));
-const GrindCalculators   = lazy(() => import('./components/grind/GrindCalculators'));
 const Laborers           = lazy(() => import('./components/laborers/LaborersCalculator'));
 const Settings           = lazy(() => import('./components/settings/Settings'));
 
@@ -42,6 +38,13 @@ function RouteFallback() {
   );
 }
 
+const REDIRECTS = [
+  '/butcher', '/compare', '/mounts', '/farmbreed', '/island', '/farming',
+  '/journals', '/fame', '/focus',
+  '/flipper', '/bm-runner', '/suggested', '/blackmarket', '/grind',
+  '/arbitrage',
+];
+
 export default function App() {
   return (
     <HashRouter>
@@ -51,42 +54,30 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/calculator" element={<CraftingCalculator />} />
-              <Route path="/suggested" element={<SuggestedCrafts />} />
-              <Route path="/blackmarket" element={<SuggestedCrafts blackMarketOnly />} />
               <Route path="/refining" element={<SimpleRefine />} />
               <Route path="/cooking" element={<Cooking />} />
+              <Route path="/laborers" element={<Laborers />} />
+              <Route path="/transmute" element={<Transmutation />} />
+              <Route path="/capes" element={<CapeConverter />} />
               <Route path="/planner" element={<CraftingPlanner />} />
+              <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/craft-history" element={<CraftHistory />} />
               <Route path="/prices" element={<PricesBrowser />} />
+              <Route path="/history" element={<PriceHistory />} />
               <Route path="/gold" element={<GoldPrices />} />
               <Route path="/players" element={<Players />} />
               <Route path="/guilds" element={<Guilds />} />
               <Route path="/killboard" element={<Killboard />} />
               <Route path="/top-fame" element={<TopKillFame />} />
-              <Route path="/arbitrage" element={<Navigate to="/flipper" replace />} />
-              <Route path="/history" element={<PriceHistory />} />
-              <Route path="/transmute" element={<Transmutation />} />
-              <Route path="/flipper" element={<MarketFlipper />} />
-              <Route path="/bm-runner" element={<BMRunner />} />
-              <Route path="/portfolio" element={<Portfolio />} />
-              <Route path="/craft-history" element={<CraftHistory />} />
-              <Route path="/capes" element={<CapeConverter />} />
               <Route path="/meta" element={<MetaItems />} />
-              <Route path="/grind" element={<GrindCalculators />} />
-              <Route path="/laborers" element={<Laborers />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/database" element={<CustomDatabase />} />
               <Route path="/settings" element={<Settings />} />
 
-              {/* Routes that were removed (broken / data-starved) — redirect home */}
-              <Route path="/butcher"   element={<Navigate to="/" replace />} />
-              <Route path="/compare"   element={<Navigate to="/" replace />} />
-              <Route path="/mounts"    element={<Navigate to="/" replace />} />
-              <Route path="/farmbreed" element={<Navigate to="/" replace />} />
-              <Route path="/island"    element={<Navigate to="/" replace />} />
-              <Route path="/farming"   element={<Navigate to="/" replace />} />
-              <Route path="/journals"  element={<Navigate to="/" replace />} />
-              <Route path="/fame"      element={<Navigate to="/" replace />} />
-              <Route path="/focus"     element={<Navigate to="/" replace />} />
+              {/* Removed routes — preserve bookmarks by sending to Dashboard */}
+              {REDIRECTS.map(r => (
+                <Route key={r} path={r} element={<Navigate to="/" replace />} />
+              ))}
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
