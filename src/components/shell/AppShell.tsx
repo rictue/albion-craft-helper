@@ -14,7 +14,7 @@ export default function AppShell({ children }: Props) {
       <div className="flex">
         <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
         <main className="flex-1 min-w-0">
-          <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1500px]">
+          <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1800px] mx-auto">
             {children}
           </div>
         </main>
