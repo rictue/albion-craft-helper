@@ -66,8 +66,8 @@ export const TOOLS_DROPDOWN: MegaSection[] = [
   {
     title: 'Economy',
     items: [
-      { to: '/laborers',   label: 'Laborer Calculator',  blurb: 'House, journal, happiness and upgrade ROI.',  icon: IconLaborer, badge: 'NEW' },
-      { to: '/transmute',  label: 'Transmutation',       blurb: 'Lower-tier → higher-tier resource margin.',   icon: IconFurnace },
+      { to: '/laborers',   label: 'Laborer Calculator',  blurb: 'House, journal, happiness and upgrade ROI.',                  icon: IconLaborer, badge: 'NEW' },
+      { to: '/transmute',  label: 'Transmutation Profit', blurb: 'Auto-fill recipe cost, live profit/ROI, batch compare flips.', icon: IconFurnace, badge: 'NEW' },
       { to: '/capes',      label: 'Cape Converter',      blurb: 'Plain cape → faction cape upgrade margin.',   icon: IconShield },
       { to: '/portfolio',  label: 'Portfolio',           blurb: 'Track silver positions across items.',        icon: IconPouch },
     ],

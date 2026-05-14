@@ -14,7 +14,7 @@ const TOOLS = [
   { to: '/refining',   title: 'Refining Calculator', description: 'Raw → refined with focus, RR + transport.',  icon: IconFurnace,   prominent: true },
   { to: '/cooking',    title: 'Cooking Calculator',  description: 'Recipe-by-recipe meal profit.',              icon: IconFlame },
   { to: '/laborers',   title: 'Laborer Calculator',  description: 'House, journals, happiness, ROI.',           icon: IconLaborer },
-  { to: '/transmute',  title: 'Transmutation',       description: 'Lower-tier → higher-tier resource margin.',  icon: IconFurnace },
+  { to: '/transmute',  title: 'Transmutation Profit', description: 'Recipe-aware flip calculator with what-if slider.', icon: IconFurnace, prominent: true },
   { to: '/planner',    title: 'Craft Planner',       description: 'Queue items + aggregate material totals.',   icon: IconParchment },
   { to: '/prices',     title: 'Market Prices',       description: 'Browse live AODP prices, all cities.',       icon: IconScales },
   { to: '/portfolio',  title: 'Portfolio',           description: 'Track silver positions across items.',       icon: IconPouch },
