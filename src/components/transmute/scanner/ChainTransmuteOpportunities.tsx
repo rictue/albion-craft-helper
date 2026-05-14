@@ -104,6 +104,9 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
     const out: Row[] = [];
     for (const { source, target, path } of pairs) {
       const hops = path.nodes.length - 1;
+      // 1-step paths are already covered by the main scanner table on the
+      // left — only multi-hop chains belong in this panel.
+      if (hops < 2) continue;
       if (hops > maxHops) continue;
 
       for (const resource of RESOURCE_TYPES) {
@@ -202,7 +205,8 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
           <p className="eyebrow">Multi-step strategy</p>
           <h2 className="panel-title">Chain transmute</h2>
           <p className="mt-1 text-xs text-vellum/45">
-            Buy cheap source → transmute through multiple steps → sell target. Same city only.
+            2+ hop paths only. Buy cheap source → transmute multiple steps → sell target. Same city.
+            <span className="text-vellum/30"> 1-step flips are already in the scanner table on the left.</span>
           </p>
         </div>
         <GitBranch className="text-oldgold-300" size={22} />
@@ -231,10 +235,10 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
           </span>
           <input
             type="number"
-            min={1}
+            min={2}
             max={8}
             value={maxHops}
-            onChange={(e) => setMaxHops(Math.max(1, Math.min(8, Number(e.target.value) || 1)))}
+            onChange={(e) => setMaxHops(Math.max(2, Math.min(8, Number(e.target.value) || 2)))}
             className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
           />
         </label>
