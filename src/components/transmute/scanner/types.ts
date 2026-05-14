@@ -16,6 +16,13 @@ export type OrderPriceSide = "buyOrder" | "sellOrder";
 export interface OrderBookPrice {
   buyOrder: string;
   sellOrder: string;
+  /**
+   * ISO timestamps captured from AODP at fetch time — undefined when the
+   * user typed the value manually. Used to render per-cell data-age hints
+   * so the user can tell which slots are fresh vs days old.
+   */
+  sellDate?: string;
+  buyDate?: string;
 }
 
 export type PriceBook = Record<ResourceType, Record<string, OrderBookPrice>>;

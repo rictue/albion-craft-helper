@@ -50,6 +50,21 @@ export interface FetchResult {
   totalCells: number;
   city: string;
   fetchedAt: number;
+  /** AODP-side staleness summary across the cells we filled. */
+  staleness?: {
+    /** Age in ms of the oldest AODP value we used. */
+    oldestAgeMs: number;
+    /** Age in ms of the freshest AODP value we used. */
+    freshestAgeMs: number;
+    /** Median age in ms across the cells we filled. */
+    medianAgeMs: number;
+    /** Count of cells where data is <1h old. */
+    fresh: number;
+    /** Count of cells where data is 1-24h old. */
+    recent: number;
+    /** Count of cells where data is >24h old. */
+    stale: number;
+  };
 }
 
 interface MergedQuote {
@@ -101,6 +116,8 @@ export async function fetchScannerPrices(
   const next: PriceBook = structuredClone(current);
   let filledSells = 0;
   let filledBuys = 0;
+  const ages: number[] = [];
+  const now = Date.now();
 
   for (const id of itemIds) {
     const cell = idToCell.get(id);
@@ -112,17 +129,23 @@ export async function fetchScannerPrices(
     const existing: OrderBookPrice = next[cell.resource][cell.level] ?? { buyOrder: '', sellOrder: '' };
     let sellOrder = existing.sellOrder;
     let buyOrder = existing.buyOrder;
+    let sellDate = existing.sellDate;
+    let buyDate  = existing.buyDate;
 
     if (aodp.sell > 0) {
       sellOrder = String(aodp.sell);
+      sellDate = aodp.sellDate > 0 ? new Date(aodp.sellDate).toISOString() : undefined;
       filledSells += 1;
+      if (aodp.sellDate > 0) ages.push(now - aodp.sellDate);
     }
     if (aodp.buy > 0) {
       buyOrder = String(aodp.buy);
+      buyDate = aodp.buyDate > 0 ? new Date(aodp.buyDate).toISOString() : undefined;
       filledBuys += 1;
+      if (aodp.buyDate > 0) ages.push(now - aodp.buyDate);
     }
 
-    next[cell.resource][cell.level] = { sellOrder, buyOrder };
+    next[cell.resource][cell.level] = { sellOrder, buyOrder, sellDate, buyDate };
   }
 
   return {
@@ -132,8 +155,32 @@ export async function fetchScannerPrices(
       filledBuys,
       totalCells: itemIds.length,
       city,
-      fetchedAt: Date.now(),
+      fetchedAt: now,
+      staleness: ages.length > 0 ? summarizeAges(ages) : undefined,
     },
+  };
+}
+
+function summarizeAges(ages: number[]): NonNullable<FetchResult['staleness']> {
+  const sorted = [...ages].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const ONE_HOUR = 3_600_000;
+  const ONE_DAY = 24 * ONE_HOUR;
+  let fresh = 0;
+  let recent = 0;
+  let stale = 0;
+  for (const age of ages) {
+    if (age < ONE_HOUR) fresh += 1;
+    else if (age < ONE_DAY) recent += 1;
+    else stale += 1;
+  }
+  return {
+    oldestAgeMs: sorted[sorted.length - 1],
+    freshestAgeMs: sorted[0],
+    medianAgeMs: median,
+    fresh,
+    recent,
+    stale,
   };
 }
 

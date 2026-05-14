@@ -27,6 +27,14 @@ interface PriceMatrixProps {
     totalCells: number;
     city: string;
     fetchedAt: number;
+    staleness?: {
+      oldestAgeMs: number;
+      freshestAgeMs: number;
+      medianAgeMs: number;
+      fresh: number;
+      recent: number;
+      stale: number;
+    };
   } | null;
   fetchError?: string | null;
 }
@@ -79,24 +87,42 @@ export function PriceMatrix({
           {isFetching ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
           {isFetching ? 'Fetching…' : 'Fetch live prices'}
         </button>
-        <div className="ml-auto text-[10px] text-vellum/45 tabular-nums">
+        <div className="ml-auto flex flex-col items-end gap-0.5 text-[10px] tabular-nums">
           {fetchError ? (
             <span className="text-ember-400">{fetchError}</span>
           ) : lastFetch ? (
             <>
-              <span className="text-moss-300 font-bold">{lastFetch.filledSells}</span>
-              <span className="text-vellum/55"> sells</span>
-              <span className="text-vellum/30"> · </span>
-              <span className={`font-bold ${lastFetch.filledBuys === 0 ? 'text-ember-400' : 'text-moss-300'}`}>
-                {lastFetch.filledBuys}
-              </span>
-              <span className="text-vellum/55"> buys</span>
-              <span className="text-vellum/30"> / {lastFetch.totalCells} cells</span>
-              <span className="text-vellum/30"> · </span>
-              <span>{lastFetch.city} · {formatAge(lastFetch.fetchedAt)}</span>
+              <div className="text-vellum/45">
+                <span className="text-moss-300 font-bold">{lastFetch.filledSells}</span>
+                <span className="text-vellum/55"> sells</span>
+                <span className="text-vellum/30"> · </span>
+                <span className={`font-bold ${lastFetch.filledBuys === 0 ? 'text-ember-400' : 'text-moss-300'}`}>
+                  {lastFetch.filledBuys}
+                </span>
+                <span className="text-vellum/55"> buys</span>
+                <span className="text-vellum/30"> / {lastFetch.totalCells} cells</span>
+                <span className="text-vellum/30"> · </span>
+                <span>{lastFetch.city} · {formatAge(lastFetch.fetchedAt)}</span>
+              </div>
+              {lastFetch.staleness && (
+                <div className="text-vellum/45">
+                  <span className="text-vellum/55">AODP data: </span>
+                  <span className="text-moss-300 font-bold">{lastFetch.staleness.fresh}</span>
+                  <span className="text-vellum/45"> &lt;1h </span>
+                  <span className="text-vellum/30">·</span>
+                  <span className="text-oldgold-300 font-bold"> {lastFetch.staleness.recent}</span>
+                  <span className="text-vellum/45"> 1-24h </span>
+                  <span className="text-vellum/30">·</span>
+                  <span className={`font-bold ${lastFetch.staleness.stale > 0 ? 'text-ember-400' : 'text-vellum/55'}`}> {lastFetch.staleness.stale}</span>
+                  <span className="text-vellum/45"> &gt;24h </span>
+                  <span className="text-vellum/30">·</span>
+                  <span className="text-vellum/55"> median </span>
+                  <span className="text-vellum">{formatDuration(lastFetch.staleness.medianAgeMs)}</span>
+                </div>
+              )}
             </>
           ) : (
-            <span>125 cells × 5 resources — buy orders are rarer in AODP than sells.</span>
+            <span className="text-vellum/45">125 cells × 5 resources — buy orders are rarer in AODP than sells.</span>
           )}
         </div>
       </div>
@@ -153,18 +179,37 @@ export function PriceMatrix({
             </button>
           ))}
         </div>
-        {viewMode === "both" && (
-          <div className="ml-auto flex items-center gap-3 text-[10px] uppercase tracking-[0.12em] font-bold">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-rose-400/80" />
-              <span className="text-rose-300/85">Sell</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400/80" />
-              <span className="text-emerald-300/85">Buy</span>
-            </span>
-          </div>
-        )}
+        <div className="ml-auto flex items-center gap-3 text-[10px] uppercase tracking-[0.12em] font-bold">
+          {viewMode === "both" && (
+            <>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400/80" />
+                <span className="text-rose-300/85">Sell</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400/80" />
+                <span className="text-emerald-300/85">Buy</span>
+              </span>
+              <span className="text-vellum/15">|</span>
+            </>
+          )}
+          <span className="flex items-center gap-1" title="AODP data fresher than 1 hour">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span className="text-vellum/55 normal-case tracking-normal">&lt;1h</span>
+          </span>
+          <span className="flex items-center gap-1" title="AODP data 1-24 hours old">
+            <span className="w-1.5 h-1.5 rounded-full bg-oldgold-300" />
+            <span className="text-vellum/55 normal-case tracking-normal">1-24h</span>
+          </span>
+          <span className="flex items-center gap-1" title="AODP data older than 24 hours">
+            <span className="w-1.5 h-1.5 rounded-full bg-ember-400" />
+            <span className="text-vellum/55 normal-case tracking-normal">&gt;24h</span>
+          </span>
+          <span className="flex items-center gap-1" title="You typed this value manually">
+            <span className="w-1.5 h-1.5 rounded-full bg-oldgold-300/55" />
+            <span className="text-vellum/55 normal-case tracking-normal">manual</span>
+          </span>
+        </div>
       </div>
 
       {/* Price grid */}
@@ -220,6 +265,7 @@ function PriceRow({ tier, activeResource, priceBook, onPriceChange, viewMode }: 
         const label = `${tier}.${enchant}`;
         const cell = priceBook[activeResource][label];
         const hasAny = !!(cell.sellOrder || cell.buyOrder);
+        const ageBadge = freshestBadge(cell);
 
         return (
           <div
@@ -234,7 +280,12 @@ function PriceRow({ tier, activeResource, priceBook, onPriceChange, viewMode }: 
               <span className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-vellum/45">
                 {label}
               </span>
-              {hasAny && <span className="w-1.5 h-1.5 rounded-full bg-oldgold-300/55" />}
+              {hasAny && (
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${ageBadge.color}`}
+                  title={ageBadge.title}
+                />
+              )}
             </div>
 
             {viewMode === "both" ? (
@@ -363,4 +414,52 @@ function formatAge(ts: number): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+/** Format a duration (ms) into a compact human string for inline labels. */
+function formatDuration(ms: number): string {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return '<1m';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
+/**
+ * Look at the AODP timestamps on a cell and pick the color of its
+ * top-right dot:
+ *   - Fresh   (<1h)            : green
+ *   - Recent  (1-24h)          : gold
+ *   - Stale   (>24h)           : amber
+ *   - Manual  (no AODP date)   : neutral parchment
+ * Title attribute carries the per-side ages so a hover reveals the
+ * detail without crowding the cell visually.
+ */
+function freshestBadge(cell: { sellDate?: string; buyDate?: string }): {
+  color: string;
+  title: string;
+} {
+  const now = Date.now();
+  const sellAge = cell.sellDate ? now - Date.parse(cell.sellDate) : undefined;
+  const buyAge  = cell.buyDate  ? now - Date.parse(cell.buyDate)  : undefined;
+
+  // Pick the FRESHEST side as the dominant signal — if either side was just
+  // refreshed, the cell is trustworthy. Both undefined → manual entry.
+  const ages = [sellAge, buyAge].filter((a): a is number => Number.isFinite(a));
+  if (ages.length === 0) {
+    return { color: 'bg-oldgold-300/55', title: 'Manual entry — no AODP date' };
+  }
+  const freshest = Math.min(...ages);
+  const ONE_HOUR = 3_600_000;
+  const ONE_DAY = 24 * ONE_HOUR;
+
+  const partTitle: string[] = [];
+  if (sellAge !== undefined) partTitle.push(`sell ${formatDuration(sellAge)}`);
+  if (buyAge !== undefined)  partTitle.push(`buy ${formatDuration(buyAge)}`);
+  const title = `AODP age — ${partTitle.join(' · ')}`;
+
+  if (freshest < ONE_HOUR) return { color: 'bg-emerald-400', title };
+  if (freshest < ONE_DAY)  return { color: 'bg-oldgold-300', title };
+  return { color: 'bg-ember-400',     title };
 }
