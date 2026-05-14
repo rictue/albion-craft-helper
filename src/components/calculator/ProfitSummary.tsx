@@ -210,8 +210,14 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
     : undefined;
   const bestCity = pinnedCity ?? bestRealCity ?? cityPrices[0];
   const isPinned = !!pinnedCity;
-  const bestProfit = bestCity?.profit || 0;
-  const bestPrice = bestCity?.price || 0;
+  // When the user has an inline sell-price override, the calc-side
+  // result.profit already reflects it (priceMap routes :custom into the
+  // crafted item's price). The headline numbers should follow suit so the
+  // top of the card matches what the user typed — otherwise the override
+  // appears to do nothing while it's silently being applied.
+  const cityProfit = bestCity?.profit || 0;
+  const bestProfit = hasCustomSell ? result.profit : cityProfit;
+  const bestPrice = hasCustomSell ? (customSell ?? 0) : (bestCity?.price || 0);
   const totalProfit = bestProfit + journalNet;
   const isProfit = totalProfit > 0;
   const hasJournal = Math.abs(journalNet) > 0.5; // ignore noise
@@ -275,7 +281,13 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
                 </div>
                 {bestCity && (
                   <div className="text-[10px] text-zinc-500">
-                    Sell @ {bestCity.city} · {formatSilver(bestPrice)} ea
+                    {hasCustomSell ? (
+                      <>
+                        Sell @ <span className="text-gold-light">override</span> · {formatSilver(bestPrice)} ea
+                      </>
+                    ) : (
+                      <>Sell @ {bestCity.city} · {formatSilver(bestPrice)} ea</>
+                    )}
                   </div>
                 )}
               </div>
@@ -319,7 +331,13 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
               </div>
               {bestCity && (
                 <div className="text-right">
-                  <div className="text-xs text-zinc-500">Sell at {bestCity.city}</div>
+                  <div className="text-xs text-zinc-500">
+                    {hasCustomSell ? (
+                      <>Sell at <span className="text-gold-light">override</span></>
+                    ) : (
+                      <>Sell at {bestCity.city}</>
+                    )}
+                  </div>
                   <div className="text-sm text-zinc-300">{formatSilver(bestPrice)} ea</div>
                 </div>
               )}
