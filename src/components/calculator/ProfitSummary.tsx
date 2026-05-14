@@ -48,6 +48,13 @@ const CRAFT_FOCUS_BASE: Record<number, number> = {
 };
 const DAILY_FOCUS_CAP = 30_000; // roughly one day of focus regen
 
+/** Adds dot thousand separators ("1234567" → "1.234.567"). Input must be
+ *  a digit-only string; non-digits are passed through unchanged. */
+function formatThousands(digits: string): string {
+  if (!digits) return '';
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
 export default function ProfitSummary({ result, onAddToPlan, prices, itemId, journalNet = 0 }: Props) {
   const [added, setAdded] = useState(false);
   // When the user clicks a city row in the Sell Prices list, the top
@@ -76,14 +83,15 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
   const customSell = customPrices[customSellKey];
   const hasCustomSell = customSell !== undefined && customSell > 0;
   const [overrideInput, setOverrideInput] = useState<string>(
-    hasCustomSell ? String(customSell) : '',
+    hasCustomSell ? formatThousands(String(customSell)) : '',
   );
   // Reset the input when the item changes so a stale value from a previous
   // item doesn't appear pre-filled on the new one.
   const [prevOverrideItemId, setPrevOverrideItemId] = useState(itemId);
   if (prevOverrideItemId !== itemId) {
     setPrevOverrideItemId(itemId);
-    setOverrideInput(customPrices[`${itemId}:custom`] ? String(customPrices[`${itemId}:custom`]) : '');
+    const next = customPrices[`${itemId}:custom`];
+    setOverrideInput(next ? formatThousands(String(next)) : '');
   }
 
   // All city prices for this item. Unlike the old version which dropped
@@ -335,20 +343,28 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
             Override sell:
           </label>
           <input
-            type="number"
-            min={0}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9.]*"
             value={overrideInput}
             onChange={(e) => {
-              const raw = e.target.value;
-              setOverrideInput(raw);
-              const n = Number(raw);
-              if (raw === '' || !Number.isFinite(n) || n <= 0) {
+              // Accept formatted input ("1.250.000") and store the raw number.
+              // Re-format on every keystroke so the dots stay correct as the
+              // user types or deletes digits.
+              const digits = e.target.value.replace(/[^\d]/g, '');
+              setOverrideInput(formatThousands(digits));
+              if (digits === '') {
                 removeCustomPrice(customSellKey);
-              } else {
+                return;
+              }
+              const n = Number(digits);
+              if (Number.isFinite(n) && n > 0) {
                 setCustomPrice(customSellKey, n);
+              } else {
+                removeCustomPrice(customSellKey);
               }
             }}
-            placeholder={result.sellPrice > 0 ? formatSilver(result.sellPrice / Math.max(1, qty)) : 'Per item'}
+            placeholder={result.sellPrice > 0 ? formatThousands(String(Math.round(result.sellPrice / Math.max(1, qty)))) : 'Per item'}
             className={`flex-1 min-w-0 bg-zinc-900 border rounded px-2 py-1 text-xs text-zinc-100 tabular-nums focus:outline-none focus:ring-1 focus:ring-gold/40 ${
               hasCustomSell ? 'border-gold/50 text-gold-light' : 'border-zinc-700'
             }`}
