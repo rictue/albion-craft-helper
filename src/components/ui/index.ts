@@ -15,3 +15,4 @@ export { default as RiskBadge } from './RiskBadge';
 export type { RiskLevel } from './RiskBadge';
 export { default as NumberInput } from './NumberInput';
 export { default as SectionDivider } from './SectionDivider';
+export { default as DecisionBadge } from './DecisionBadge';

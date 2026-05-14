@@ -8,11 +8,20 @@ import { ageHoursOf } from '../../utils/dataAge';
 import { CITIES } from '../../data/cities';
 import { getRefineSpec, setRefineSpec } from '../../data/specs';
 import ItemIcon from '../common/ItemIcon';
+import MarketFeeControls from '../common/MarketFeeControls';
+import FeeRealityCheck from '../common/FeeRealityCheck';
+import { DecisionBadge } from '../ui';
+import {
+  DEFAULT_FEE_SETTINGS,
+  getSaleMultiplier,
+  getEntryMultiplier,
+} from '../../utils/marketFees';
+import type { MarketFeeSettings } from '../../utils/marketFees';
+import { getDecision, SILVER_PER_UNIT_THRESHOLDS } from '../../utils/decision';
 
 const BASE_LPB = 18;
 const CITY_LPB = 40;
 const FOCUS_LPB = 59;
-const TAX_RATE = 0.065; // Premium
 
 // Raw resources + refined materials weight (Albion: all raw 0.1 kg, refined 0.2 kg)
 const RAW_WEIGHT_KG = 0.1;
@@ -39,7 +48,20 @@ interface CityPriceData {
   refinedDate: string;
 }
 
-type SellMode = 'market' | 'discord';
+const FEE_SETTINGS_LS_KEY = 'albion-refine-fee-settings-v1';
+
+function loadFeeSettings(): MarketFeeSettings {
+  try {
+    const raw = localStorage.getItem(FEE_SETTINGS_LS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<MarketFeeSettings>;
+      return { ...DEFAULT_FEE_SETTINGS, ...parsed };
+    }
+  } catch {
+    // Bad LS — fall through to defaults.
+  }
+  return DEFAULT_FEE_SETTINGS;
+}
 
 export default function SimpleRefine() {
   const [resource, setResource] = useState('wood');
@@ -49,10 +71,9 @@ export default function SimpleRefine() {
   const [buyCity] = useState('auto');
   const [refineCity, setRefineCity] = useState('Fort Sterling');
   const [sellCity] = useState('auto');
-  const [sellMode, setSellMode] = useState<SellMode>('market');
+  const [feeSettings, setFeeSettings] = useState<MarketFeeSettings>(() => loadFeeSettings());
   const [useFocus, setUseFocus] = useState(false);
   const [focusBudget, setFocusBudget] = useState(30000);
-  const [premium, setPremium] = useState(true);
   // Daily Production Bonus shown on the station UI. Like AFM, treat it as an
   // LPB-style production bonus, then convert the combined value to RR.
   const [dailyBonus, setDailyBonus] = useState(0);
@@ -179,6 +200,15 @@ export default function SimpleRefine() {
   useEffect(() => {
     if (tier < 4) setEnchant(0);
   }, [tier]);
+
+  // Persist fee settings between sessions.
+  useEffect(() => {
+    try {
+      localStorage.setItem(FEE_SETTINGS_LS_KEY, JSON.stringify(feeSettings));
+    } catch {
+      // Private mode / quota full — calc still works.
+    }
+  }, [feeSettings]);
 
   // Buy prices: default from refine city if available, otherwise cheapest
   const bestBuy = useMemo(() => {
@@ -377,19 +407,21 @@ export default function SimpleRefine() {
     const initialRaw = simulation.initialCrafts * recipe.rawPerCraft;
     const initialPrev = simulation.initialCrafts * recipe.prevPerCraft;
 
-    const rawCost = initialRaw * rawPrice;
-    const prevCost = initialPrev * prevPrice;
+    // Entry-side multiplier: if the user posts a buy order for raw materials
+    // they pay an extra setup fee on top of the sticker price.
+    const entryMult = getEntryMultiplier(feeSettings);
+    const rawCost = initialRaw * rawPrice * entryMult;
+    const prevCost = initialPrev * prevPrice * entryMult;
     // Station fee is paid per craft ACTION, including reinvest passes.
     // Previously we only charged initial crafts, which understated fees by
     // ~2× when RR is high. Now we charge all chain crafts.
     const feeTotal = simulation.totalOutput * feePerCraft;
     const totalCost = rawCost + prevCost + feeTotal;
 
-    // Sell revenue with mode-specific pricing
-    let effectiveSellPrice = sellPrice;
-    if (sellMode === 'discord') effectiveSellPrice = sellPrice * 0.95; // -5% discount, no tax
-    else if (sellMode === 'market' && premium) effectiveSellPrice = sellPrice * (1 - TAX_RATE);
-    else if (sellMode === 'market' && !premium) effectiveSellPrice = sellPrice * (1 - 0.105);
+    // Sale-side multiplier handles all four cases: marketplace prem/normal,
+    // sell order vs instant sell, and private (Discord) sale.
+    const saleMult = getSaleMultiplier(feeSettings);
+    const effectiveSellPrice = sellPrice * saleMult;
 
     const revenue = simulation.totalOutput * effectiveSellPrice;
     const profit = revenue - totalCost;
@@ -397,13 +429,19 @@ export default function SimpleRefine() {
 
     const totalFocus = focusSplit.usedFocus;
 
+    // Per-unit decision uses the same threshold preset as the transmutation
+    // scanner so the badges feel consistent across the site.
+    const profitPerUnit = simulation.totalOutput > 0 ? profit / simulation.totalOutput : 0;
+    const decision = getDecision(profitPerUnit, SILVER_PER_UNIT_THRESHOLDS);
+
     return {
       initialRaw, initialPrev,
       rawCost, prevCost, feeTotal, totalCost,
       effectiveSellPrice, revenue, profit, roi,
-      totalFocus,
+      totalFocus, profitPerUnit, decision,
+      entryMult, saleMult,
     };
-  }, [recipe, simulation, rawPrice, prevPrice, sellPrice, feePerCraft, sellMode, premium, focusSplit]);
+  }, [recipe, simulation, rawPrice, prevPrice, sellPrice, feePerCraft, feeSettings, focusSplit]);
 
   // Stale price warning (>6h old). Uses the shared AODP-aware parser so
   // the user's timezone doesn't inflate ages by +3h (UTC+3 Turkey).
@@ -488,16 +526,10 @@ export default function SimpleRefine() {
               <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Your spec (this tier)</label>
               <input type="number" min={0} max={100} value={specInput} onChange={(e) => updateSpec(parseInt(e.target.value) || 0)} className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className={`flex items-center justify-center gap-1.5 cursor-pointer border rounded-lg px-2 py-2 text-xs font-semibold transition-all ${useFocus ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' : 'bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border)] text-zinc-400 hover:text-zinc-200'}`}>
-                <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-cyan-500" />
-                Focus
-              </label>
-              <label className={`flex items-center justify-center gap-1.5 cursor-pointer border rounded-lg px-2 py-2 text-xs font-semibold transition-all ${premium ? 'bg-gold/15 border-gold/40 text-gold' : 'bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border)] text-zinc-400 hover:text-zinc-200'}`}>
-                <input type="checkbox" checked={premium} onChange={(e) => setPremium(e.target.checked)} className="accent-amber-500" />
-                Premium
-              </label>
-            </div>
+            <label className={`flex items-center justify-center gap-1.5 cursor-pointer border rounded-lg px-2 py-2 text-xs font-semibold transition-all ${useFocus ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' : 'bg-[color:var(--color-bg-overlay)] border-[color:var(--color-border)] text-zinc-400 hover:text-zinc-200'}`}>
+              <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-cyan-500" />
+              Focus
+            </label>
             <div>
               <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5" title="Daily Production Bonus — shown at the refining station in-game">
                 Daily bonus %
@@ -537,14 +569,7 @@ export default function SimpleRefine() {
           {/* Step 3 — How to sell */}
           <div className="surface p-4 space-y-3">
             <StepHeader num={3} label="How to sell" />
-            <div className="grid grid-cols-2 gap-1">
-              <button onClick={() => setSellMode('market')} className={`h-9 rounded-lg text-[11px] font-semibold transition-all ${sellMode === 'market' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-400 border border-[color:var(--color-border)]'}`}>
-                Market {premium ? '−6.5%' : '−10.5%'}
-              </button>
-              <button onClick={() => setSellMode('discord')} className={`h-9 rounded-lg text-[11px] font-semibold transition-all ${sellMode === 'discord' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-400 border border-[color:var(--color-border)]'}`}>
-                Discord −5%
-              </button>
-            </div>
+            <MarketFeeControls value={feeSettings} onChange={setFeeSettings} />
             <div>
               <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Station fee / craft</label>
               <input type="number" min={0} value={feePerCraft} onChange={(e) => setFeePerCraft(parseInt(e.target.value) || 0)} className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
@@ -634,6 +659,10 @@ export default function SimpleRefine() {
                 <div className={`text-sm font-semibold ${result.profit > 0 ? 'text-green-500/80' : 'text-red-500/80'}`}>
                   {formatPercent(result.roi)} ROI
                 </div>
+                <div className="mt-2 flex items-center justify-end gap-2">
+                  <span className="text-[10px] text-zinc-500 tabular-nums">{formatSilver(result.profitPerUnit)}/plank</span>
+                  <DecisionBadge decision={result.decision} />
+                </div>
               </div>
             </div>
           </div>
@@ -668,10 +697,18 @@ export default function SimpleRefine() {
               <div className="text-[11px] text-zinc-500 mt-2 space-y-0.5">
                 <div>{simulation.totalOutput} × {formatSilver(result.effectiveSellPrice)}</div>
                 <div>{sellPriceCity && <span className="text-zinc-700">@ {sellPriceCity}</span>}</div>
-                <div className="text-zinc-700 text-[10px]">{sellMode === 'market' ? `${premium ? '6.5%' : '10.5%'} tax` : '5% Discord discount'}</div>
+                <div className="text-zinc-700 text-[10px]">×{result.saleMult.toFixed(3)} after fees</div>
               </div>
             </div>
           </div>
+
+          {/* Fee reality check — what's profit per plank under the 4 common setups */}
+          <FeeRealityCheck
+            sellPrice={sellPrice}
+            costBeforeFees={(result.rawCost / Math.max(1, result.entryMult) + result.prevCost / Math.max(1, result.entryMult)) / Math.max(1, simulation.totalOutput)}
+            fixedFees={feePerCraft}
+            unitLabel="Per plank"
+          />
 
           {/* Prices section */}
           <div className="surface p-4">
