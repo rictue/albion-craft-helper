@@ -86,7 +86,7 @@ export default function CraftingPlanner() {
         entry,
         result: calculateCrafting(
           entry.item, entry.tier, entry.enchantment, entry.quantity,
-          rr, settings.hasPremium, settings.usageFeePerHundred, priceMap,
+          rr, settings.feeSettings, settings.usageFeePerHundred, priceMap,
         ),
       };
     });

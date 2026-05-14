@@ -6,6 +6,10 @@ import { ageHoursOf, formatAge, ageColor } from '../../utils/dataAge';
 import { useAppStore } from '../../store/appStore';
 import { CITIES } from '../../data/cities';
 import ItemIcon from '../common/ItemIcon';
+import MarketFeeControls from '../common/MarketFeeControls';
+import FeeRealityCheck from '../common/FeeRealityCheck';
+import { DecisionBadge } from '../ui';
+import { getDecision, MARGIN_PCT_THRESHOLDS } from '../../utils/decision';
 
 interface Props {
   result: CraftingResult;
@@ -60,9 +64,9 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
     setPinnedCityName(null);
   }
 
-  const { settings } = useAppStore();
+  const { settings, updateSettings } = useAppStore();
   const qty = settings.quantity || 1;
-  const taxRate = settings.hasPremium ? 0.065 : 0.105;
+  const saleMultiplier = result.saleMultiplier;
 
   // All city prices for this item. Unlike the old version which dropped
   // cities that had no listings, this one always emits a row for every
@@ -111,7 +115,7 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
 
       const hasData = bestSell > 0 || bestBuyOrder > 0;
       const totalSell = bestSell * qty;
-      const profit = bestSell > 0 ? totalSell * (1 - taxRate) - result.investment : 0;
+      const profit = bestSell > 0 ? totalSell * saleMultiplier - result.investment : 0;
       results.push({
         city: city.name,
         price: bestSell,
@@ -156,7 +160,7 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
       if (ra !== rb) return ra - rb;
       return (cityOrder.get(a.city) ?? 99) - (cityOrder.get(b.city) ?? 99);
     });
-  }, [prices, itemId, result.investment, taxRate, qty, settings.craftingCity]);
+  }, [prices, itemId, result.investment, saleMultiplier, qty, settings.craftingCity]);
 
   // For the headline "Total Profit" card we want the best *actual* profit,
   // not the pinned craft city — otherwise the header would flash red when
@@ -296,7 +300,34 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
             </div>
           )}
         </div>
+
+        {/* Decision badge + margin */}
+        <div className="mt-3 flex items-center justify-between">
+          <div className="text-[11px] text-zinc-500">
+            Margin <span className="font-bold text-zinc-300 tabular-nums">{result.profitMargin.toFixed(1)}%</span>
+            <span className="text-zinc-700 mx-1.5">·</span>
+            ×{result.saleMultiplier.toFixed(3)} after fees
+          </div>
+          <DecisionBadge decision={getDecision(result.profitMargin, MARGIN_PCT_THRESHOLDS)} />
+        </div>
       </div>
+
+      {/* Market fees + entry/exit source */}
+      <div className="bg-bg-raised rounded-xl border border-border p-3">
+        <MarketFeeControls
+          value={settings.feeSettings}
+          onChange={(next) => updateSettings({ feeSettings: next })}
+          compact
+        />
+      </div>
+
+      {/* Fee reality check — profit/item under the 4 common setups */}
+      <FeeRealityCheck
+        sellPrice={(result.sellPrice / Math.max(1, qty))}
+        costBeforeFees={(result.effectiveMaterialCost / Math.max(1, result.entryMultiplier)) / Math.max(1, qty)}
+        fixedFees={result.usageFee / Math.max(1, qty)}
+        unitLabel="Per item"
+      />
 
       {/* All cities */}
       {cityPrices.length > 0 && (

@@ -40,16 +40,7 @@ export default function CraftingSettings() {
         </div>
 
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={settings.hasPremium}
-              onChange={(e) => updateSettings({ hasPremium: e.target.checked })}
-              className="accent-gold w-3.5 h-3.5"
-            />
-            <span className="text-sm text-zinc-300">Premium</span>
-          </label>
-          <label className="flex items-center gap-1.5 cursor-pointer">
+          <label className="flex items-center gap-1.5 cursor-pointer" title="Tax profile, sell-order vs instant sell, and private (Discord) sale live in the right panel under the profit card.">
             <input
               type="checkbox"
               checked={settings.useFocus}

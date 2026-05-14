@@ -214,7 +214,7 @@ export default function CraftingCalculator() {
     if (!selectedItem) return null;
     return calculateCrafting(
       selectedItem, tier, enchantment, settings.quantity,
-      returnRate, settings.hasPremium, settings.usageFeePerHundred, priceMap,
+      returnRate, settings.feeSettings, settings.usageFeePerHundred, priceMap,
     );
   }, [selectedItem, tier, enchantment, settings, returnRate, priceMap]);
 

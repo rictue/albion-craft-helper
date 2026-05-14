@@ -53,9 +53,12 @@ export interface PriceEntry {
   fetchedAt: number;
 }
 
+import type { MarketFeeSettings } from '../utils/marketFees';
+
 export interface CraftingSettings {
   craftingCity: string;
   sellingLocation: string;
+  /** @deprecated Kept for backwards compat — derived from feeSettings.taxProfile === 'premium'. */
   hasPremium: boolean;
   useFocus: boolean;
   returnRateOverride: number | null;
@@ -69,6 +72,12 @@ export interface CraftingSettings {
    * enters it manually.
    */
   dailyStationBonusPct: number;
+  /**
+   * Full marketplace fee model: tax profile + entry/exit price source +
+   * private (Discord) sale toggle. Replaces the old hasPremium boolean as
+   * the single source of truth for tax calculations.
+   */
+  feeSettings: MarketFeeSettings;
 }
 
 export interface PlannerEntry {

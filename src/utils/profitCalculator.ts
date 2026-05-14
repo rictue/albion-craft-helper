@@ -1,5 +1,7 @@
 import type { ItemDefinition, Tier, Enchantment } from '../types';
 import { resolveMaterialId, resolveItemId, resolveArtifactId } from './itemIdParser';
+import type { MarketFeeSettings } from './marketFees';
+import { getSaleMultiplier, getEntryMultiplier } from './marketFees';
 
 export interface MaterialCost {
   materialId: string;
@@ -15,10 +17,14 @@ export interface CraftingResult {
   materials: MaterialCost[];
   artifactCost: { id: string; price: number } | null;
   totalMaterialCost: number;      // raw materials + artifact (display)
-  effectiveMaterialCost: number;  // materials × (1 - RR) + artifact (true cost paid per craft set)
+  effectiveMaterialCost: number;  // materials × (1 - RR) × entryMult + artifact × entryMult (true cost paid per craft set)
   sellPrice: number;
   tax: number;
   taxRate: number;
+  /** Multiplier applied to sticker sell price after fees (1 - taxRate). */
+  saleMultiplier: number;
+  /** Multiplier applied to material/artifact costs (1 + buy-order setup fee). */
+  entryMultiplier: number;
   usageFee: number;
   profit: number;
   profitMargin: number;
@@ -66,7 +72,7 @@ export function calculateCrafting(
   enchantment: Enchantment,
   quantity: number,
   returnRate: number,
-  hasPremium: boolean,
+  feeSettings: MarketFeeSettings,
   usageFeePerHundred: number,
   priceMap: Map<string, number>,
 ): CraftingResult {
@@ -94,14 +100,17 @@ export function calculateCrafting(
   }
 
   // CRITICAL: Return rate only applies to REFINED materials, never to artifacts.
-  // Artifacts are always fully consumed per craft.
+  // Artifacts are always fully consumed per craft. Both costs are subject to
+  // the entry-side setup fee if the player buys via buy order.
+  const entryMultiplier = getEntryMultiplier(feeSettings);
   const rawMaterialCost = materials.reduce((sum, m) => sum + m.totalPrice, 0);
   const artifactTotal = artifactCost?.price || 0;
-  const totalMaterialCost = rawMaterialCost + artifactTotal;
-  const effectiveMaterialCost = rawMaterialCost * (1 - returnRate) + artifactTotal;
+  const totalMaterialCost = (rawMaterialCost + artifactTotal) * entryMultiplier;
+  const effectiveMaterialCost = (rawMaterialCost * (1 - returnRate) + artifactTotal) * entryMultiplier;
 
   const sellPrice = (priceMap.get(itemId) || 0) * quantity;
-  const taxRate = hasPremium ? 0.065 : 0.105;
+  const saleMultiplier = getSaleMultiplier(feeSettings);
+  const taxRate = 1 - saleMultiplier;
   const tax = sellPrice * taxRate;
 
   // Station usage fee (setup/nutrition).
@@ -128,6 +137,8 @@ export function calculateCrafting(
     sellPrice,
     tax,
     taxRate,
+    saleMultiplier,
+    entryMultiplier,
     usageFee,
     profit,
     profitMargin,

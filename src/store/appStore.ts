@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ItemDefinition, Tier, Enchantment, CraftingSettings, PlannerEntry, MarketPrice } from '../types';
+import { DEFAULT_FEE_SETTINGS } from '../utils/marketFees';
 
 export interface ProfitRecord {
   id: string;
@@ -67,9 +68,26 @@ export const useAppStore = create<AppState>()(
         usageFeePerHundred: 0,
         quantity: 1,
         dailyStationBonusPct: 0,
+        feeSettings: { ...DEFAULT_FEE_SETTINGS },
       },
       updateSettings: (partial) =>
-        set((state) => ({ settings: { ...state.settings, ...partial } })),
+        set((state) => {
+          // Keep hasPremium and feeSettings in sync — if one is updated, the
+          // other follows so we don't have to migrate every consumer at once.
+          let next = { ...state.settings, ...partial };
+          if (partial.feeSettings && !('hasPremium' in partial)) {
+            next.hasPremium = partial.feeSettings.taxProfile === 'premium';
+          } else if ('hasPremium' in partial && !partial.feeSettings) {
+            next = {
+              ...next,
+              feeSettings: {
+                ...next.feeSettings,
+                taxProfile: partial.hasPremium ? 'premium' : 'normal',
+              },
+            };
+          }
+          return { settings: next };
+        }),
 
       plannerItems: [],
       addToPlan: (entry) =>
@@ -118,6 +136,21 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'albion-craft-helper',
+      // Bump when CraftingSettings shape changes so migrate can run.
+      version: 2,
+      migrate: (persistedState, version) => {
+        if (!persistedState || typeof persistedState !== 'object') return persistedState;
+        const state = persistedState as { settings?: Partial<CraftingSettings> };
+        if (version < 2 && state.settings && !state.settings.feeSettings) {
+          // Old persisted state lacked feeSettings — seed it from the legacy
+          // hasPremium boolean so existing users land on the same tax mode.
+          state.settings.feeSettings = {
+            ...DEFAULT_FEE_SETTINGS,
+            taxProfile: state.settings.hasPremium ? 'premium' : 'normal',
+          };
+        }
+        return persistedState;
+      },
       partialize: (state) => ({
         settings: state.settings,
         plannerItems: state.plannerItems,
