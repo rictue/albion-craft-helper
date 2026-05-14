@@ -31,6 +31,19 @@ interface Props {
   feeSettings: MarketFeeSettings;
 }
 
+type ExitMode = 'sellOrder' | 'instantSell' | 'discord';
+
+interface ExitScenario {
+  mode: ExitMode;
+  /** What the calc multiplied the reference price by. */
+  multiplier: number;
+  /** AODP price the scenario is referenced from (sell-order or buy-order side). */
+  referencePrice: number;
+  netRevenue: number;
+  profit: number;
+  marginPct: number;
+}
+
 interface Row {
   id: string;
   resource: ResourceType;
@@ -39,16 +52,30 @@ interface Row {
   path: ChainPath;
   hops: number;
   inputPrice: number;
-  outputPrice: number;
-  netRevenue: number;
   totalCostPerUnit: number;
-  profitPerUnit: number;
-  marginPct: number;
+  /** Per-exit-mode breakdown so the user can pick whichever route fits. */
+  scenarios: ExitScenario[];
+  /** Best (highest) profit across scenarios — drives the row's sort + filter. */
+  bestProfit: number;
+  /** Which exit mode produced bestProfit. */
+  bestMode: ExitMode;
   /** Cheapest 1-step alternative to acquire target (if exists). */
   directBuyCost?: number;
   /** Savings vs the best 1-step alternative (positive = chain is better). */
   savingsVsDirect?: number;
 }
+
+const EXIT_LABELS: Record<ExitMode, string> = {
+  sellOrder:   'Sell order',
+  instantSell: 'Buy order',
+  discord:     'Discord −5%',
+};
+
+const EXIT_HINTS: Record<ExitMode, string> = {
+  sellOrder:   'Post, wait',
+  instantSell: 'Sell into top buy now',
+  discord:     'Private sale, no tax',
+};
 
 const ONE_HOUR = 3_600_000;
 
@@ -73,19 +100,28 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
     return () => window.clearInterval(id);
   }, []);
 
-  const saleMult = getSaleMultiplier(feeSettings);
   const entryMult = getEntryMultiplier(feeSettings);
+
+  // Three exit multipliers — sell-order (post + wait), instant-sell (sell
+  // into a buy order), and Discord (-5%, no tax). Memoize so the object
+  // identity is stable across renders; otherwise the downstream useMemo
+  // would re-run on every keystroke.
+  const exitMults = useMemo<Record<ExitMode, number>>(() => ({
+    sellOrder:   getSaleMultiplier({ ...feeSettings, saleMode: 'marketplace', exitSource: 'sellOrder' }),
+    instantSell: getSaleMultiplier({ ...feeSettings, saleMode: 'marketplace', exitSource: 'buyOrder'  }),
+    discord:     getSaleMultiplier({ ...feeSettings, saleMode: 'private' }),
+  }), [feeSettings]);
 
   const rows = useMemo<Row[]>(() => {
     const pairs = allChainOpportunities(presets);
     const ageCutoff = maxAgeHours > 0 ? now - maxAgeHours * ONE_HOUR : 0;
 
-    // For each (resource, target), remember the cheapest 1-step path so
-    // we can compute savingsVsDirect for multi-step entries to the same
-    // target. The map key is "resource|target".
+    // For each (resource, target), remember the cheapest 1-step acquisition
+    // path so we can compute savingsVsDirect on multi-step entries to the
+    // same target. The map key is "resource|target".
     const directBy = new Map<string, number>();
     for (const { source, target, path } of pairs) {
-      if (path.nodes.length !== 2) continue; // 1 step = [source, target]
+      if (path.nodes.length !== 2) continue;
       for (const resource of RESOURCE_TYPES) {
         const inputPriceStr = feeSettings.entrySource === 'buyOrder'
           ? priceBook[resource]?.[source]?.buyOrder
@@ -118,40 +154,73 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
         const inputPriceStr = feeSettings.entrySource === 'buyOrder'
           ? sourceCell.buyOrder
           : sourceCell.sellOrder;
-        const outputPriceStr = feeSettings.exitSource === 'sellOrder'
-          ? targetCell.sellOrder
-          : targetCell.buyOrder;
-
         const inputPrice = toNumber(inputPriceStr);
-        const outputPrice = toNumber(outputPriceStr);
-        if (inputPrice <= 0 || outputPrice <= 0) continue;
+        if (inputPrice <= 0) continue;
 
-        // Staleness filter — skip cells whose source or target side is too old.
+        // Pull BOTH target sides — we'll evaluate three exit routes:
+        //  sellOrder (referenced from target's sell-order price),
+        //  instantSell (referenced from target's buy-order price),
+        //  discord (referenced from target's sell-order price, no tax).
+        const targetSellOrderPrice = toNumber(targetCell.sellOrder);
+        const targetBuyOrderPrice  = toNumber(targetCell.buyOrder);
+        if (targetSellOrderPrice <= 0 && targetBuyOrderPrice <= 0) continue;
+
+        // Staleness filter on the source side and on whichever target side
+        // we have data for.
         if (ageCutoff > 0) {
           const inSideStr = feeSettings.entrySource === 'buyOrder'
             ? (sourceCell.buyConfirmedAt ?? sourceCell.buyDate)
             : (sourceCell.sellConfirmedAt ?? sourceCell.sellDate);
-          const outSideStr = feeSettings.exitSource === 'sellOrder'
-            ? (targetCell.sellConfirmedAt ?? targetCell.sellDate)
-            : (targetCell.buyConfirmedAt ?? targetCell.buyDate);
           if (inSideStr) {
             const t = Date.parse(inSideStr);
             if (Number.isFinite(t) && t < ageCutoff) continue;
           }
-          if (outSideStr) {
-            const t = Date.parse(outSideStr);
-            if (Number.isFinite(t) && t < ageCutoff) continue;
+          // Take the freshest of the two target sides — if either side is
+          // current, we trust the row enough to display it.
+          const outDates = [
+            targetCell.sellConfirmedAt ?? targetCell.sellDate,
+            targetCell.buyConfirmedAt  ?? targetCell.buyDate,
+          ].filter(Boolean) as string[];
+          if (outDates.length > 0) {
+            const ts = outDates.map(d => Date.parse(d)).filter(Number.isFinite);
+            const freshest = ts.length ? Math.max(...ts) : 0;
+            if (freshest > 0 && freshest < ageCutoff) continue;
           }
         }
 
         const totalCostPerUnit = inputPrice * entryMult + path.totalStepCost;
-        const netRevenue = outputPrice * saleMult;
-        const profitPerUnit = Math.floor(netRevenue - totalCostPerUnit);
-        if (profitPerUnit < minProfit) continue;
+        const scenarios: ExitScenario[] = [];
 
-        const marginPct = totalCostPerUnit > 0 ? (profitPerUnit / totalCostPerUnit) * 100 : 0;
+        const pushScenario = (mode: ExitMode, refPrice: number) => {
+          if (refPrice <= 0) return;
+          const mult = exitMults[mode];
+          const netRev = refPrice * mult;
+          const profit = Math.floor(netRev - totalCostPerUnit);
+          const margin = totalCostPerUnit > 0 ? (profit / totalCostPerUnit) * 100 : 0;
+          scenarios.push({
+            mode,
+            multiplier: mult,
+            referencePrice: refPrice,
+            netRevenue: Math.floor(netRev),
+            profit,
+            marginPct: margin,
+          });
+        };
 
-        // Compare against cheapest 1-step acquisition of the same target.
+        pushScenario('sellOrder',   targetSellOrderPrice);
+        pushScenario('instantSell', targetBuyOrderPrice);
+        pushScenario('discord',     targetSellOrderPrice);
+
+        if (scenarios.length === 0) continue;
+
+        // Best-scenario sort + filter — we want the row to show up if ANY
+        // exit beats the user's threshold.
+        const best = scenarios.reduce(
+          (a, b) => (b.profit > a.profit ? b : a),
+          scenarios[0],
+        );
+        if (best.profit < minProfit) continue;
+
         const directBuyCost = directBy.get(`${resource}|${target}`);
         const isMultiStep = hops > 1;
         const savingsVsDirect = (isMultiStep && directBuyCost !== undefined)
@@ -170,11 +239,10 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
           path,
           hops,
           inputPrice,
-          outputPrice,
-          netRevenue: Math.floor(netRevenue),
           totalCostPerUnit: Math.floor(totalCostPerUnit),
-          profitPerUnit,
-          marginPct,
+          scenarios,
+          bestProfit: best.profit,
+          bestMode: best.mode,
           directBuyCost: directBuyCost !== undefined ? Math.floor(directBuyCost) : undefined,
           savingsVsDirect: savingsVsDirect !== undefined ? Math.floor(savingsVsDirect) : undefined,
         });
@@ -182,13 +250,13 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
     }
 
     return out
-      .sort((a, b) => b.profitPerUnit - a.profitPerUnit)
+      .sort((a, b) => b.bestProfit - a.bestProfit)
       .slice(0, 50);
   }, [
     priceBook,
     presets,
     feeSettings,
-    saleMult,
+    exitMults,
     entryMult,
     minProfit,
     maxHops,
@@ -347,8 +415,8 @@ function ChainCard({ row }: { row: Row }) {
         {row.path.nodes.join(' → ')}
       </div>
 
-      {/* Cost / profit grid */}
-      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+      {/* Cost breakdown */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] mb-2">
         <div className="text-vellum/55">Buy {row.source} at</div>
         <div className="text-right text-vellum tabular-nums">
           {row.inputPrice.toLocaleString('de-DE')}
@@ -363,29 +431,62 @@ function ChainCard({ row }: { row: Row }) {
         <div className="text-right text-vellum tabular-nums font-bold">
           {row.totalCostPerUnit.toLocaleString('de-DE')}
         </div>
-
-        <div className="text-vellum/55">Sell {row.target} net</div>
-        <div className="text-right text-vellum tabular-nums">
-          {row.netRevenue.toLocaleString('de-DE')}
-        </div>
-
-        <div className="text-vellum/55 font-bold pt-1">Profit / unit</div>
-        <div className="text-right font-black text-moss-300 tabular-nums pt-1">
-          +{row.profitPerUnit.toLocaleString('de-DE')}
-          <span className="text-[10px] text-moss-300/65 ml-1">({row.marginPct.toFixed(1)}%)</span>
-        </div>
-
-        {row.savingsVsDirect !== undefined && (
-          <>
-            <div className="text-vellum/35 text-[10px]">vs direct 1-step</div>
-            <div className={`text-right text-[10px] tabular-nums ${
-              row.savingsVsDirect > 0 ? 'text-moss-300' : 'text-ember-400'
-            }`}>
-              {row.savingsVsDirect > 0 ? '+' : ''}{row.savingsVsDirect.toLocaleString('de-DE')} saved
-            </div>
-          </>
-        )}
       </div>
+
+      {/* Per-exit comparison — sell order vs instant sell vs Discord */}
+      <div className="rounded bg-ash-950/45 border border-white/5 p-1.5 space-y-0.5">
+        <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-vellum/45 mb-1 px-1">
+          Exit options
+        </div>
+        {row.scenarios.map((s) => {
+          const isBest = s.mode === row.bestMode;
+          const isLoss = s.profit < 0;
+          return (
+            <div
+              key={s.mode}
+              className={`grid grid-cols-[1fr_auto_auto] items-baseline gap-2 px-1.5 py-0.5 rounded text-[11px] ${
+                isBest ? 'bg-moss-500/15 ring-1 ring-moss-300/30' : ''
+              }`}
+            >
+              <div>
+                <span className={isBest ? 'text-moss-300 font-bold' : 'text-vellum/75'}>
+                  {EXIT_LABELS[s.mode]}
+                </span>
+                <span className="text-vellum/35 text-[9px] ml-1">
+                  @{s.referencePrice.toLocaleString('de-DE')}
+                </span>
+              </div>
+              <div className="text-vellum/55 tabular-nums text-[10px]">
+                net {s.netRevenue.toLocaleString('de-DE')}
+              </div>
+              <div className={`tabular-nums font-bold text-right min-w-[70px] ${
+                isLoss ? 'text-ember-400' : isBest ? 'text-moss-300' : 'text-vellum/80'
+              }`}>
+                {s.profit > 0 ? '+' : ''}{s.profit.toLocaleString('de-DE')}
+                <span className={`block text-[9px] font-normal ${
+                  isLoss ? 'text-ember-400/65' : 'text-vellum/40'
+                }`}>
+                  {s.marginPct.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+          );
+        })}
+        <div className="px-1.5 pt-0.5 text-[9px] text-vellum/30 leading-tight">
+          {EXIT_HINTS[row.bestMode]} → best for this row
+        </div>
+      </div>
+
+      {row.savingsVsDirect !== undefined && (
+        <div className="mt-1.5 flex items-baseline justify-between text-[10px]">
+          <span className="text-vellum/35">vs direct 1-step</span>
+          <span className={`tabular-nums ${
+            row.savingsVsDirect > 0 ? 'text-moss-300' : 'text-ember-400'
+          }`}>
+            {row.savingsVsDirect > 0 ? '+' : ''}{row.savingsVsDirect.toLocaleString('de-DE')} saved
+          </span>
+        </div>
+      )}
     </div>
   );
 }
