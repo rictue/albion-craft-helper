@@ -31,6 +31,8 @@ import {
 } from '../../utils/marketFees';
 import type { MarketFeeSettings } from '../../utils/marketFees';
 import { getDecision, PER_MEAL_THRESHOLDS } from '../../utils/decision';
+import { buildCsv, downloadCsv } from '../../utils/csvExport';
+import { Download } from 'lucide-react';
 import {
   BASE_LPB, FOCUS_LPB,
   DEFAULT_STATION_FEE,
@@ -789,6 +791,28 @@ function BulkScan() {
 
       {results.length > 0 && (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 text-[10px] uppercase tracking-wider text-zinc-500">
+            <span>{results.length} recipes ranked by profit / craft</span>
+            <button
+              type="button"
+              onClick={() => {
+                const csv = buildCsv(
+                  ['Rank', 'Meal', 'Category', 'Tier', 'Enchant', 'Sell city', 'Sell/meal', 'Cost/craft', 'Profit/craft', 'Margin %', 'Missing ingredient'],
+                  results.map((r, i) => [
+                    i + 1, r.mealName, r.category, r.tier, r.enchant, r.sellCity,
+                    Math.round(r.perMealRevenue), Math.round(r.perCraftEffective),
+                    Math.round(r.perCraftProfit), Number(r.margin.toFixed(2)),
+                    r.hasMissing ? 'yes' : '',
+                  ]),
+                );
+                downloadCsv(csv, `albion-cooking-scan-${new Date().toISOString().slice(0, 10)}`);
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-300 normal-case tracking-normal text-[11px] font-bold transition"
+            >
+              <Download size={12} />
+              CSV
+            </button>
+          </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-800 text-[10px] uppercase tracking-wider text-zinc-500">

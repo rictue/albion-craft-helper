@@ -5,7 +5,9 @@ import { calculateCrafting } from '../../utils/profitCalculator';
 import { calculateReturnRate } from '../../utils/returnRate';
 import { resolveItemId, resolveMaterialId, resolveArtifactId } from '../../utils/itemIdParser';
 import { formatSilver } from '../../utils/formatters';
+import { buildCsv, downloadCsv } from '../../utils/csvExport';
 import ItemIcon from '../common/ItemIcon';
+import { Download } from 'lucide-react';
 
 export default function CraftingPlanner() {
   const {
@@ -141,6 +143,25 @@ export default function CraftingPlanner() {
             className="text-xs text-zinc-400 hover:text-gold px-3 py-1.5 rounded-lg bg-surface border border-surface-lighter transition-colors"
           >
             Refresh Prices
+          </button>
+          <button
+            onClick={() => {
+              if (results.length === 0) return;
+              const csv = buildCsv(
+                ['Item', 'Tier', 'Enchant', 'Quantity', 'Investment', 'Sell price', 'Profit', 'Margin %', 'Sale multiplier'],
+                results.map(({ entry, result }) => [
+                  entry.item.name, entry.tier, entry.enchantment, entry.quantity,
+                  Math.round(result.investment), Math.round(result.sellPrice),
+                  Math.round(result.profit), Number(result.profitMargin.toFixed(2)),
+                  Number(result.saleMultiplier.toFixed(3)),
+                ]),
+              );
+              downloadCsv(csv, `albion-craft-plan-${new Date().toISOString().slice(0, 10)}`);
+            }}
+            className="text-xs text-zinc-400 hover:text-gold inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface border border-surface-lighter transition-colors"
+          >
+            <Download size={12} />
+            CSV
           </button>
           <button
             onClick={clearPlan}
