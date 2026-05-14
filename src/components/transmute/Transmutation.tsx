@@ -29,6 +29,7 @@ import { PriceMatrix } from "./scanner/PriceMatrix";
 import { QuickResults } from "./scanner/QuickResults";
 import { ScannerControls } from "./scanner/ScannerControls";
 import { ScannerResultsTable } from "./scanner/ScannerResultsTable";
+import { BuyOrderOpportunities } from "./scanner/BuyOrderOpportunities";
 import { fetchScannerPrices, SCANNER_CITIES } from "./scanner/fetchAODPPrices";
 import type { FetchResult } from "./scanner/fetchAODPPrices";
 import { useAppStore } from "../../store/appStore";
@@ -230,7 +231,21 @@ export default function Transmutation() {
           />
         </div>
 
-        <PresetCostsEditor presets={presets} onChange={(next) => setPresets(normalizePresets(next))} />
+        <div className="space-y-4">
+          <BuyOrderOpportunities
+            priceBook={priceBook}
+            presets={presets}
+            feeSettings={{
+              saleMode: 'marketplace',
+              taxProfile: settings.taxProfile === 'normal' ? 'normal' : settings.taxProfile === 'custom' ? 'custom' : 'premium',
+              customSalesTaxPct: settings.marketplaceTaxPercent,
+              customSetupFeePct: settings.setupFeePercent,
+              entrySource: 'buyOrder',
+              exitSource: settings.exitPriceSource,
+            }}
+          />
+          <PresetCostsEditor presets={presets} onChange={(next) => setPresets(normalizePresets(next))} />
+        </div>
       </div>
 
       <div className="mt-4">
