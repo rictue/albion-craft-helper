@@ -64,9 +64,27 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
     setPinnedCityName(null);
   }
 
-  const { settings, updateSettings } = useAppStore();
+  const { settings, updateSettings, customPrices, setCustomPrice, removeCustomPrice } = useAppStore();
   const qty = settings.quantity || 1;
   const saleMultiplier = result.saleMultiplier;
+
+  // Custom sell-price override keyed by item id. The priceMap loop in
+  // CraftingCalculator already honors any custom price for this item id
+  // (see `customPrices.forEach(...) map.set(itemId, price)`), so just
+  // writing into the store here automatically reroutes the calc.
+  const customSellKey = `${itemId}:custom`;
+  const customSell = customPrices[customSellKey];
+  const hasCustomSell = customSell !== undefined && customSell > 0;
+  const [overrideInput, setOverrideInput] = useState<string>(
+    hasCustomSell ? String(customSell) : '',
+  );
+  // Reset the input when the item changes so a stale value from a previous
+  // item doesn't appear pre-filled on the new one.
+  const [prevOverrideItemId, setPrevOverrideItemId] = useState(itemId);
+  if (prevOverrideItemId !== itemId) {
+    setPrevOverrideItemId(itemId);
+    setOverrideInput(customPrices[`${itemId}:custom`] ? String(customPrices[`${itemId}:custom`]) : '');
+  }
 
   // All city prices for this item. Unlike the old version which dropped
   // cities that had no listings, this one always emits a row for every
@@ -310,6 +328,49 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
           </div>
           <DecisionBadge decision={getDecision(result.profitMargin, MARGIN_PCT_THRESHOLDS)} />
         </div>
+
+        {/* Custom sell-price override — when AODP returns wrong/stale prices */}
+        <div className="mt-3 pt-3 border-t border-zinc-800/60 flex items-center gap-2">
+          <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold shrink-0">
+            Override sell:
+          </label>
+          <input
+            type="number"
+            min={0}
+            value={overrideInput}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setOverrideInput(raw);
+              const n = Number(raw);
+              if (raw === '' || !Number.isFinite(n) || n <= 0) {
+                removeCustomPrice(customSellKey);
+              } else {
+                setCustomPrice(customSellKey, n);
+              }
+            }}
+            placeholder={result.sellPrice > 0 ? formatSilver(result.sellPrice / Math.max(1, qty)) : 'Per item'}
+            className={`flex-1 min-w-0 bg-zinc-900 border rounded px-2 py-1 text-xs text-zinc-100 tabular-nums focus:outline-none focus:ring-1 focus:ring-gold/40 ${
+              hasCustomSell ? 'border-gold/50 text-gold-light' : 'border-zinc-700'
+            }`}
+          />
+          {hasCustomSell && (
+            <button
+              onClick={() => {
+                setOverrideInput('');
+                removeCustomPrice(customSellKey);
+              }}
+              className="text-[10px] uppercase tracking-wider text-zinc-500 hover:text-gold px-1.5 py-1"
+              title="Clear override and use AODP price"
+            >
+              clear
+            </button>
+          )}
+        </div>
+        {hasCustomSell && (
+          <div className="mt-1 text-[10px] text-gold/70">
+            Using manual price · ignores AODP for this item until cleared
+          </div>
+        )}
       </div>
 
       {/* Market fees + entry/exit source */}

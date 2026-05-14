@@ -214,6 +214,16 @@ textarea {
   color-scheme: dark;
 }
 
+/* Native <option> popups respect the option background color on most
+   browsers but ignore inherited / transparent backgrounds. Force a dark
+   palette so dropdown text stays readable regardless of the select's
+   own background (was rendering white-on-white in Chrome dark mode). */
+select option,
+select optgroup {
+  background-color: var(--color-bg-raised);
+  color: var(--color-parchment);
+}
+
 select,
 input[type="number"],
 input[type="text"],

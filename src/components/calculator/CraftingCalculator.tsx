@@ -184,11 +184,20 @@ export default function CraftingCalculator() {
 
     // Custom prices (highest priority). Skip entries with price <= 0 so
     // a cleared override falls back to the API price instead of zeroing it.
-    Object.entries(customPrices).forEach(([key, price]) => {
-      if (!(price > 0)) return;
+    // Apply city-specific keys first, then the special `:custom` suffix so
+    // an explicit inline override beats older per-city custom prices for
+    // the same item.
+    const customEntries = Object.entries(customPrices).filter(([, p]) => p > 0);
+    for (const [key, price] of customEntries) {
+      if (key.endsWith(':custom')) continue;
       const [itemId] = key.split(':');
       map.set(itemId, price);
-    });
+    }
+    for (const [key, price] of customEntries) {
+      if (!key.endsWith(':custom')) continue;
+      const [itemId] = key.split(':');
+      map.set(itemId, price);
+    }
 
     return map;
     // settings.craftingCity used to be a dep back when the craft-city price

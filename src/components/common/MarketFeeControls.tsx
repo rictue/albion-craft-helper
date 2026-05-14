@@ -215,9 +215,20 @@ function SourceSelect({ label, value, options, onChange }: {
         value={value}
         onChange={(e) => onChange(e.target.value as PriceSource)}
         className="w-full bg-transparent text-[12px] font-bold text-zinc-100 focus:outline-none"
+        // The OS-native dropdown ignores tailwind's bg-transparent and falls
+        // back to white-on-white in some browsers (notably Chrome + dark
+        // theme). Forcing a concrete dark background on the option keeps it
+        // readable when the dropdown popup opens.
+        style={{ colorScheme: 'dark' }}
       >
         {options.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
+          <option
+            key={o.value}
+            value={o.value}
+            style={{ backgroundColor: '#17100a', color: '#f3ead2' }}
+          >
+            {o.label}
+          </option>
         ))}
       </select>
     </label>
