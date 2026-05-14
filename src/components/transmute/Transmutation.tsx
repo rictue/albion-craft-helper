@@ -29,14 +29,27 @@ import { PriceMatrix } from "./scanner/PriceMatrix";
 import { QuickResults } from "./scanner/QuickResults";
 import { ScannerControls } from "./scanner/ScannerControls";
 import { ScannerResultsTable } from "./scanner/ScannerResultsTable";
+import { fetchScannerPrices, SCANNER_CITIES } from "./scanner/fetchAODPPrices";
+import type { FetchResult } from "./scanner/fetchAODPPrices";
+import { useAppStore } from "../../store/appStore";
 
 const STORAGE_KEYS = {
-  prices:  "albion-scanner-prices-v1",
-  presets: "albion-scanner-presets-v4",
-  settings:"albion-scanner-settings-v1",
+  prices:    "albion-scanner-prices-v1",
+  presets:   "albion-scanner-presets-v4",
+  settings:  "albion-scanner-settings-v1",
+  fetchCity: "albion-scanner-fetch-city-v1",
 };
 
+function resolveFetchCity(stored: unknown, fallback: string): string {
+  const cities: readonly string[] = SCANNER_CITIES;
+  if (typeof stored === "string" && cities.includes(stored)) return stored;
+  if (cities.includes(fallback)) return fallback;
+  return SCANNER_CITIES[0];
+}
+
 export default function Transmutation() {
+  const globalCity = useAppStore(s => s.settings.craftingCity);
+
   const [activeResource, setActiveResource] = useState<ResourceType>("Wood / Logs");
   const [priceBook, setPriceBook] = useState<PriceBook>(() =>
     normalizePriceBook(readStorage<unknown>(STORAGE_KEYS.prices, createEmptyPriceBook()))
@@ -48,6 +61,14 @@ export default function Transmutation() {
     normalizeSettings(readStorage<unknown>(STORAGE_KEYS.settings, DEFAULT_SCANNER_SETTINGS))
   );
   const [toast, setToast] = useState("");
+
+  // Auto-fill controls
+  const [fetchCity, setFetchCity] = useState<string>(() =>
+    resolveFetchCity(readStorage<unknown>(STORAGE_KEYS.fetchCity, null), globalCity)
+  );
+  const [isFetching, setIsFetching] = useState(false);
+  const [lastFetch, setLastFetch] = useState<FetchResult | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const saleMultiplier = useMemo(() => getSaleMultiplier(settings), [settings]);
   const entryMultiplier = useMemo(() => getEntryMultiplier(settings), [settings]);
@@ -93,6 +114,7 @@ export default function Transmutation() {
   useEffect(() => writeStorage(STORAGE_KEYS.prices, priceBook), [priceBook]);
   useEffect(() => writeStorage(STORAGE_KEYS.presets, presets), [presets]);
   useEffect(() => writeStorage(STORAGE_KEYS.settings, settings), [settings]);
+  useEffect(() => writeStorage(STORAGE_KEYS.fetchCity, fetchCity), [fetchCity]);
 
   useEffect(() => {
     if (!toast) return;
@@ -130,6 +152,24 @@ export default function Transmutation() {
     setToast("CSV exported");
   };
 
+  const handleFetchLivePrices = async () => {
+    if (isFetching) return;
+    setIsFetching(true);
+    setFetchError(null);
+    try {
+      const { priceBook: nextBook, result } = await fetchScannerPrices(priceBook, fetchCity);
+      setPriceBook(nextBook);
+      setLastFetch(result);
+      setToast(`Filled ${result.filledCells} cells from ${result.city}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Fetch failed";
+      setFetchError(msg);
+      setToast("AODP fetch failed");
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
   return (
     <div className="text-vellum">
       <header className="mb-5 flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
@@ -162,6 +202,12 @@ export default function Transmutation() {
             activeResource={activeResource}
             onActiveResourceChange={setActiveResource}
             onPriceChange={updatePrice}
+            fetchCity={fetchCity}
+            onFetchCityChange={setFetchCity}
+            onFetchLivePrices={handleFetchLivePrices}
+            isFetching={isFetching}
+            lastFetch={lastFetch}
+            fetchError={fetchError}
           />
           <QuickResults resource={activeResource} rows={rows} settings={settings} />
           <ScannerControls
