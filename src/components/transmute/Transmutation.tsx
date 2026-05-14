@@ -30,6 +30,7 @@ import { QuickResults } from "./scanner/QuickResults";
 import { ScannerControls } from "./scanner/ScannerControls";
 import { ScannerResultsTable } from "./scanner/ScannerResultsTable";
 import { BuyOrderOpportunities } from "./scanner/BuyOrderOpportunities";
+import { ChainTransmuteOpportunities } from "./scanner/ChainTransmuteOpportunities";
 import { fetchScannerPrices, SCANNER_CITIES } from "./scanner/fetchAODPPrices";
 import type { FetchResult } from "./scanner/fetchAODPPrices";
 import { useAppStore } from "../../store/appStore";
@@ -241,6 +242,18 @@ export default function Transmutation() {
               customSalesTaxPct: settings.marketplaceTaxPercent,
               customSetupFeePct: settings.setupFeePercent,
               entrySource: 'buyOrder',
+              exitSource: settings.exitPriceSource,
+            }}
+          />
+          <ChainTransmuteOpportunities
+            priceBook={priceBook}
+            presets={presets}
+            feeSettings={{
+              saleMode: 'marketplace',
+              taxProfile: settings.taxProfile === 'normal' ? 'normal' : settings.taxProfile === 'custom' ? 'custom' : 'premium',
+              customSalesTaxPct: settings.marketplaceTaxPercent,
+              customSetupFeePct: settings.setupFeePercent,
+              entrySource: settings.entryPriceSource,
               exitSource: settings.exitPriceSource,
             }}
           />
