@@ -160,7 +160,7 @@ export default function Transmutation() {
       const { priceBook: nextBook, result } = await fetchScannerPrices(priceBook, fetchCity);
       setPriceBook(nextBook);
       setLastFetch(result);
-      setToast(`Filled ${result.filledCells} cells from ${result.city}`);
+      setToast(`${result.filledSells} sells · ${result.filledBuys} buys from ${result.city}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Fetch failed";
       setFetchError(msg);

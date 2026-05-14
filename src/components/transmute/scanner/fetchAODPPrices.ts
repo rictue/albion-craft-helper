@@ -45,16 +45,33 @@ export function buildResourceItemId(resource: ResourceType, level: string): stri
 }
 
 export interface FetchResult {
-  filledCells: number;
+  filledSells: number;
+  filledBuys: number;
   totalCells: number;
   city: string;
   fetchedAt: number;
 }
 
+interface MergedQuote {
+  sell: number;
+  buy: number;
+  sellDate: number;
+  buyDate: number;
+}
+
 /**
  * Fetch raw resource prices for one city and merge them into the current
  * PriceBook. Cells where AODP has no data keep their existing manual value.
- * Returns the new PriceBook plus a summary of how many cells got filled.
+ *
+ * AODP coverage notes:
+ *  - Sell orders are far more common in uploads than buy orders, so any
+ *    given fetch typically fills more sell cells than buy cells. That is
+ *    a property of the dataset, not a bug.
+ *  - We pass forceRefresh so the in-app 30s cache doesn't keep handing
+ *    back the same (possibly incomplete) snapshot.
+ *  - We pass allQualities=true and merge sell/buy independently from
+ *    every returned row, so a missing quality-1 row but a populated
+ *    quality-0 row still fills the cell.
  */
 export async function fetchScannerPrices(
   current: PriceBook,
@@ -71,40 +88,48 @@ export async function fetchScannerPrices(
     }
   }
 
-  const prices: MarketPrice[] = await fetchPrices(itemIds, [city], /* allQualities */ false);
-  const cellByItem = indexByItemQuality1(prices, city);
+  const prices: MarketPrice[] = await fetchPrices(
+    itemIds,
+    [city],
+    /* allQualities */ true,
+    /* forceRefresh */ true,
+  );
+  const quoteByItem = mergeQuotes(prices, city);
 
   // Build the new price book — start from the existing one so unaffected
   // cells (no AODP data) keep their manual entries.
   const next: PriceBook = structuredClone(current);
-  let filledCells = 0;
+  let filledSells = 0;
+  let filledBuys = 0;
 
   for (const id of itemIds) {
     const cell = idToCell.get(id);
     if (!cell) continue;
 
-    const aodp = cellByItem.get(id);
+    const aodp = quoteByItem.get(id);
     if (!aodp) continue;
 
-    const sell = aodp.sell_price_min > 0 ? String(aodp.sell_price_min) : '';
-    const buy  = aodp.buy_price_max  > 0 ? String(aodp.buy_price_max)  : '';
-
-    if (!sell && !buy) continue;
-
     const existing: OrderBookPrice = next[cell.resource][cell.level] ?? { buyOrder: '', sellOrder: '' };
-    next[cell.resource][cell.level] = {
-      // Prefer AODP value when it has one; fall back to whatever the user
-      // had previously entered.
-      sellOrder: sell || existing.sellOrder,
-      buyOrder:  buy  || existing.buyOrder,
-    };
-    filledCells += 1;
+    let sellOrder = existing.sellOrder;
+    let buyOrder = existing.buyOrder;
+
+    if (aodp.sell > 0) {
+      sellOrder = String(aodp.sell);
+      filledSells += 1;
+    }
+    if (aodp.buy > 0) {
+      buyOrder = String(aodp.buy);
+      filledBuys += 1;
+    }
+
+    next[cell.resource][cell.level] = { sellOrder, buyOrder };
   }
 
   return {
     priceBook: next,
     result: {
-      filledCells,
+      filledSells,
+      filledBuys,
       totalCells: itemIds.length,
       city,
       fetchedAt: Date.now(),
@@ -112,25 +137,41 @@ export async function fetchScannerPrices(
   };
 }
 
-/** Map item_id → quality-1 row for the requested city. */
-function indexByItemQuality1(prices: MarketPrice[], city: string): Map<string, MarketPrice> {
-  const map = new Map<string, MarketPrice>();
+/**
+ * AODP returns one row per (item_id, city, quality). Raw resources are
+ * always quality 1 in practice, but a few uploads tag them quality 0, so
+ * we accept any quality and merge sell/buy independently — keeping the
+ * freshest non-zero value for each side. That fixes the "buy orders not
+ * pulled" case where one row had the sell side and a different row had
+ * the buy side.
+ */
+function mergeQuotes(prices: MarketPrice[], city: string): Map<string, MergedQuote> {
+  const map = new Map<string, MergedQuote>();
   for (const p of prices) {
     if (p.city !== city) continue;
-    if (p.quality !== 1) continue;
-    // Some entries duplicate; keep the freshest one.
-    const existing = map.get(p.item_id);
-    if (!existing) {
-      map.set(p.item_id, p);
-      continue;
+    const current = map.get(p.item_id) ?? { sell: 0, buy: 0, sellDate: 0, buyDate: 0 };
+
+    const sellDate = parseDate(p.sell_price_min_date);
+    const buyDate = parseDate(p.buy_price_max_date);
+
+    if (p.sell_price_min > 0 && sellDate >= current.sellDate) {
+      current.sell = p.sell_price_min;
+      current.sellDate = sellDate;
     }
-    const existingDate = Date.parse(existing.sell_price_min_date || existing.buy_price_max_date || '');
-    const incomingDate = Date.parse(p.sell_price_min_date || p.buy_price_max_date || '');
-    if (Number.isFinite(incomingDate) && incomingDate > existingDate) {
-      map.set(p.item_id, p);
+    if (p.buy_price_max > 0 && buyDate >= current.buyDate) {
+      current.buy = p.buy_price_max;
+      current.buyDate = buyDate;
     }
+
+    map.set(p.item_id, current);
   }
   return map;
+}
+
+function parseDate(value: string | undefined): number {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 /** Cities the scanner can auto-fill. Caerleon excluded per repo convention. */

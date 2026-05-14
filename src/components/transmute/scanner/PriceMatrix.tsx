@@ -18,7 +18,13 @@ interface PriceMatrixProps {
   onFetchLivePrices: () => void;
   isFetching: boolean;
   /** Last fetch summary — null if never fetched. */
-  lastFetch?: { filledCells: number; totalCells: number; city: string; fetchedAt: number } | null;
+  lastFetch?: {
+    filledSells: number;
+    filledBuys: number;
+    totalCells: number;
+    city: string;
+    fetchedAt: number;
+  } | null;
   fetchError?: string | null;
 }
 
@@ -73,12 +79,19 @@ export function PriceMatrix({
             <span className="text-ember-400">{fetchError}</span>
           ) : lastFetch ? (
             <>
-              <span className="text-moss-300 font-bold">{lastFetch.filledCells}</span>
-              <span className="text-vellum/30"> / {lastFetch.totalCells} cells </span>
-              <span>· {lastFetch.city} · {formatAge(lastFetch.fetchedAt)}</span>
+              <span className="text-moss-300 font-bold">{lastFetch.filledSells}</span>
+              <span className="text-vellum/55"> sells</span>
+              <span className="text-vellum/30"> · </span>
+              <span className={`font-bold ${lastFetch.filledBuys === 0 ? 'text-ember-400' : 'text-moss-300'}`}>
+                {lastFetch.filledBuys}
+              </span>
+              <span className="text-vellum/55"> buys</span>
+              <span className="text-vellum/30"> / {lastFetch.totalCells} cells</span>
+              <span className="text-vellum/30"> · </span>
+              <span>{lastFetch.city} · {formatAge(lastFetch.fetchedAt)}</span>
             </>
           ) : (
-            <span>125 cells across 5 resources — fills empty slots only when AODP has data.</span>
+            <span>125 cells × 5 resources — buy orders are rarer in AODP than sells.</span>
           )}
         </div>
       </div>
