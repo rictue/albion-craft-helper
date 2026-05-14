@@ -233,18 +233,6 @@ export default function Transmutation() {
         </div>
 
         <div className="space-y-4">
-          <BuyOrderOpportunities
-            priceBook={priceBook}
-            presets={presets}
-            feeSettings={{
-              saleMode: 'marketplace',
-              taxProfile: settings.taxProfile === 'normal' ? 'normal' : settings.taxProfile === 'custom' ? 'custom' : 'premium',
-              customSalesTaxPct: settings.marketplaceTaxPercent,
-              customSetupFeePct: settings.setupFeePercent,
-              entrySource: 'buyOrder',
-              exitSource: settings.exitPriceSource,
-            }}
-          />
           <ChainTransmuteOpportunities
             priceBook={priceBook}
             presets={presets}
@@ -254,6 +242,18 @@ export default function Transmutation() {
               customSalesTaxPct: settings.marketplaceTaxPercent,
               customSetupFeePct: settings.setupFeePercent,
               entrySource: settings.entryPriceSource,
+              exitSource: settings.exitPriceSource,
+            }}
+          />
+          <BuyOrderOpportunities
+            priceBook={priceBook}
+            presets={presets}
+            feeSettings={{
+              saleMode: 'marketplace',
+              taxProfile: settings.taxProfile === 'normal' ? 'normal' : settings.taxProfile === 'custom' ? 'custom' : 'premium',
+              customSalesTaxPct: settings.marketplaceTaxPercent,
+              customSetupFeePct: settings.setupFeePercent,
+              entrySource: 'buyOrder',
               exitSource: settings.exitPriceSource,
             }}
           />
