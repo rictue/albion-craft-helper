@@ -21,8 +21,18 @@ import type { CookingRecipe } from '../../data/cooking';
 import { lpbToReturnRate } from '../../utils/returnRate';
 import { formatSilver, formatPercent } from '../../utils/formatters';
 import { getRefineSpec, setRefineSpec } from '../../data/specs';
+import MarketFeeControls from '../common/MarketFeeControls';
+import FeeRealityCheck from '../common/FeeRealityCheck';
+import { DecisionBadge } from '../ui';
 import {
-  TAX_PREMIUM, TAX_NON_PREMIUM, BASE_LPB, FOCUS_LPB,
+  DEFAULT_FEE_SETTINGS,
+  getSaleMultiplier,
+  getEntryMultiplier,
+} from '../../utils/marketFees';
+import type { MarketFeeSettings } from '../../utils/marketFees';
+import { getDecision, PER_MEAL_THRESHOLDS } from '../../utils/decision';
+import {
+  BASE_LPB, FOCUS_LPB,
   DEFAULT_STATION_FEE,
 } from '../../data/constants';
 import SidebarLayout from '../common/SidebarLayout';
@@ -140,6 +150,21 @@ function ModeSwitcher({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => v
 // SINGLE RECIPE DEEP-DIVE
 // ============================================================================
 
+const COOKING_FEE_SETTINGS_LS_KEY = 'albion-cooking-fee-settings-v1';
+
+function loadCookingFeeSettings(): MarketFeeSettings {
+  try {
+    const raw = localStorage.getItem(COOKING_FEE_SETTINGS_LS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<MarketFeeSettings>;
+      return { ...DEFAULT_FEE_SETTINGS, ...parsed };
+    }
+  } catch {
+    // LS unreadable — fall through.
+  }
+  return DEFAULT_FEE_SETTINGS;
+}
+
 function SingleRecipe() {
   // Step 1 — What to cook
   const [category, setCategory] = useState<string>('Omelette');
@@ -150,9 +175,14 @@ function SingleRecipe() {
 
   // Step 2 — Where & how
   const [useFocus, setUseFocus] = useState(true);
-  const [premium, setPremium] = useState(true);
+  const [feeSettings, setFeeSettings] = useState<MarketFeeSettings>(() => loadCookingFeeSettings());
   const [spec, setSpec] = useState(() => getRefineSpec('COOKING', 5));
   const [feePerCraft, setFeePerCraft] = useState(DEFAULT_STATION_FEE);
+
+  useEffect(() => {
+    try { localStorage.setItem(COOKING_FEE_SETTINGS_LS_KEY, JSON.stringify(feeSettings)); }
+    catch { /* private mode / quota — calc still works. */ }
+  }, [feeSettings]);
 
   // Step 3 — Overrides
   const [rrOverride, setRrOverride] = useState<number | null>(null);
@@ -228,7 +258,8 @@ function SingleRecipe() {
   const rawFocus = recipe ? focusForEnchant(recipe, enchant) : 0;
   const focusPerCraft = useFocus ? applyFocusSpecDiscount(rawFocus, spec, totalSpec) : 0;
 
-  const taxRate = premium ? TAX_PREMIUM : TAX_NON_PREMIUM;
+  const saleMultiplier = getSaleMultiplier(feeSettings);
+  const entryMultiplier = getEntryMultiplier(feeSettings);
 
   const calc = useMemo(() => {
     if (!recipe) return null;
@@ -253,14 +284,15 @@ function SingleRecipe() {
       ? { price: customSell, city: 'Custom' }
       : bestSellFromMap(prices, fullMealId) ?? { price: 0, city: '-' };
 
-    // Effective per-craft cost after return rate
-    const effectivePerCraft = perCraftRaw * (1 - rr);
+    // Effective per-craft cost after return rate, with entry-side setup
+    // fee if the user buys ingredients via buy order.
+    const effectivePerCraft = perCraftRaw * (1 - rr) * entryMultiplier;
 
-    // Sell after tax — per single meal (each craft outputs `amountCrafted`)
-    const sellAfterTaxPerMeal = sellInfo.price * (1 - taxRate);
+    // Sell after tax/fees — per single meal (each craft outputs `amountCrafted`)
+    const sellAfterTaxPerMeal = sellInfo.price * saleMultiplier;
 
-    // Per craft: cost = ingredients × (1 - RR) + station fee
-    //           revenue = amountCrafted × sell × (1 - tax)
+    // Per craft: cost = ingredients × (1 - RR) × entryMult + station fee
+    //           revenue = amountCrafted × sell × saleMult
     const revenuePerCraft = sellAfterTaxPerMeal * recipe.amountCrafted;
     const profitPerCraft = revenuePerCraft - effectivePerCraft - feePerCraft;
     const profitPerMeal = profitPerCraft / recipe.amountCrafted;
@@ -272,12 +304,14 @@ function SingleRecipe() {
     const focusForBatch = useFocus ? focusPerCraft * batchSize : 0;
     const profitPerFocus = focusForBatch > 0 ? batchProfit / focusForBatch : 0;
 
+    const decision = getDecision(profitPerMeal, PER_MEAL_THRESHOLDS);
+
     return {
       ingredientDetail, perCraftRaw, effectivePerCraft, sellInfo, sellAfterTaxPerMeal,
-      revenuePerCraft, profitPerCraft, profitPerMeal,
+      revenuePerCraft, profitPerCraft, profitPerMeal, decision,
       batchProfit, batchCost, batchMeals, focusForBatch, profitPerFocus,
     };
-  }, [recipe, prices, customSell, rr, feePerCraft, taxRate, batchSize, focusPerCraft, useFocus, enchant]);
+  }, [recipe, prices, customSell, rr, feePerCraft, saleMultiplier, entryMultiplier, batchSize, focusPerCraft, useFocus, enchant]);
 
   if (!recipe) {
     return (
@@ -381,10 +415,9 @@ function SingleRecipe() {
           <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-orange-500" />
           <span className="text-xs text-zinc-300">Use focus <span className="text-zinc-600">({focusPerCraft} per craft)</span></span>
         </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={premium} onChange={(e) => setPremium(e.target.checked)} className="accent-orange-500" />
-          <span className="text-xs text-zinc-300">Premium account <span className="text-zinc-600">({premium ? '6.5%' : '10.5%'} tax)</span></span>
-        </label>
+        <div className="pt-1 border-t border-[color:var(--color-border)]">
+          <MarketFeeControls value={feeSettings} onChange={setFeeSettings} />
+        </div>
         <div>
           <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Station fee per craft</label>
           <input
@@ -472,7 +505,7 @@ function SingleRecipe() {
               {calc?.sellInfo.price ? formatSilver(calc.sellInfo.price) : '—'}
             </div>
             <div className="text-[10px] text-zinc-600">
-              after {(taxRate * 100).toFixed(1)}% tax: {calc?.sellAfterTaxPerMeal ? formatSilver(calc.sellAfterTaxPerMeal) : '—'} / meal
+              ×{saleMultiplier.toFixed(3)} after fees: {calc?.sellAfterTaxPerMeal ? formatSilver(calc.sellAfterTaxPerMeal) : '—'} / meal
             </div>
           </div>
         </div>
@@ -543,7 +576,10 @@ function SingleRecipe() {
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Profit / meal</div>
+            <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold flex items-center justify-between gap-2">
+              <span>Profit / meal</span>
+              {calc && <DecisionBadge decision={calc.decision} />}
+            </div>
             <div className={`text-2xl font-bold tabular-nums ${(calc?.profitPerMeal ?? 0) >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
               {(calc?.profitPerMeal ?? 0) >= 0 ? '+' : ''}{formatSilver(calc?.profitPerMeal ?? 0)}
             </div>
@@ -572,6 +608,16 @@ function SingleRecipe() {
           </div>
         </div>
       </div>
+
+      {/* Fee reality check — per-meal profit under the 4 common setups */}
+      {calc && calc.sellInfo.price > 0 && (
+        <FeeRealityCheck
+          sellPrice={calc.sellInfo.price}
+          costBeforeFees={(calc.perCraftRaw * (1 - rr)) / recipe.amountCrafted}
+          fixedFees={feePerCraft / recipe.amountCrafted}
+          unitLabel="Per meal"
+        />
+      )}
     </SidebarLayout>
   );
 }
@@ -592,14 +638,20 @@ function Row({ label, value, bold, accent }: { label: string; value: string; bol
 
 function BulkScan() {
   const [useFocus, setUseFocus] = useState(true);
-  const [premium, setPremium] = useState(true);
+  const [feeSettings, setFeeSettings] = useState<MarketFeeSettings>(() => loadCookingFeeSettings());
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterEnchant, setFilterEnchant] = useState<number | 'all'>(0);
   const [results, setResults] = useState<ScanResult[]>([]);
   const [scanning, setScanning] = useState(false);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
 
-  const taxRate = premium ? TAX_PREMIUM : TAX_NON_PREMIUM;
+  useEffect(() => {
+    try { localStorage.setItem(COOKING_FEE_SETTINGS_LS_KEY, JSON.stringify(feeSettings)); }
+    catch { /* LS unavailable. */ }
+  }, [feeSettings]);
+
+  const saleMultiplier = getSaleMultiplier(feeSettings);
+  const entryMultiplier = getEntryMultiplier(feeSettings);
 
   const scan = useCallback(async () => {
     setScanning(true);
@@ -658,8 +710,8 @@ function BulkScan() {
 
         const lpb = BASE_LPB + (useFocus ? FOCUS_LPB : 0);
         const rr = lpbToReturnRate(lpb);
-        const effectiveCost = totalRaw * (1 - rr);
-        const sellAfterTaxPerMeal = bestSell.price * (1 - taxRate);
+        const effectiveCost = totalRaw * (1 - rr) * entryMultiplier;
+        const sellAfterTaxPerMeal = bestSell.price * saleMultiplier;
         const revenuePerCraft = sellAfterTaxPerMeal * recipe.amountCrafted;
         const profit = revenuePerCraft - effectiveCost;
         const margin = revenuePerCraft > 0 ? (profit / revenuePerCraft) * 100 : 0;
@@ -681,7 +733,7 @@ function BulkScan() {
     } finally {
       setScanning(false);
     }
-  }, [useFocus, filterCategory, filterEnchant, taxRate]);
+  }, [useFocus, filterCategory, filterEnchant, saleMultiplier, entryMultiplier]);
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 py-6 space-y-4">
@@ -711,10 +763,6 @@ function BulkScan() {
           <input type="checkbox" checked={useFocus} onChange={(e) => setUseFocus(e.target.checked)} className="accent-orange-500" />
           <span className="text-sm text-zinc-200">Focus</span>
         </label>
-        <label className="flex items-center gap-2 cursor-pointer bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2">
-          <input type="checkbox" checked={premium} onChange={(e) => setPremium(e.target.checked)} className="accent-orange-500" />
-          <span className="text-sm text-zinc-200">Premium</span>
-        </label>
         <button
           onClick={scan}
           disabled={scanning}
@@ -722,6 +770,11 @@ function BulkScan() {
         >
           {scanning ? 'Scanning…' : 'Scan All Recipes'}
         </button>
+      </div>
+
+      {/* Market fee controls applied to every row in the scan */}
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
+        <MarketFeeControls value={feeSettings} onChange={setFeeSettings} />
       </div>
 
       {scannedAt && <div className="text-[10px] text-zinc-600 text-right px-1">Scanned at {scannedAt}</div>}
