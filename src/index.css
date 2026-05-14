@@ -51,6 +51,24 @@
   /* Typography — Cinzel (display, medieval serif) + Inter (body) */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Cinzel', 'Trajan Pro', 'Inter', serif;
+
+  /* === Transmutation scanner palette (Codex import) ===
+     Aliases that let the ported Codex classes (bg-ash-900, text-oldgold-300,
+     etc.) work without rewriting every class name in those components. */
+  --color-ash-950: #0b0d0f;
+  --color-ash-900: #11151a;
+  --color-ash-850: #151a20;
+  --color-ash-800: #1b222a;
+  --color-ash-700: #2b3540;
+  --color-oldgold-300: #f3d37b;
+  --color-oldgold-400: #d9af4c;
+  --color-oldgold-500: #b9872f;
+  --color-moss-300: #99d98c;
+  --color-moss-500: #4a9b68;
+  --color-ember-400: #e36d3b;
+  --color-ember-500: #bf4e2d;
+  --color-vellum: #f3ead2;
+  --shadow-steel: 0 18px 60px rgba(0, 0, 0, 0.28);
 }
 
 * {
@@ -701,6 +719,133 @@ a {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: rgba(242,208,138,0.85);
+}
+
+/* === Transmutation scanner component classes (ported from Codex) === */
+.panel {
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(17, 21, 26, 0.8);
+  padding: 1rem;
+  box-shadow: var(--shadow-steel);
+  backdrop-filter: blur(4px);
+}
+.panel-heading {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.panel-title {
+  font-size: 1.125rem;
+  font-weight: 900;
+  letter-spacing: normal;
+  color: var(--color-vellum);
+}
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(243, 211, 123, 0.8);
+}
+.field-shell {
+  display: block;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(11, 13, 15, 0.5);
+  padding: 0.5rem 0.75rem;
+  transition: border-color 0.12s, background 0.12s;
+}
+.field-shell:focus-within {
+  border-color: rgba(243, 211, 123, 0.6);
+  background: rgba(11, 13, 15, 0.8);
+}
+.field-label {
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(243, 234, 210, 0.45);
+}
+.field-input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-vellum);
+  outline: none;
+}
+.field-input::placeholder { color: rgba(243, 234, 210, 0.2); }
+.primary-action {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(243, 211, 123, 0.7);
+  background: var(--color-oldgold-400);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 900;
+  color: var(--color-ash-950);
+  transition: background 0.12s;
+}
+.primary-action:hover { background: var(--color-oldgold-300); }
+.secondary-action {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-ash-850);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: rgba(243, 234, 210, 0.8);
+  transition: border-color 0.12s, color 0.12s;
+  cursor: pointer;
+}
+.secondary-action:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--color-vellum);
+}
+.icon-action {
+  display: inline-flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-ash-850);
+  color: rgba(243, 234, 210, 0.7);
+  transition: border-color 0.12s, color 0.12s;
+  cursor: pointer;
+}
+.icon-action:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--color-vellum);
+}
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(11, 13, 15, 0.35);
+  padding: 0.5rem;
 }
 
 /* === Empty state === */

@@ -1,729 +1,316 @@
-import { useEffect, useMemo, useState } from 'react';
+// Hosted inside AlbionCrafts AppShell. The original Codex standalone app
+// lived at the root with its own <main>; here we drop that wrapper and slot
+// the panels into the existing layout.
+import { useEffect, useMemo, useState } from "react";
+import { Calculator, Shield } from "lucide-react";
+import type {
+  OrderPriceSide,
+  PriceBook,
+  PresetCost,
+  ResourceType,
+  ScannerSettings,
+  TransmutationScanRow,
+} from "./scanner/types";
 import {
-  PageHeader,
-  StatCard,
-  ProfitBadge,
-  WarningBox,
-  Button,
-  Select,
-  NumberInput,
-  SectionDivider,
-  DataTable,
-  EmptyState,
-} from '../ui';
-import type { Column } from '../ui';
-import ItemIcon from '../common/ItemIcon';
-import {
-  RESOURCES,
-  RECIPES,
-  ALL_TARGETS,
-  ALL_LEVELS,
-  getRecipesFor,
-  getRecipeCost,
-  resourceItemId,
-  compareLevels,
-} from '../../data/transmutations';
-import type { ResourceType, Recipe } from '../../data/transmutations';
-import {
-  calculateTransmute,
-  decisionFor,
-  decisionMeta,
-  resolveMultiplier,
-  SALE_MULTIPLIERS,
-  DEFAULT_THRESHOLDS,
-} from '../../utils/transmutationCalc';
-import type { SaleMode, DecisionThresholds, Decision } from '../../utils/transmutationCalc';
-import { formatSilver, formatPercent } from '../../utils/formatters';
-import { IconFurnace } from '../shell/navIcons';
+  createEmptyPriceBook,
+  DEFAULT_SCANNER_SETTINGS,
+  getEntryMultiplier,
+  getSaleMultiplier,
+  normalizePresets,
+  normalizePriceBook,
+  RESOURCE_TYPES,
+  scanTransmutations,
+  TRANSMUTATION_STEPS,
+} from "./scanner/calculations";
+import { scannerRowsToCsv } from "./scanner/format";
+import { readStorage, writeStorage } from "./scanner/storage";
+import { PresetCostsEditor } from "./scanner/PresetCostsEditor";
+import { PriceMatrix } from "./scanner/PriceMatrix";
+import { QuickResults } from "./scanner/QuickResults";
+import { ScannerControls } from "./scanner/ScannerControls";
+import { ScannerResultsTable } from "./scanner/ScannerResultsTable";
 
-interface SavedOpportunity {
-  id: string;
-  ts: number;
-  resource: ResourceType;
-  from: string;
-  to: string;
-  buy: number;
-  transmute: number;
-  sell: number;
-  quantity: number;
-  saleMultiplier: number;
-}
-
-const LS_SAVED      = 'albion-transmute-saved-v1';
-const LS_THRESHOLDS = 'albion-transmute-thresholds-v1';
-
-function loadSaved(): SavedOpportunity[] {
-  try {
-    const raw = localStorage.getItem(LS_SAVED);
-    if (raw) return JSON.parse(raw) as SavedOpportunity[];
-  } catch {
-    // Corrupt LS — fall through to empty list rather than crash the page.
-  }
-  return [];
-}
-function persistSaved(rows: SavedOpportunity[]) {
-  try { localStorage.setItem(LS_SAVED, JSON.stringify(rows)); } catch { /* quota — ignore */ }
-}
-
-function loadThresholds(): DecisionThresholds {
-  try {
-    const raw = localStorage.getItem(LS_THRESHOLDS);
-    if (raw) return { ...DEFAULT_THRESHOLDS, ...JSON.parse(raw) };
-  } catch {
-    // Corrupt LS — use defaults.
-  }
-  return DEFAULT_THRESHOLDS;
-}
-function persistThresholds(t: DecisionThresholds) {
-  try { localStorage.setItem(LS_THRESHOLDS, JSON.stringify(t)); } catch { /* ignore */ }
-}
-
-function decisionPillClass(d: Decision): string {
-  switch (d) {
-    case 'strong':   return 'text-emerald-300 bg-emerald-500/15 border-emerald-500/40';
-    case 'playable': return 'text-gold-light bg-gold/15 border-gold/40';
-    case 'thin':     return 'text-amber-300 bg-amber-500/15 border-amber-500/40';
-    case 'loss':     return 'text-rose-300 bg-rose-500/15 border-rose-500/40';
-  }
-}
-
-/** Default source pick for a given target: prefer enchant-up over tier-up. */
-function defaultFromFor(to: string): string {
-  const sources = getRecipesFor(to);
-  if (sources.length === 0) return to;
-  const enchantUp = sources.find(r => r.from.startsWith(to.split('.')[0]));
-  return (enchantUp ?? sources[0]).from;
-}
+const STORAGE_KEYS = {
+  prices:  "albion-scanner-prices-v1",
+  presets: "albion-scanner-presets-v4",
+  settings:"albion-scanner-settings-v1",
+};
 
 export default function Transmutation() {
-  // === Inputs ===
-  const [resource, setResource] = useState<ResourceType>('wood');
-  const [to, setTo]             = useState<string>('8.3');
-  // `from` is derived from (to, fromOverride). When the user clicks a source
-  // button we set fromOverride; if `to` changes and the override no longer
-  // matches a valid source for the new target, we fall back to the default.
-  const [fromOverride, setFromOverride] = useState<string | null>(null);
-  const [buyPrice, setBuyPrice] = useState<number>(0);
-  // Same pattern for transmute cost: null = use recipe, number = manual.
-  const [transmuteOverride, setTransmuteOverride] = useState<number | null>(null);
-  const [sellPrice, setSellPrice] = useState<number>(0);
-  const [quantity, setQuantity]   = useState<number>(100);
+  const [activeResource, setActiveResource] = useState<ResourceType>("Wood / Logs");
+  const [priceBook, setPriceBook] = useState<PriceBook>(() =>
+    normalizePriceBook(readStorage<unknown>(STORAGE_KEYS.prices, createEmptyPriceBook()))
+  );
+  const [presets, setPresets] = useState<PresetCost[]>(() =>
+    normalizePresets(readStorage<unknown>(STORAGE_KEYS.presets, []))
+  );
+  const [settings, setSettings] = useState<ScannerSettings>(() =>
+    normalizeSettings(readStorage<unknown>(STORAGE_KEYS.settings, DEFAULT_SCANNER_SETTINGS))
+  );
+  const [toast, setToast] = useState("");
 
-  const [saleMode, setSaleMode]                 = useState<SaleMode>('market');
-  const [customMultiplier, setCustomMultiplier] = useState<number>(0.935);
+  const saleMultiplier = useMemo(() => getSaleMultiplier(settings), [settings]);
+  const entryMultiplier = useMemo(() => getEntryMultiplier(settings), [settings]);
+  const rows = useMemo(
+    () =>
+      scanTransmutations(
+        priceBook,
+        presets,
+        saleMultiplier,
+        entryMultiplier,
+        settings.stationFeePerUnit,
+        settings.entryPriceSource,
+        settings.exitPriceSource
+      ),
+    [
+      priceBook,
+      presets,
+      saleMultiplier,
+      entryMultiplier,
+      settings.stationFeePerUnit,
+      settings.entryPriceSource,
+      settings.exitPriceSource,
+    ]
+  );
+  const visibleRows = useMemo(
+    () =>
+      sortRows(
+        filterRows(pickBestRoutes(rows, settings.bestRouteOnly), settings.onlyProfitable),
+        settings.sortMode
+      ),
+    [rows, settings.bestRouteOnly, settings.onlyProfitable, settings.sortMode]
+  );
+  const completeRows = rows.filter((row) => !row.missingPrice).length;
+  const profitableRows = rows.filter((row) => (row.profitPerUnit ?? 0) > 0).length;
+  const bestProfit = rows
+    .filter((row) => row.profitPerUnit !== undefined)
+    .reduce<number | undefined>(
+      (best, row) =>
+        best === undefined || row.profitPerUnit! > best ? row.profitPerUnit : best,
+      undefined
+    );
 
-  const [sellSliderDelta, setSellSliderDelta] = useState<number>(0);
-  const [showThresholds, setShowThresholds]   = useState<boolean>(false);
-  const [thresholds, setThresholds]           = useState<DecisionThresholds>(() => loadThresholds());
-  const [saved, setSaved]                     = useState<SavedOpportunity[]>(() => loadSaved());
-  const [justCopied, setJustCopied]           = useState(false);
+  useEffect(() => writeStorage(STORAGE_KEYS.prices, priceBook), [priceBook]);
+  useEffect(() => writeStorage(STORAGE_KEYS.presets, presets), [presets]);
+  useEffect(() => writeStorage(STORAGE_KEYS.settings, settings), [settings]);
 
-  // Available source levels for the current target.
-  const availableSources = useMemo<Recipe[]>(() => getRecipesFor(to), [to]);
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = window.setTimeout(() => setToast(""), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
 
-  // Derive `from`: honor override only if it's a valid source for the
-  // current target; otherwise fall back to the default.
-  const from = useMemo(() => {
-    if (fromOverride && availableSources.some(s => s.from === fromOverride)) {
-      return fromOverride;
-    }
-    return defaultFromFor(to);
-  }, [to, availableSources, fromOverride]);
-
-  // Derive transmute cost: override wins, else the recipe table value, else 0.
-  const transmuteCost = transmuteOverride ?? (getRecipeCost(from, to) ?? 0);
-  const isTransmuteOverridden = transmuteOverride !== null;
-
-  // Persist thresholds + saved automatically.
-  useEffect(() => { persistThresholds(thresholds); }, [thresholds]);
-  useEffect(() => { persistSaved(saved); }, [saved]);
-
-  const multiplier    = resolveMultiplier(saleMode, customMultiplier);
-  const effectiveSell = Math.max(0, sellPrice + sellSliderDelta);
-
-  const result = useMemo(() => calculateTransmute({
-    inputBuyPrice: buyPrice,
-    transmuteCost,
-    outputSellPrice: effectiveSell,
-    quantity,
-    saleMultiplier: multiplier,
-  }), [buyPrice, transmuteCost, effectiveSell, quantity, multiplier]);
-
-  const decision     = decisionFor(result.profitPerUnit, thresholds);
-  const decMeta      = decisionMeta(decision);
-  const resourceInfo = RESOURCES.find(r => r.id === resource)!;
-
-  // === Handlers ===
-  const handleResetTransmute = () => setTransmuteOverride(null);
-
-  const handleSave = () => {
-    if (buyPrice <= 0 || sellPrice <= 0) return;
-    const op: SavedOpportunity = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      ts: Date.now(),
-      resource,
-      from,
-      to,
-      buy: buyPrice,
-      transmute: transmuteCost,
-      sell: effectiveSell,
-      quantity,
-      saleMultiplier: multiplier,
-    };
-    setSaved(prev => [op, ...prev].slice(0, 200));
+  const updatePrice = (
+    resource: ResourceType,
+    tier: string,
+    side: OrderPriceSide,
+    value: string
+  ) => {
+    setPriceBook((current) => ({
+      ...current,
+      [resource]: {
+        ...current[resource],
+        [tier]: {
+          ...current[resource][tier],
+          [side]: value,
+        },
+      },
+    }));
   };
 
-  const handleDelete = (id: string) => {
-    setSaved(prev => prev.filter(r => r.id !== id));
-  };
-
-  const handleClearAll = () => {
-    if (saved.length === 0) return;
-    if (window.confirm('Clear all saved opportunities?')) setSaved([]);
-  };
-
-  const handleCopyResult = () => {
-    const lines = [
-      `${resourceInfo.label} T${from} → T${to}`,
-      `Buy: ${formatSilver(buyPrice)}/u · Transmute: ${formatSilver(transmuteCost)}/u · Sell: ${formatSilver(effectiveSell)}/u`,
-      `Qty: ${quantity} · Sale: ${(multiplier * 100).toFixed(1)}%`,
-      `Profit/unit: ${formatSilver(result.profitPerUnit)} · ROI: ${result.roiPercent.toFixed(2)}%`,
-      `Total profit: ${formatSilver(result.totalProfit)} (${decMeta.label})`,
-      `Break-even sell: ${formatSilver(result.breakEvenSellPrice)}/u`,
-    ];
-    navigator.clipboard?.writeText(lines.join('\n')).then(() => {
-      setJustCopied(true);
-      window.setTimeout(() => setJustCopied(false), 1500);
-    }).catch(() => {
-      // Clipboard API unavailable (insecure context) — silently no-op.
-    });
-  };
-
-  const handleCsvExport = () => {
-    const header = ['Resource', 'From', 'To', 'Buy/u', 'Transmute/u', 'Sell/u', 'Qty', 'Multiplier', 'Profit/u', 'Total Profit', 'ROI %', 'Decision'];
-    const rows = saved.map(s => {
-      const r = calculateTransmute({
-        inputBuyPrice: s.buy,
-        transmuteCost: s.transmute,
-        outputSellPrice: s.sell,
-        quantity: s.quantity,
-        saleMultiplier: s.saleMultiplier,
-      });
-      const d = decisionMeta(decisionFor(r.profitPerUnit, thresholds)).label;
-      return [
-        s.resource,
-        s.from,
-        s.to,
-        s.buy,
-        s.transmute,
-        s.sell,
-        s.quantity,
-        s.saleMultiplier,
-        Math.round(r.profitPerUnit),
-        Math.round(r.totalProfit),
-        r.roiPercent.toFixed(2),
-        d,
-      ];
-    });
-    const csv = [header, ...rows].map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const exportCsv = () => {
+    const csv = scannerRowsToCsv(visibleRows);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `albion-transmute-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "albion-transmutation-scan.csv";
+    anchor.click();
     URL.revokeObjectURL(url);
+    setToast("CSV exported");
   };
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        eyebrow="Market · Transmutation"
-        title="Transmutation Profit Calculator"
-        description="Find profitable raw resource transmutation flips before the market corrects. Buy low-enchant, pay transmute cost, sell next-enchant — at a higher net than the spread."
-        icon={IconFurnace}
-        actions={
-          <Button variant="secondary" size="sm" onClick={() => setShowThresholds(s => !s)}>
-            {showThresholds ? 'Hide' : 'Edit'} thresholds
-          </Button>
-        }
-      />
+    <div className="text-vellum">
+      <header className="mb-5 flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-oldgold-300/25 bg-oldgold-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-oldgold-300">
+            <Shield size={14} />
+            Albion market tool
+          </div>
+          <h1 className="max-w-4xl text-3xl font-black tracking-normal text-vellum sm:text-4xl">
+            Resource Transmutation Profit Scanner
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-vellum/62 sm:text-base">
+            Scan every raw resource enchant step from manual prices before the market corrects.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 rounded-md border border-white/10 bg-ash-850/70 px-3 py-2 text-sm text-vellum/70">
+          <Calculator size={18} className="text-oldgold-300" />
+          <span className="font-semibold tabular-nums">{completeRows}</span>
+          calculated
+          <span className="text-vellum/30">/</span>
+          <span className="font-semibold tabular-nums text-moss-300">{profitableRows}</span>
+          profitable
+        </div>
+      </header>
 
-      {showThresholds && (
-        <div className="medieval-panel p-4 grid grid-cols-3 gap-3">
-          <NumberInput
-            label="Strong ≥"
-            value={thresholds.strong}
-            onChange={v => setThresholds(t => ({ ...t, strong: v }))}
-            suffix="silver/u"
-            min={0}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="space-y-4">
+          <PriceMatrix
+            priceBook={priceBook}
+            activeResource={activeResource}
+            onActiveResourceChange={setActiveResource}
+            onPriceChange={updatePrice}
           />
-          <NumberInput
-            label="Playable ≥"
-            value={thresholds.playable}
-            onChange={v => setThresholds(t => ({ ...t, playable: v }))}
-            suffix="silver/u"
-            min={0}
-          />
-          <NumberInput
-            label="Thin ≥"
-            value={thresholds.thin}
-            onChange={v => setThresholds(t => ({ ...t, thin: v }))}
-            suffix="silver/u"
+          <QuickResults resource={activeResource} rows={rows} settings={settings} />
+          <ScannerControls
+            settings={settings}
+            saleMultiplier={saleMultiplier}
+            totalRows={rows.length}
+            completeRows={completeRows}
+            profitableRows={profitableRows}
+            visibleRows={visibleRows.length}
+            bestProfit={bestProfit}
+            onSettingsChange={(nextSettings) => setSettings(normalizeSettings(nextSettings))}
+            onExportCsv={exportCsv}
           />
         </div>
-      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-5 items-start">
-        {/* === LEFT: input panel === */}
-        <div className="space-y-3">
-          {/* Resource picker */}
-          <div className="medieval-panel p-4">
-            <div className="medieval-title-sm mb-2.5">1. Resource</div>
-            <div className="grid grid-cols-5 gap-1.5">
-              {RESOURCES.map(r => (
-                <button
-                  key={r.id}
-                  onClick={() => setResource(r.id)}
-                  className={`py-2 px-1 rounded-md border text-[11px] font-bold uppercase tracking-wider transition-all ${
-                    resource === r.id
-                      ? 'bg-gold/15 border-gold/50 text-gold-light'
-                      : 'border-[color:var(--color-border)] text-zinc-400 hover:border-gold/30 hover:text-gold'
-                  }`}
-                  title={r.hint}
-                >
-                  {r.id.charAt(0).toUpperCase() + r.id.slice(1)}
-                </button>
-              ))}
-            </div>
-            <div className="text-[10px] text-[#8a7b62] mt-2">{resourceInfo.hint}</div>
-          </div>
-
-          {/* From / To */}
-          <div className="medieval-panel p-4 space-y-3">
-            <div className="medieval-title-sm">2. Tier & Enchant</div>
-            <Select
-              label="To (target)"
-              value={to}
-              onChange={v => setTo(v)}
-              options={[...ALL_TARGETS].sort(compareLevels).map(t => ({ value: t, label: `T${t}` }))}
-            />
-            <div>
-              <label className="block text-[10px] uppercase tracking-[0.18em] font-bold text-gold/70 mb-1.5">
-                From (source)
-              </label>
-              {availableSources.length > 0 ? (
-                <div className="space-y-1.5">
-                  {[...availableSources].sort((a, b) => compareLevels(a.from, b.from)).map(r => (
-                    <button
-                      key={r.from}
-                      onClick={() => { setFromOverride(r.from); setTransmuteOverride(null); }}
-                      className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md border text-[12px] transition-all ${
-                        from === r.from
-                          ? 'bg-gold/15 border-gold/45 text-gold-light'
-                          : 'border-[color:var(--color-border)] text-zinc-300 hover:border-gold/30 hover:bg-[rgba(214,166,74,0.06)]'
-                      }`}
-                    >
-                      <span className="font-bold">T{r.from} → T{r.to}</span>
-                      <span className="tabular-nums text-[#bba485] text-[11px]">{formatSilver(r.cost)}/u</span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <Select
-                  value={from}
-                  onChange={v => setFromOverride(v)}
-                  options={ALL_LEVELS.filter(l => compareLevels(l, to) < 0).map(l => ({ value: l, label: `T${l}` }))}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Prices */}
-          <div className="medieval-panel p-4 space-y-3">
-            <div className="medieval-title-sm">3. Prices</div>
-            <div className="flex items-center gap-2">
-              <ItemIcon itemId={resourceItemId(resource, from)} size={32} className="shrink-0" />
-              <NumberInput
-                label={`Buy price (T${from})`}
-                value={buyPrice}
-                onChange={setBuyPrice}
-                suffix="silver/u"
-                min={0}
-                className="flex-1"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="icon-frame h-8 w-8 rounded-md text-gold-light shrink-0">{IconFurnace}</div>
-              <div className="flex-1">
-                <NumberInput
-                  label="Transmute cost"
-                  value={transmuteCost}
-                  onChange={v => setTransmuteOverride(v)}
-                  suffix="silver/u"
-                  min={0}
-                  hint={isTransmuteOverridden ? 'Manual override active.' : 'Auto-filled from recipe.'}
-                />
-                {isTransmuteOverridden && (
-                  <button
-                    onClick={handleResetTransmute}
-                    className="text-[10px] text-gold/70 hover:text-gold-light mt-1 uppercase tracking-wider font-bold"
-                  >
-                    Reset to recipe
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <ItemIcon itemId={resourceItemId(resource, to)} size={32} className="shrink-0" />
-              <NumberInput
-                label={`Sell price (T${to})`}
-                value={sellPrice}
-                onChange={setSellPrice}
-                suffix="silver/u"
-                min={0}
-                className="flex-1"
-              />
-            </div>
-            <NumberInput
-              label="Quantity"
-              value={quantity}
-              onChange={setQuantity}
-              min={1}
-              hint="Empty = 1 unit."
-            />
-          </div>
-
-          {/* Sale mode */}
-          <div className="medieval-panel p-4 space-y-2.5">
-            <div className="medieval-title-sm">4. Sale Mode</div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {(['market', 'discord', 'custom'] as SaleMode[]).map(m => (
-                <button
-                  key={m}
-                  onClick={() => setSaleMode(m)}
-                  className={`py-1.5 px-2 rounded-md border text-[11px] font-bold uppercase tracking-wider transition-all ${
-                    saleMode === m
-                      ? 'bg-gold/15 border-gold/50 text-gold-light'
-                      : 'border-[color:var(--color-border)] text-zinc-400 hover:border-gold/30'
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-            <div className="text-[10px] text-[#a89175] leading-relaxed">
-              {saleMode === 'market'  && `Marketplace sell order → net ${(SALE_MULTIPLIERS.market * 100).toFixed(1)}% (6.5% premium tax).`}
-              {saleMode === 'discord' && `Discord/private sale → net ${(SALE_MULTIPLIERS.discord * 100).toFixed(1)}% (-5% discount, no tax).`}
-              {saleMode === 'custom'  && 'Custom multiplier: 0-1 fraction of gross sell price kept.'}
-            </div>
-            {saleMode === 'custom' && (
-              <NumberInput
-                label="Custom multiplier (0-1)"
-                value={customMultiplier}
-                onChange={v => setCustomMultiplier(Math.max(0, Math.min(1, v)))}
-                min={0}
-                max={1}
-                step={0.005}
-              />
-            )}
-          </div>
-
-          {/* Save button */}
-          <Button
-            variant="primary"
-            size="md"
-            onClick={handleSave}
-            disabled={buyPrice <= 0 || sellPrice <= 0}
-            className="w-full"
-          >
-            Save opportunity
-          </Button>
-        </div>
-
-        {/* === RIGHT: live results === */}
-        <div className="space-y-4 min-w-0">
-          {/* Decision banner */}
-          <div className={`rounded-lg border-2 p-4 ${decisionPillClass(decision)}`}>
-            <div className="flex items-baseline justify-between gap-3 flex-wrap">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.22em] font-black opacity-70">Decision</div>
-                <div className="medieval-title text-3xl mt-0.5 leading-none">{decMeta.label}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] uppercase tracking-wider font-bold opacity-70">Profit / unit</div>
-                <div className="text-2xl font-black tabular-nums leading-none mt-0.5">
-                  {result.profitPerUnit >= 0 ? '+' : ''}{formatSilver(result.profitPerUnit)}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] uppercase tracking-wider font-bold opacity-70">Total · {quantity} units</div>
-                <div className="text-2xl font-black tabular-nums leading-none mt-0.5">
-                  {result.totalProfit >= 0 ? '+' : ''}{formatSilver(result.totalProfit)}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stat grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard label="Cost / unit"     value={formatSilver(result.costPerUnit)}    hint="Buy + transmute" />
-            <StatCard label="Net sell / unit" value={formatSilver(result.netSellPerUnit)} hint={`Gross × ${(multiplier * 100).toFixed(1)}%`} />
-            <StatCard label="Total revenue"   value={formatSilver(result.totalRevenue)}   hint={`Net for ${quantity} units`} tone="gold" />
-            <StatCard label="Total cost"      value={formatSilver(result.totalCost)}      hint="Capital tied up" />
-            <StatCard label="ROI"             value={formatPercent(result.roiPercent)}    hint="Profit ÷ cost" tone={result.roiPercent >= 0 ? 'profit' : 'loss'} />
-            <StatCard label="Break-even sell" value={formatSilver(result.breakEvenSellPrice)} hint="Min sell to net zero" />
-            <StatCard
-              label="Profit / unit"
-              value={
-                <span className={result.profitPerUnit >= 0 ? 'text-[color:var(--color-profit)]' : 'text-[color:var(--color-loss)]'}>
-                  {result.profitPerUnit >= 0 ? '+' : ''}{formatSilver(result.profitPerUnit)}
-                </span>
-              }
-              hint="After tax / discount"
-              tone={result.profitPerUnit >= 0 ? 'profit' : 'loss'}
-            />
-            <StatCard
-              label="Total profit"
-              value={
-                <span className={result.totalProfit >= 0 ? 'text-[color:var(--color-profit)]' : 'text-[color:var(--color-loss)]'}>
-                  {result.totalProfit >= 0 ? '+' : ''}{formatSilver(result.totalProfit)}
-                </span>
-              }
-              hint={`Across ${quantity} units`}
-              tone={result.profitPerUnit >= 0 ? 'profit' : 'loss'}
-            />
-          </div>
-
-          {/* What-if slider */}
-          <div className="medieval-panel p-4">
-            <div className="flex items-baseline justify-between mb-2 gap-3 flex-wrap">
-              <div>
-                <div className="medieval-title-sm">What-if · Sell price</div>
-                <div className="text-[11px] text-[#a89175] mt-0.5">
-                  Drag to see how a price change affects profit. Range: ±50% of entered sell.
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] uppercase tracking-wider text-gold/70 font-bold">Effective</div>
-                <div className="text-xl font-black tabular-nums text-zinc-100 leading-none">
-                  {formatSilver(effectiveSell)} /u
-                </div>
-                {sellSliderDelta !== 0 && (
-                  <div className="text-[10px] font-bold mt-0.5">
-                    <span className={sellSliderDelta > 0 ? 'text-emerald-300' : 'text-rose-300'}>
-                      {sellSliderDelta > 0 ? '+' : ''}{formatSilver(sellSliderDelta)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <input
-              type="range"
-              min={-Math.round(sellPrice * 0.5)}
-              max={Math.round(sellPrice * 0.5)}
-              step={Math.max(1, Math.round(sellPrice * 0.01))}
-              value={sellSliderDelta}
-              onChange={e => setSellSliderDelta(Number(e.target.value))}
-              disabled={sellPrice <= 0}
-              className="w-full"
-            />
-            {sellSliderDelta !== 0 && (
-              <button
-                onClick={() => setSellSliderDelta(0)}
-                className="text-[10px] text-gold/70 hover:text-gold-light mt-2 uppercase tracking-wider font-bold"
-              >
-                Reset slider
-              </button>
-            )}
-          </div>
-
-          {/* Copy action */}
-          <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={handleCopyResult}>
-              {justCopied ? 'Copied ✓' : 'Copy result'}
-            </Button>
-          </div>
-
-          {(buyPrice <= 0 || sellPrice <= 0) && (
-            <WarningBox tone="info">
-              Enter buy and sell prices to start. The transmute cost auto-fills from the recipe table — you can override.
-            </WarningBox>
-          )}
-        </div>
+        <PresetCostsEditor presets={presets} onChange={(next) => setPresets(normalizePresets(next))} />
       </div>
 
-      {/* === Saved opportunities table === */}
-      <section className="space-y-3">
-        <div className="section-heading">
-          <h2>Saved opportunities</h2>
-          <div className="flex items-center gap-2">
-            <span className="hint">{saved.length} entries</span>
-            <Button variant="ghost" size="sm" onClick={handleCsvExport} disabled={saved.length === 0}>
-              Export CSV
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleClearAll} disabled={saved.length === 0}>
-              Clear all
-            </Button>
-          </div>
-        </div>
-        <SavedTable rows={saved} thresholds={thresholds} onDelete={handleDelete} />
-      </section>
+      <div className="mt-4">
+        <ScannerResultsTable rows={visibleRows} />
+      </div>
 
-      {/* === Reference: recipe table === */}
-      <section className="space-y-3">
-        <SectionDivider label="Recipe Reference" hint="Auto-fills cost when From + To is picked above" />
-        <div className="medieval-panel p-4 overflow-x-auto">
-          <RecipeReference />
+      {toast ? (
+        <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-oldgold-300/40 bg-ash-900 px-4 py-2 text-sm font-bold text-oldgold-300 shadow-steel">
+          {toast}
         </div>
-      </section>
+      ) : null}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────
-
-function SavedTable({
-  rows,
-  thresholds,
-  onDelete,
-}: {
-  rows: SavedOpportunity[];
-  thresholds: DecisionThresholds;
-  onDelete: (id: string) => void;
-}) {
-  const columns: Column<SavedOpportunity>[] = [
-    {
-      key: 'resource',
-      header: 'Resource',
-      cell: r => (
-        <div className="flex items-center gap-2">
-          <ItemIcon itemId={resourceItemId(r.resource, r.to)} size={28} />
-          <div>
-            <div className="text-[12px] text-zinc-100 font-semibold capitalize leading-tight">{r.resource}</div>
-            <div className="text-[10px] text-gold/60 font-bold tracking-wider uppercase">T{r.from} → T{r.to}</div>
-          </div>
-        </div>
-      ),
-    },
-    { key: 'buy',  header: 'Buy/u',       numeric: true, cell: r => formatSilver(r.buy) },
-    { key: 'tx',   header: 'Transmute/u', numeric: true, cell: r => formatSilver(r.transmute) },
-    { key: 'sell', header: 'Sell/u',      numeric: true, cell: r => formatSilver(r.sell) },
-    { key: 'qty',  header: 'Qty',         numeric: true, cell: r => r.quantity.toLocaleString() },
-    {
-      key: 'ppu',
-      header: 'Profit/u',
-      numeric: true,
-      cell: r => {
-        const res = calculateTransmute({
-          inputBuyPrice: r.buy,
-          transmuteCost: r.transmute,
-          outputSellPrice: r.sell,
-          quantity: r.quantity,
-          saleMultiplier: r.saleMultiplier,
-        });
-        return <ProfitBadge amount={res.profitPerUnit} />;
-      },
-    },
-    {
-      key: 'total',
-      header: 'Total',
-      numeric: true,
-      cell: r => {
-        const res = calculateTransmute({
-          inputBuyPrice: r.buy,
-          transmuteCost: r.transmute,
-          outputSellPrice: r.sell,
-          quantity: r.quantity,
-          saleMultiplier: r.saleMultiplier,
-        });
-        return <ProfitBadge amount={res.totalProfit} percent={res.roiPercent} />;
-      },
-    },
-    {
-      key: 'decision',
-      header: 'Decision',
-      cell: r => {
-        const res = calculateTransmute({
-          inputBuyPrice: r.buy,
-          transmuteCost: r.transmute,
-          outputSellPrice: r.sell,
-          quantity: r.quantity,
-          saleMultiplier: r.saleMultiplier,
-        });
-        const d = decisionFor(res.profitPerUnit, thresholds);
-        const m = decisionMeta(d);
-        return <span className={`chip ${decisionPillClass(d)}`}>{m.label}</span>;
-      },
-    },
-    {
-      key: 'del',
-      header: '',
-      cell: r => (
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(r.id); }}
-          className="text-zinc-600 hover:text-rose-400 text-[14px] px-1.5"
-          title="Delete row"
-          aria-label="Delete row"
-        >
-          ×
-        </button>
-      ),
-    },
-  ];
-
-  return (
-    <DataTable
-      columns={columns}
-      rows={rows}
-      rowKey={r => r.id}
-      empty={
-        <EmptyState
-          title="No saved opportunities yet"
-          description="Set inputs above and click 'Save opportunity' to compare flips side-by-side. Saved entries persist in your browser."
-        />
-      }
-    />
-  );
+function filterRows(rows: TransmutationScanRow[], onlyProfitable: boolean) {
+  if (!onlyProfitable) return rows;
+  return rows.filter((row) => (row.profitPerUnit ?? 0) > 0);
 }
 
-function RecipeReference() {
-  // Group recipes by target so each row shows "to | from-A cost | from-B cost".
-  const byTarget = new Map<string, Recipe[]>();
-  for (const r of RECIPES) {
-    const arr = byTarget.get(r.to) ?? [];
-    arr.push(r);
-    byTarget.set(r.to, arr);
-  }
-  const sortedTargets = [...byTarget.keys()].sort(compareLevels);
+function sortRows(rows: TransmutationScanRow[], sortMode: ScannerSettings["sortMode"]) {
+  return [...rows].sort((a, b) => {
+    if (a.missingPrice !== b.missingPrice) return a.missingPrice ? 1 : -1;
 
-  return (
-    <table className="ledger w-full">
-      <thead>
-        <tr>
-          <th>Target</th>
-          <th>From A</th>
-          <th className="num">Cost/u</th>
-          <th>From B</th>
-          <th className="num">Cost/u</th>
-        </tr>
-      </thead>
-      <tbody>
-        {sortedTargets.map(target => {
-          const list = (byTarget.get(target) ?? []).sort((a, b) => compareLevels(a.from, b.from));
-          const a = list[0];
-          const b = list[1];
-          return (
-            <tr key={target}>
-              <td className="text-gold-light font-bold">T{target}</td>
-              <td>T{a.from}</td>
-              <td className="num tabular-nums">{formatSilver(a.cost)}</td>
-              <td>{b ? `T${b.from}` : <span className="text-zinc-600">—</span>}</td>
-              <td className="num tabular-nums">{b ? formatSilver(b.cost) : <span className="text-zinc-600">—</span>}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
+    if (sortMode === "profitAsc") {
+      return (a.profitPerUnit ?? Number.POSITIVE_INFINITY) - (b.profitPerUnit ?? Number.POSITIVE_INFINITY);
+    }
+
+    if (sortMode === "roiDesc") {
+      return (b.roiPercent ?? Number.NEGATIVE_INFINITY) - (a.roiPercent ?? Number.NEGATIVE_INFINITY);
+    }
+
+    if (sortMode === "resource") {
+      const resourceDelta =
+        RESOURCE_TYPES.indexOf(a.resource) - RESOURCE_TYPES.indexOf(b.resource);
+      if (resourceDelta !== 0) return resourceDelta;
+      return stepIndex(a) - stepIndex(b);
+    }
+
+    return (b.profitPerUnit ?? Number.NEGATIVE_INFINITY) - (a.profitPerUnit ?? Number.NEGATIVE_INFINITY);
+  });
+}
+
+function stepIndex(row: TransmutationScanRow) {
+  return TRANSMUTATION_STEPS.findIndex((step) => step.from === row.from && step.to === row.to);
+}
+
+function normalizeSettings(value: unknown): ScannerSettings {
+  if (!value || typeof value !== "object") return DEFAULT_SCANNER_SETTINGS;
+
+  const candidate = value as Partial<ScannerSettings>;
+  const legacyTotalTax =
+    candidate.setupFeePercent === undefined &&
+    typeof candidate.marketplaceTaxPercent === "number" &&
+    candidate.marketplaceTaxPercent >= 6;
+  const taxProfile = candidate.taxProfile ?? (legacyTotalTax ? "premium" : undefined);
+  const marketplaceTaxPercent =
+    legacyTotalTax && candidate.marketplaceTaxPercent === 6.5
+      ? 4
+      : typeof candidate.marketplaceTaxPercent === "number"
+        ? candidate.marketplaceTaxPercent
+        : DEFAULT_SCANNER_SETTINGS.marketplaceTaxPercent;
+  const sortModes: ScannerSettings["sortMode"][] = [
+    "profitDesc",
+    "profitAsc",
+    "roiDesc",
+    "resource",
+  ];
+
+  return {
+    saleMode: candidate.saleMode === "private" ? "private" : "marketplace",
+    marketplaceTaxPercent: clampNumber(marketplaceTaxPercent, 0, 100),
+    setupFeePercent: clampNumber(
+      typeof candidate.setupFeePercent === "number"
+        ? candidate.setupFeePercent
+        : DEFAULT_SCANNER_SETTINGS.setupFeePercent,
+      0,
+      100
+    ),
+    stationFeePerUnit: clampNumber(
+      typeof candidate.stationFeePerUnit === "number"
+        ? candidate.stationFeePerUnit
+        : DEFAULT_SCANNER_SETTINGS.stationFeePerUnit,
+      0,
+      Number.MAX_SAFE_INTEGER
+    ),
+    taxProfile:
+      taxProfile === "normal" || taxProfile === "custom" || taxProfile === "premium"
+        ? taxProfile
+        : DEFAULT_SCANNER_SETTINGS.taxProfile,
+    entryPriceSource:
+      candidate.entryPriceSource === "buyOrder" ? "buyOrder" : "sellOrder",
+    exitPriceSource:
+      candidate.exitPriceSource === "sellOrder" ? "sellOrder" : "buyOrder",
+    onlyProfitable: Boolean(candidate.onlyProfitable),
+    bestRouteOnly:
+      typeof candidate.bestRouteOnly === "boolean"
+        ? candidate.bestRouteOnly
+        : DEFAULT_SCANNER_SETTINGS.bestRouteOnly,
+    sortMode: candidate.sortMode && sortModes.includes(candidate.sortMode)
+      ? candidate.sortMode
+      : DEFAULT_SCANNER_SETTINGS.sortMode,
+  };
+}
+
+function pickBestRoutes(rows: TransmutationScanRow[], bestRouteOnly: boolean) {
+  if (!bestRouteOnly) return rows;
+
+  const bestByTarget = new Map<string, TransmutationScanRow>();
+  rows.forEach((row) => {
+    const key = `${row.resource}-${row.to}`;
+    const current = bestByTarget.get(key);
+    if (!current) {
+      bestByTarget.set(key, row);
+      return;
+    }
+
+    if (current.missingPrice && !row.missingPrice) {
+      bestByTarget.set(key, row);
+      return;
+    }
+
+    if (!current.missingPrice && row.missingPrice) return;
+
+    if ((row.profitPerUnit ?? Number.NEGATIVE_INFINITY) > (current.profitPerUnit ?? Number.NEGATIVE_INFINITY)) {
+      bestByTarget.set(key, row);
+    }
+  });
+
+  return Array.from(bestByTarget.values());
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(value, min), max);
 }
