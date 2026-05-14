@@ -128,10 +128,11 @@ export default function Transmutation() {
     side: OrderPriceSide,
     value: string
   ) => {
-    // Manual edit overrides AODP — clear the date for the edited side so
-    // the cell freshness dot flips to "manual" instead of falsely showing
-    // an old AODP timestamp from the previous fetch.
-    const dateKey = side === "sellOrder" ? "sellDate" : "buyDate";
+    // Manual edit overrides AODP — clear both the AODP date AND our own
+    // confirmation timestamp for the edited side so the cell freshness
+    // dot flips to "manual" instead of falsely showing a fresh signal.
+    const dateKey      = side === "sellOrder" ? "sellDate"        : "buyDate";
+    const confirmedKey = side === "sellOrder" ? "sellConfirmedAt" : "buyConfirmedAt";
     setPriceBook((current) => ({
       ...current,
       [resource]: {
@@ -140,6 +141,7 @@ export default function Transmutation() {
           ...current[resource][tier],
           [side]: value,
           [dateKey]: undefined,
+          [confirmedKey]: undefined,
         },
       },
     }));

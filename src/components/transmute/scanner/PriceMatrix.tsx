@@ -427,28 +427,48 @@ function formatDuration(ms: number): string {
 }
 
 /**
- * Look at the AODP timestamps on a cell and pick the color of its
- * top-right dot:
+ * Look at the freshness signals on a cell and pick the color of its
+ * top-right dot.
+ *
+ * For each side we take the LATER of:
+ *   - the AODP *_date field (when AODP first observed this price), and
+ *   - our local sellConfirmedAt / buyConfirmedAt (set when a fetch
+ *     returned this side, regardless of AODP's date).
+ *
+ * The local confirmation is critical because AODP dedups: if a price
+ * hasn't changed, AODP keeps the original sighting date forever even as
+ * thousands of players re-upload the same value. Without our own
+ * confirmation timestamp, a perfectly current price would render yellow
+ * just because nobody else has moved it in 8 hours.
+ *
  *   - Fresh   (<1h)            : green
  *   - Recent  (1-24h)          : gold
  *   - Stale   (>24h)           : amber
  *   - Manual  (no AODP date)   : neutral parchment
- * Title attribute carries the per-side ages so a hover reveals the
- * detail without crowding the cell visually.
  */
-function freshestBadge(cell: { sellDate?: string; buyDate?: string }): {
-  color: string;
-  title: string;
-} {
+function freshestBadge(cell: {
+  sellDate?: string;
+  buyDate?: string;
+  sellConfirmedAt?: string;
+  buyConfirmedAt?: string;
+}): { color: string; title: string } {
   const now = Date.now();
-  const sellAge = cell.sellDate ? now - Date.parse(cell.sellDate) : undefined;
-  const buyAge  = cell.buyDate  ? now - Date.parse(cell.buyDate)  : undefined;
 
-  // Pick the FRESHEST side as the dominant signal — if either side was just
-  // refreshed, the cell is trustworthy. Both undefined → manual entry.
-  const ages = [sellAge, buyAge].filter((a): a is number => Number.isFinite(a));
+  const ageOf = (aodpDate?: string, confirmedAt?: string): number | undefined => {
+    const aodp = aodpDate ? Date.parse(aodpDate) : NaN;
+    const conf = confirmedAt ? Date.parse(confirmedAt) : NaN;
+    const candidates = [aodp, conf].filter(Number.isFinite);
+    if (candidates.length === 0) return undefined;
+    // Take the LATER timestamp → freshest age.
+    return now - Math.max(...candidates);
+  };
+
+  const sellAge = ageOf(cell.sellDate, cell.sellConfirmedAt);
+  const buyAge  = ageOf(cell.buyDate,  cell.buyConfirmedAt);
+
+  const ages = [sellAge, buyAge].filter((a): a is number => Number.isFinite(a as number));
   if (ages.length === 0) {
-    return { color: 'bg-oldgold-300/55', title: 'Manual entry — no AODP date' };
+    return { color: 'bg-oldgold-300/55', title: 'Manual entry — no AODP confirmation yet' };
   }
   const freshest = Math.min(...ages);
   const ONE_HOUR = 3_600_000;
@@ -457,7 +477,7 @@ function freshestBadge(cell: { sellDate?: string; buyDate?: string }): {
   const partTitle: string[] = [];
   if (sellAge !== undefined) partTitle.push(`sell ${formatDuration(sellAge)}`);
   if (buyAge !== undefined)  partTitle.push(`buy ${formatDuration(buyAge)}`);
-  const title = `AODP age — ${partTitle.join(' · ')}`;
+  const title = `Last confirmed — ${partTitle.join(' · ')}`;
 
   if (freshest < ONE_HOUR) return { color: 'bg-emerald-400', title };
   if (freshest < ONE_DAY)  return { color: 'bg-oldgold-300', title };

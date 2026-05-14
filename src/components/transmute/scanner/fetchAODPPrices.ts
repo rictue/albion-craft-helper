@@ -131,21 +131,30 @@ export async function fetchScannerPrices(
     let buyOrder = existing.buyOrder;
     let sellDate = existing.sellDate;
     let buyDate  = existing.buyDate;
+    let sellConfirmedAt = existing.sellConfirmedAt;
+    let buyConfirmedAt  = existing.buyConfirmedAt;
+    const nowIso = new Date(now).toISOString();
 
     if (aodp.sell > 0) {
       sellOrder = String(aodp.sell);
       sellDate = aodp.sellDate > 0 ? new Date(aodp.sellDate).toISOString() : undefined;
+      // We just confirmed this side via fetch — overrides any stale AODP
+      // *_date that came from the dedup pipeline.
+      sellConfirmedAt = nowIso;
       filledSells += 1;
       if (aodp.sellDate > 0) ages.push(now - aodp.sellDate);
     }
     if (aodp.buy > 0) {
       buyOrder = String(aodp.buy);
       buyDate = aodp.buyDate > 0 ? new Date(aodp.buyDate).toISOString() : undefined;
+      buyConfirmedAt = nowIso;
       filledBuys += 1;
       if (aodp.buyDate > 0) ages.push(now - aodp.buyDate);
     }
 
-    next[cell.resource][cell.level] = { sellOrder, buyOrder, sellDate, buyDate };
+    next[cell.resource][cell.level] = {
+      sellOrder, buyOrder, sellDate, buyDate, sellConfirmedAt, buyConfirmedAt,
+    };
   }
 
   return {

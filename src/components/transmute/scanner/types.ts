@@ -20,9 +20,24 @@ export interface OrderBookPrice {
    * ISO timestamps captured from AODP at fetch time — undefined when the
    * user typed the value manually. Used to render per-cell data-age hints
    * so the user can tell which slots are fresh vs days old.
+   *
+   * Quirk: AODP's *_date fields reflect when the price was first observed,
+   * not the most recent confirmation. If many players keep scanning the
+   * same market without the price changing, AODP dedups silently and the
+   * date stays stuck on the original sighting. That makes a "yellow" dot
+   * misleading — the price might be confirmed-correct right now even
+   * though AODP says the date is 8h old.
    */
   sellDate?: string;
   buyDate?: string;
+  /**
+   * Our own confirmation timestamps: set to "now" every time a fetch
+   * returns a non-zero value for this side, regardless of AODP's date.
+   * Cleared on manual edit so user-entered values don't get a false
+   * fresh signal. The freshness dot uses max(aodp_date, confirmedAt).
+   */
+  sellConfirmedAt?: string;
+  buyConfirmedAt?: string;
 }
 
 export type PriceBook = Record<ResourceType, Record<string, OrderBookPrice>>;
