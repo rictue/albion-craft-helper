@@ -20,7 +20,6 @@ import {
   IconLedger,
   IconCog,
   IconPouch,
-  IconParchment,
   IconShield,
   IconFlame,
   IconCrown,
@@ -28,7 +27,6 @@ import {
   IconHoof,
   IconIsland,
   IconCrate,
-  IconAnvil,
   IconSearch,
 } from './navIcons';
 
@@ -60,7 +58,6 @@ export const TOOLS_DROPDOWN: MegaSection[] = [
       { to: '/calculator', label: 'Crafting Calculator', blurb: 'Cost, return rate, focus and net profit for any item.', icon: IconHammer, badge: 'POPULAR' },
       { to: '/refining',   label: 'Refining Calculator', blurb: 'Raw → refined chain with city + focus + transport.',  icon: IconFurnace, badge: 'POPULAR' },
       { to: '/cooking',    label: 'Cooking Calculator',  blurb: 'Recipe-by-recipe meal profit with city bonus.',       icon: IconFlame },
-      { to: '/planner',    label: 'Craft Planner',       blurb: 'Queue items + see aggregate material totals.',        icon: IconParchment },
     ],
   },
   {
@@ -68,26 +65,19 @@ export const TOOLS_DROPDOWN: MegaSection[] = [
     items: [
       { to: '/laborers',   label: 'Laborer Calculator',  blurb: 'House, journal, happiness and upgrade ROI.',                  icon: IconLaborer, badge: 'NEW' },
       { to: '/transmute',  label: 'Transmutation Profit', blurb: 'Auto-fill recipe cost, live profit/ROI, batch compare flips.', icon: IconFurnace, badge: 'NEW' },
-      { to: '/capes',      label: 'Cape Converter',      blurb: 'Plain cape → faction cape upgrade margin.',   icon: IconShield },
       { to: '/portfolio',  label: 'Portfolio',           blurb: 'Track silver positions across items.',        icon: IconPouch },
     ],
   },
   {
     title: 'Market',
     items: [
-      { to: '/prices',   label: 'Market Prices',  blurb: 'Browse live AODP prices, all cities, all enchants.', icon: IconScales },
-      { to: '/history',  label: 'Price History',  blurb: 'Daily averages per item across the week.',           icon: IconLedger },
       { to: '/gold',     label: 'Gold Prices',    blurb: 'Premium gold spot history and trends.',              icon: IconCrown },
-      { to: '/database', label: 'Custom Prices',  blurb: 'Override stale AODP data with your own numbers.',    icon: IconParchment },
     ],
   },
   {
     title: 'Records',
     items: [
       { to: '/craft-history', label: 'Profit History', blurb: 'Log finished runs to see real margin over time.', icon: IconLedger },
-      { label: 'Tax Calculator',     blurb: 'Per-sale premium vs non-premium tax compare.',    icon: IconAnvil,    badge: 'SOON', disabled: true },
-      { label: 'Return Rate Reference', blurb: 'RR by city, focus, and spec — quick lookup.',   icon: IconBook,     badge: 'SOON', disabled: true },
-      { label: 'Favorites',          blurb: 'Pin your most-used tools and items.',              icon: IconCrown,    badge: 'SOON', disabled: true },
     ],
   },
 ];
@@ -126,7 +116,6 @@ export const HEADER: HeaderEntry[] = [
   { kind: 'link', to: '/refining',   label: 'Refining' },
   { kind: 'link', to: '/cooking',    label: 'Cooking' },
   { kind: 'link', to: '/laborers',   label: 'Laborers' },
-  { kind: 'link', to: '/prices',     label: 'Market' },
   { kind: 'mega', label: 'Tools',  sections: TOOLS_DROPDOWN,  minWidth: 880 },
   { kind: 'mega', label: 'Guides', sections: GUIDES_DROPDOWN, minWidth: 760 },
 ];

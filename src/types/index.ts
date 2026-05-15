@@ -80,21 +80,6 @@ export interface CraftingSettings {
   feeSettings: MarketFeeSettings;
 }
 
-export interface PlannerEntry {
-  id: string;
-  item: ItemDefinition;
-  tier: Tier;
-  enchantment: Enchantment;
-  quantity: number;
-}
-
-export interface CustomPriceEntry {
-  itemId: string;
-  city: string;
-  price: number;
-  updatedAt: number;
-}
-
 export interface CityInfo {
   id: string;
   name: string;

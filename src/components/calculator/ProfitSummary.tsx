@@ -13,7 +13,6 @@ import { getDecision, MARGIN_PCT_THRESHOLDS } from '../../utils/decision';
 
 interface Props {
   result: CraftingResult;
-  onAddToPlan: () => void;
   prices: MarketPrice[];
   itemId: string;
   /** @deprecated No longer used for price matching (cross-variant bug). Kept
@@ -55,8 +54,7 @@ function formatThousands(digits: string): string {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
-export default function ProfitSummary({ result, onAddToPlan, prices, itemId, journalNet = 0 }: Props) {
-  const [added, setAdded] = useState(false);
+export default function ProfitSummary({ result, prices, itemId, journalNet = 0 }: Props) {
   // When the user clicks a city row in the Sell Prices list, the top
   // Investment/Best Profit card is pinned to that city. null = auto (use
   // the best real-data city).
@@ -242,12 +240,6 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
     const dailyProfit = craftsFromDailyCap * perUnitProfit;
     return { tier, enchant, focusPerCraft, totalFocus, silverPerFocus, craftsFromDailyCap, dailyProfit };
   }, [settings.useFocus, settings.quantity, result.itemId, totalProfit]);
-
-  const handleAdd = () => {
-    onAddToPlan();
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
-  };
 
   return (
     <div className="space-y-3">
@@ -562,17 +554,6 @@ export default function ProfitSummary({ result, onAddToPlan, prices, itemId, jou
         </div>
       )}
 
-      {/* Add to planner */}
-      <button
-        onClick={handleAdd}
-        className={`w-full rounded-lg py-2 text-sm font-medium transition-all ${
-          added
-            ? 'bg-green-600/20 text-green-400 border border-green-600/30'
-            : 'bg-gold/20 hover:bg-gold/30 text-gold border border-gold/30'
-        }`}
-      >
-        {added ? '+ Added!' : '+ Add to Planner'}
-      </button>
     </div>
   );
 }

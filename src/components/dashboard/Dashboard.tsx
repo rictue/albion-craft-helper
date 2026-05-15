@@ -2,14 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import HeroPanel from './panels/HeroPanel';
 import QuickToolsPanel from './panels/QuickToolsPanel';
-import MarketSnapshotPanel from './panels/MarketSnapshotPanel';
 import ProfitOpportunitiesPanel from './panels/ProfitOpportunitiesPanel';
 import TimersPanel from './panels/TimersPanel';
 import GuidesPanel from './panels/GuidesPanel';
 import ChangelogPanel from './panels/ChangelogPanel';
 import RecentSessionsPanel from './panels/RecentSessionsPanel';
 import { StatCard, WarningBox } from '../ui';
-import { useAppStore } from '../../store/appStore';
 import { formatSilver } from '../../utils/formatters';
 import { getLastFetchTime } from '../../services/api';
 
@@ -36,9 +34,6 @@ function loadCraftHistory(): CraftEntry[] {
 }
 
 export default function Dashboard() {
-  const plannerItems = useAppStore(s => s.plannerItems);
-  const customPrices = useAppStore(s => s.customPrices);
-
   const [craftHistory] = useState<CraftEntry[]>(() => loadCraftHistory());
   const [lastFetchAge, setLastFetchAge] = useState<number | null>(() => {
     const t = getLastFetchTime();
@@ -68,7 +63,6 @@ export default function Dashboard() {
 
   const stale = lastFetchAge !== null && lastFetchAge > 6 * 3_600_000;
   const noData = lastFetchAge === null;
-  const watchlistCount = Object.keys(customPrices).length;
 
   return (
     <div className="space-y-6">
@@ -76,7 +70,7 @@ export default function Dashboard() {
       <HeroPanel />
 
       {/* Inline status row — uses real store data */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard
           label="Logged Sessions"
           value={totals.sessions}
@@ -104,20 +98,13 @@ export default function Dashboard() {
           }
           hint="Rolling 7-day from logged sessions."
         />
-        <StatCard
-          label="Watched Items"
-          value={watchlistCount}
-          hint={watchlistCount === 0
-            ? 'Add manual prices in Custom Prices.'
-            : `${plannerItems.length} planner items queued`}
-        />
       </div>
 
       {/* Stale data warning */}
       {(stale || noData) && (
         <WarningBox tone={stale ? 'warning' : 'info'} title={stale ? 'Market data is stale' : 'No prices fetched yet'}>
           {stale && lastFetchAge !== null && (
-            <>Last AODP fetch was {Math.floor(lastFetchAge / 3_600_000)}h ago. Open a calculator to force a refresh, or add manual prices via Custom Prices.</>
+            <>Last AODP fetch was {Math.floor(lastFetchAge / 3_600_000)}h ago. Open a calculator to force a refresh.</>
           )}
           {noData && (
             <>Open <Link to="/refining" className="underline">Refining</Link> or <Link to="/calculator" className="underline">Calculator</Link> to fetch live AODP prices.</>
@@ -128,13 +115,10 @@ export default function Dashboard() {
       {/* 2. Quick Tools */}
       <QuickToolsPanel />
 
-      {/* 3 + 4: Market Snapshot + Profit Opportunities (side by side on lg) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <MarketSnapshotPanel />
-        <ProfitOpportunitiesPanel />
-      </div>
+      {/* 3: Profit Opportunities */}
+      <ProfitOpportunitiesPanel />
 
-      {/* 6: Timers */}
+      {/* 4: Timers */}
       <TimersPanel />
 
       {/* Recent sessions ledger */}

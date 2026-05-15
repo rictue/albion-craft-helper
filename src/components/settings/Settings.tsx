@@ -33,8 +33,6 @@ export default function Settings() {
   const clearCustomPrices = useAppStore(s => s.clearCustomPrices);
   const clearProfitHistory = useAppStore(s => s.clearProfitHistory);
   const profitHistory = useAppStore(s => s.profitHistory);
-  const plannerItems = useAppStore(s => s.plannerItems);
-  const clearPlan = useAppStore(s => s.clearPlan);
 
   const [server, setLocalServer] = useState<AlbionServer>(getServer());
   const [saved, setSaved] = useState(false);
@@ -66,11 +64,10 @@ export default function Settings() {
   // memo when content changes; the body itself just sums every LS key.
   const customPriceCount = Object.keys(customPrices).length;
   const profitHistoryCount = profitHistory.length;
-  const plannerCount = plannerItems.length;
 
   const lsBytes = useMemo(() => {
     // Touch counts so lint sees the dependency relationship.
-    void customPriceCount; void profitHistoryCount; void plannerCount;
+    void customPriceCount; void profitHistoryCount;
     try {
       let total = 0;
       for (let i = 0; i < localStorage.length; i++) {
@@ -83,7 +80,7 @@ export default function Settings() {
     } catch {
       return 0;
     }
-  }, [customPriceCount, profitHistoryCount, plannerCount]);
+  }, [customPriceCount, profitHistoryCount]);
 
   return (
     <div className="space-y-5">
@@ -108,7 +105,7 @@ export default function Settings() {
         <StatCard
           label="Local Storage"
           value={`${(lsBytes / 1024).toFixed(0)} KB`}
-          hint={`${profitHistory.length} sessions, ${Object.keys(customPrices).length} prices, ${plannerItems.length} planner items`}
+          hint={`${profitHistory.length} sessions, ${Object.keys(customPrices).length} prices`}
         />
       </div>
 
@@ -232,16 +229,6 @@ export default function Settings() {
                 if (window.confirm('Erase saved profit history?')) clearProfitHistory();
               }}
               disabled={profitHistory.length === 0}
-            />
-            <DataRow
-              label="Planner queue"
-              value={`${plannerItems.length} items`}
-              actionLabel="Clear"
-              danger
-              onAction={() => {
-                if (window.confirm('Clear the planner queue?')) clearPlan();
-              }}
-              disabled={plannerItems.length === 0}
             />
             <DataRow
               label="Live price cache"

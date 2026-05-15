@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ItemDefinition, Tier, Enchantment, CraftingSettings, PlannerEntry, MarketPrice } from '../types';
+import type { ItemDefinition, Tier, Enchantment, CraftingSettings, MarketPrice } from '../types';
 import { DEFAULT_FEE_SETTINGS } from '../utils/marketFees';
 
 export interface ProfitRecord {
@@ -23,13 +23,6 @@ interface AppState {
   // Settings
   settings: CraftingSettings;
   updateSettings: (partial: Partial<CraftingSettings>) => void;
-
-  // Planner
-  plannerItems: PlannerEntry[];
-  addToPlan: (entry: Omit<PlannerEntry, 'id'>) => void;
-  removeFromPlan: (id: string) => void;
-  updatePlanQuantity: (id: string, quantity: number) => void;
-  clearPlan: () => void;
 
   // Profit history
   profitHistory: ProfitRecord[];
@@ -89,24 +82,6 @@ export const useAppStore = create<AppState>()(
           return { settings: next };
         }),
 
-      plannerItems: [],
-      addToPlan: (entry) =>
-        set((state) => ({
-          plannerItems: [
-            ...state.plannerItems,
-            { ...entry, id: Date.now().toString() + Math.random().toString(36).slice(2) },
-          ],
-        })),
-      removeFromPlan: (id) =>
-        set((state) => ({ plannerItems: state.plannerItems.filter((item) => item.id !== id) })),
-      updatePlanQuantity: (id, quantity) =>
-        set((state) => ({
-          plannerItems: state.plannerItems.map((item) =>
-            item.id === id ? { ...item, quantity } : item,
-          ),
-        })),
-      clearPlan: () => set({ plannerItems: [] }),
-
       profitHistory: [],
       addProfitRecord: (record) =>
         set((state) => ({
@@ -153,7 +128,6 @@ export const useAppStore = create<AppState>()(
       },
       partialize: (state) => ({
         settings: state.settings,
-        plannerItems: state.plannerItems,
         customPrices: state.customPrices,
         profitHistory: state.profitHistory,
         tier: state.tier,

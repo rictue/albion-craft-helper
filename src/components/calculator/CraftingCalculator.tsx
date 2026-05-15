@@ -31,7 +31,7 @@ export default function CraftingCalculator() {
     selectedItem, tier, enchantment,
     setSelectedItem, setTier, setEnchantment,
     settings, updateSettings, prices, setPrices, pricesLoading, setPricesLoading,
-    customPrices, addToPlan,
+    customPrices,
   } = useAppStore();
 
   // Material budget widget — user enters 'I have X of the primary material'
@@ -227,11 +227,6 @@ export default function CraftingCalculator() {
     );
   }, [selectedItem, tier, enchantment, settings, returnRate, priceMap]);
 
-  const handleAddToPlan = () => {
-    if (!selectedItem) return;
-    addToPlan({ item: selectedItem, tier, enchantment, quantity: settings.quantity });
-  };
-
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       <CraftingSettings />
@@ -356,7 +351,7 @@ export default function CraftingCalculator() {
         {/* Right sidebar - Profit summary + market liquidity */}
         <div className="lg:col-span-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto space-y-4">
           {result ? (
-            <ProfitSummary result={result} onAddToPlan={handleAddToPlan} prices={prices} itemId={craftedItemId} altItemId={altVariantId} journalNet={journalNet} />
+            <ProfitSummary result={result} prices={prices} itemId={craftedItemId} altItemId={altVariantId} journalNet={journalNet} />
           ) : (
             <div className="bg-surface rounded-xl border border-surface-lighter p-6 text-center">
               <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Profit</div>
