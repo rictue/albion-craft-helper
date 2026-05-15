@@ -65,7 +65,7 @@ function rollup(prices: MarketPrice[], city: string): Map<string, { sellMin: num
     out.set(p.item_id, prev);
   }
   // Replace lingering Infinity sentinel with 0 so consumers don't have to.
-  for (const [k, v] of out) {
+  for (const v of out.values()) {
     if (!Number.isFinite(v.sellMin)) v.sellMin = 0;
   }
   return out;
