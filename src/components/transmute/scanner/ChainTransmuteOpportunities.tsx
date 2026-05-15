@@ -385,6 +385,23 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
 function ChainCard({ row }: { row: Row }) {
   const isWin = row.savingsVsDirect !== undefined && row.savingsVsDirect > 0;
 
+  // Buy order is the priority exit when profitable; hide it otherwise so
+  // unprofitable instant-sell rows don't add noise.
+  const visibleScenarios = row.scenarios
+    .filter((s) => s.mode !== 'instantSell' || s.profit > 0)
+    .sort((a, b) => {
+      if (a.mode === 'instantSell') return -1;
+      if (b.mode === 'instantSell') return 1;
+      return 0;
+    });
+
+  // Re-pick "best" from visible scenarios only — if buy order was the
+  // overall best but is now hidden, the highlight + hint should fall back
+  // to the next best visible exit.
+  const visibleBest = visibleScenarios.length === 0
+    ? null
+    : visibleScenarios.reduce((a, b) => (b.profit > a.profit ? b : a));
+
   return (
     <div className={`rounded border px-2.5 py-2 ${
       isWin
@@ -438,8 +455,8 @@ function ChainCard({ row }: { row: Row }) {
         <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-vellum/45 mb-1 px-1">
           Exit options
         </div>
-        {row.scenarios.map((s) => {
-          const isBest = s.mode === row.bestMode;
+        {visibleScenarios.map((s) => {
+          const isBest = s.mode === visibleBest?.mode;
           const isLoss = s.profit < 0;
           return (
             <div
@@ -472,9 +489,11 @@ function ChainCard({ row }: { row: Row }) {
             </div>
           );
         })}
-        <div className="px-1.5 pt-0.5 text-[9px] text-vellum/30 leading-tight">
-          {EXIT_HINTS[row.bestMode]} → best for this row
-        </div>
+        {visibleBest && (
+          <div className="px-1.5 pt-0.5 text-[9px] text-vellum/30 leading-tight">
+            {EXIT_HINTS[visibleBest.mode]} → best for this row
+          </div>
+        )}
       </div>
 
       {row.savingsVsDirect !== undefined && (
