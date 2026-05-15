@@ -24,9 +24,6 @@ import {
   IconFlame,
   IconCrown,
   IconBook,
-  IconHoof,
-  IconIsland,
-  IconCrate,
   IconSearch,
 } from './navIcons';
 
@@ -71,7 +68,8 @@ export const TOOLS_DROPDOWN: MegaSection[] = [
   {
     title: 'Market',
     items: [
-      { to: '/gold',     label: 'Gold Prices',    blurb: 'Premium gold spot history and trends.',              icon: IconCrown },
+      { to: '/market', label: 'Market Browser', blurb: 'Live AODP prices for every item, per city.', icon: IconScales },
+      { to: '/gold',   label: 'Gold Prices',    blurb: 'Premium gold spot history and trends.',      icon: IconCrown },
     ],
   },
   {
@@ -82,42 +80,13 @@ export const TOOLS_DROPDOWN: MegaSection[] = [
   },
 ];
 
-export const GUIDES_DROPDOWN: MegaSection[] = [
-  {
-    title: 'Getting Started',
-    items: [
-      { label: 'Economy Basics',  blurb: 'How silver flows in Albion — taxes, fees, premium.',     icon: IconBook,  badge: 'SOON', disabled: true },
-      { label: 'Crafting Basics', blurb: 'Item value, return rate, station fees — first crafts.',  icon: IconHammer, badge: 'SOON', disabled: true },
-      { label: 'Refining Basics', blurb: 'LPB, city bonuses, focus — the core daily loop.',        icon: IconFurnace, badge: 'SOON', disabled: true },
-    ],
-  },
-  {
-    title: 'Advanced Economy',
-    items: [
-      { label: 'Focus Usage Guide',  blurb: 'Where 30K daily focus earns the most silver.',     icon: IconFlame,    badge: 'SOON', disabled: true },
-      { label: 'City Bonus Guide',   blurb: 'Which city for which weapon, armor or resource.',  icon: IconCrown,    badge: 'SOON', disabled: true },
-      { label: 'Buy Order Strategy', blurb: 'Patient buying with order spreads + market depth.', icon: IconScales,   badge: 'SOON', disabled: true },
-      { label: 'Transport Risk',     blurb: 'Mount choice, route weight, dirt-road tradeoffs.',  icon: IconShield,   badge: 'SOON', disabled: true },
-    ],
-  },
-  {
-    title: 'Mounts & Farming',
-    items: [
-      { label: 'Swiftclaw Breeding', blurb: 'Kennel build, cub price, food math, sell margin.',  icon: IconHoof,  badge: 'SOON', disabled: true },
-      { label: 'Direwolf Breeding',  blurb: 'T6 carnivore pipeline + cabbage feed budget.',      icon: IconHoof,  badge: 'SOON', disabled: true },
-      { label: 'Animal Feed Guide',  blurb: 'Cheapest meat per silver across crops + butchers.', icon: IconCrate, badge: 'SOON', disabled: true },
-      { label: 'Island Setup',       blurb: 'Plot allocation for kennels, farms, houses.',       icon: IconIsland, badge: 'SOON', disabled: true },
-    ],
-  },
-];
-
 export const HEADER: HeaderEntry[] = [
   { kind: 'link', to: '/calculator', label: 'Crafting' },
   { kind: 'link', to: '/refining',   label: 'Refining' },
   { kind: 'link', to: '/cooking',    label: 'Cooking' },
   { kind: 'link', to: '/laborers',   label: 'Laborers' },
+  { kind: 'link', to: '/market',     label: 'Market' },
   { kind: 'mega', label: 'Tools',  sections: TOOLS_DROPDOWN,  minWidth: 880 },
-  { kind: 'mega', label: 'Guides', sections: GUIDES_DROPDOWN, minWidth: 760 },
 ];
 
 /** Community + Account live in the user/account dropdown on the right. */

@@ -4,7 +4,6 @@ import HeroPanel from './panels/HeroPanel';
 import QuickToolsPanel from './panels/QuickToolsPanel';
 import ProfitOpportunitiesPanel from './panels/ProfitOpportunitiesPanel';
 import TimersPanel from './panels/TimersPanel';
-import GuidesPanel from './panels/GuidesPanel';
 import ChangelogPanel from './panels/ChangelogPanel';
 import RecentSessionsPanel from './panels/RecentSessionsPanel';
 import { StatCard, WarningBox } from '../ui';
@@ -124,11 +123,8 @@ export default function Dashboard() {
       {/* Recent sessions ledger */}
       <RecentSessionsPanel rows={craftHistory.slice(0, 8)} />
 
-      {/* 5 + 7: Guides + Changelog (side by side on lg) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <GuidesPanel />
-        <ChangelogPanel />
-      </div>
+      {/* 5: Changelog */}
+      <ChangelogPanel />
     </div>
   );
 }

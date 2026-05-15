@@ -8,6 +8,7 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import Dashboard from './components/dashboard/Dashboard';
 
 const CraftingCalculator = lazy(() => import('./components/calculator/CraftingCalculator'));
+const MarketBrowser      = lazy(() => import('./components/market/MarketBrowser'));
 const SimpleRefine       = lazy(() => import('./components/refining/SimpleRefine'));
 const Profile            = lazy(() => import('./components/profile/Profile'));
 const Players            = lazy(() => import('./components/players/Players'));
@@ -38,7 +39,7 @@ const REDIRECTS = [
   '/journals', '/fame', '/focus',
   '/flipper', '/bm-runner', '/suggested', '/blackmarket', '/grind',
   '/arbitrage',
-  '/planner', '/capes', '/prices', '/history', '/database',
+  '/planner', '/capes', '/history', '/database',
 ];
 
 export default function App() {
@@ -54,6 +55,7 @@ export default function App() {
               <Route path="/cooking" element={<Cooking />} />
               <Route path="/laborers" element={<Laborers />} />
               <Route path="/transmute" element={<Transmutation />} />
+              <Route path="/market" element={<MarketBrowser />} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/craft-history" element={<CraftHistory />} />
               <Route path="/gold" element={<GoldPrices />} />
@@ -64,6 +66,9 @@ export default function App() {
               <Route path="/meta" element={<MetaItems />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
+
+              {/* Old market browser bookmark → new market page */}
+              <Route path="/prices" element={<Navigate to="/market" replace />} />
 
               {/* Removed routes — preserve bookmarks by sending to Dashboard */}
               {REDIRECTS.map(r => (
