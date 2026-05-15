@@ -72,7 +72,7 @@ export default function HeroPanel() {
                 type="search"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Search items, tools, guides…"
+                placeholder="Search items or tools…"
                 className="w-full pl-10 pr-3 py-2.5 rounded-md bg-[color:var(--color-bg-raised)]/90 border border-[color:var(--color-border-light)] text-[14px] text-zinc-100 placeholder:text-zinc-500 focus:border-gold focus:outline-none"
               />
               {matches.length > 0 && (
