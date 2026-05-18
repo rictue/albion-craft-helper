@@ -16,7 +16,7 @@ export function QuickResults({ resource, rows, settings }: QuickResultsProps) {
   )
     .filter((row) => !row.missingPrice)
     .sort((a, b) => (b.profitPerUnit ?? 0) - (a.profitPerUnit ?? 0))
-    .slice(0, 6);
+    .slice(0, 15);
 
   return (
     <section className="panel">
