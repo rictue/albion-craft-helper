@@ -213,18 +213,16 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
 
         if (scenarios.length === 0) continue;
 
-        // Row gate: only surface chains where selling into a buy order
-        // (instant sell) is profitable AND beats the user's min-profit
-        // threshold. The other exit modes (sell order, Discord) still
-        // render inside the row for comparison — they just don't decide
-        // visibility on their own.
-        const instantSell = scenarios.find((s) => s.mode === 'instantSell');
-        if (!instantSell || instantSell.profit < minProfit) continue;
-
+        // Row gate: show the chain if ANY exit (sell order / buy order /
+        // discord) clears the user's min-profit threshold. Earlier this
+        // gate required the buy-order exit specifically, which hid
+        // legitimate sell-order plays whenever AODP's buy-order side for
+        // that target was missing or stale.
         const best = scenarios.reduce(
           (a, b) => (b.profit > a.profit ? b : a),
           scenarios[0],
         );
+        if (best.profit < minProfit) continue;
 
         const directBuyCost = directBy.get(`${resource}|${target}`);
         const isMultiStep = hops > 1;
