@@ -261,7 +261,7 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
 
     return out
       .sort((a, b) => b.bestProfit - a.bestProfit)
-      .slice(0, 50);
+      .slice(0, 200);
   }, [
     priceBook,
     presets,
