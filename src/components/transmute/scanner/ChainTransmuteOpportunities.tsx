@@ -19,7 +19,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { GitBranch, TrendingUp } from 'lucide-react';
 import type { PresetCost, PriceBook, ResourceType } from './types';
-import { RESOURCE_TYPES } from './calculations';
+import { RESOURCE_TYPES, TIER_LABELS } from './calculations';
+
+// Valid chain targets: every tier.enchant except T4.0, which is only ever
+// a source node (the cheapest raw input — you'd never transmute INTO it).
+const END_GOAL_OPTIONS = TIER_LABELS.filter((t) => t !== '4.0');
 import { allChainOpportunities } from './chainPathfinder';
 import type { ChainPath } from './chainPathfinder';
 import { getSaleMultiplier, getEntryMultiplier } from '../../../utils/marketFees';
@@ -87,6 +91,7 @@ function toNumber(value: string | undefined): number {
 
 export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }: Props) {
   const [resourceFilter, setResourceFilter] = useState<ResourceType | 'all'>('all');
+  const [endGoal, setEndGoal] = useState<string>('all');
   const [minProfit, setMinProfit] = useState<number>(1000);
   const [maxHops, setMaxHops] = useState<number>(4);
   const [maxAgeHours, setMaxAgeHours] = useState<number>(24);
@@ -151,6 +156,10 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
       // left — only multi-hop chains belong in this panel.
       if (hops < 2) continue;
       if (hops > maxHops) continue;
+
+      // End-goal filter: when set, only surface chains whose final output
+      // matches the user's target tier.enchant (e.g. "6.3").
+      if (endGoal !== 'all' && target !== endGoal) continue;
 
       for (const resource of RESOURCE_TYPES) {
         if (resourceFilter !== 'all' && resource !== resourceFilter) continue;
@@ -271,6 +280,7 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
     minProfit,
     maxHops,
     resourceFilter,
+    endGoal,
     maxAgeHours,
     chainOnlyWins,
     now,
@@ -348,6 +358,22 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
             onChange={(e) => setMaxAgeHours(Math.max(0, Number(e.target.value) || 0))}
             className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
           />
+        </label>
+        <label className="col-span-2 block rounded border border-white/10 bg-ash-950/35 px-2 py-1.5">
+          <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-vellum/45">
+            End goal
+          </span>
+          <select
+            value={endGoal}
+            onChange={(e) => setEndGoal(e.target.value)}
+            className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
+            style={{ colorScheme: 'dark' }}
+          >
+            <option value="all" style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>All targets</option>
+            {END_GOAL_OPTIONS.map((t) => (
+              <option key={t} value={t} style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>T{t}</option>
+            ))}
+          </select>
         </label>
       </div>
 
