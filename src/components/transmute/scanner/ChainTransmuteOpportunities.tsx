@@ -90,7 +90,14 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
   const [minProfit, setMinProfit] = useState<number>(1000);
   const [maxHops, setMaxHops] = useState<number>(4);
   const [maxAgeHours, setMaxAgeHours] = useState<number>(24);
-  const [chainOnlyWins, setChainOnlyWins] = useState<boolean>(true);
+  // Default OFF: the pure-silver "is chain cheaper than 1-step direct" check
+  // ignores fill speed. In practice low-enchant inputs (.0/.1/.2) fill buy
+  // orders in minutes while high-enchant inputs (.3/.4) can sit for days
+  // because open-world drops at those enchants are far rarer. Players
+  // rationally chain through low enchants even when direct is a few silver
+  // cheaper, so we show every profitable chain by default and let power
+  // users opt in to the strict "must beat 1-step direct" filter.
+  const [chainOnlyWins, setChainOnlyWins] = useState<boolean>(false);
 
   // "now" snapshot kept in state (Date.now() inside render trips
   // react-hooks/purity).
@@ -351,7 +358,7 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
             Show only chain wins
           </span>
           <span className="text-[9.5px] text-vellum/40 normal-case tracking-normal">
-            Hide multi-hop rows where the direct 1-step path is cheaper anyway
+            Hide multi-hop rows where direct 1-step is cheaper on paper. Off by default — low-enchant inputs fill buy orders much faster than high-enchant ones, so chaining is often the right call even when silver-cost says otherwise.
           </span>
         </span>
         <input
