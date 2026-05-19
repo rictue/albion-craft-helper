@@ -32,6 +32,7 @@ import { ScannerControls } from "./scanner/ScannerControls";
 import { ScannerResultsTable } from "./scanner/ScannerResultsTable";
 import { BuyOrderOpportunities } from "./scanner/BuyOrderOpportunities";
 import { ChainTransmuteOpportunities } from "./scanner/ChainTransmuteOpportunities";
+import ErrorBoundary from "../common/ErrorBoundary";
 import { fetchScannerPrices, SCANNER_CITIES } from "./scanner/fetchAODPPrices";
 import type { FetchResult } from "./scanner/fetchAODPPrices";
 import { useAppStore } from "../../store/appStore";
@@ -262,30 +263,34 @@ export default function Transmutation() {
         </div>
 
         <div className="space-y-4">
-          <ChainTransmuteOpportunities
-            priceBook={priceBook}
-            presets={presets}
-            feeSettings={{
-              saleMode: 'marketplace',
-              taxProfile: settings.taxProfile === 'normal' ? 'normal' : settings.taxProfile === 'custom' ? 'custom' : 'premium',
-              customSalesTaxPct: settings.marketplaceTaxPercent,
-              customSetupFeePct: settings.setupFeePercent,
-              entrySource: settings.entryPriceSource,
-              exitSource: settings.exitPriceSource,
-            }}
-          />
-          <BuyOrderOpportunities
-            priceBook={priceBook}
-            presets={presets}
-            feeSettings={{
-              saleMode: 'marketplace',
-              taxProfile: settings.taxProfile === 'normal' ? 'normal' : settings.taxProfile === 'custom' ? 'custom' : 'premium',
-              customSalesTaxPct: settings.marketplaceTaxPercent,
-              customSetupFeePct: settings.setupFeePercent,
-              entrySource: 'buyOrder',
-              exitSource: settings.exitPriceSource,
-            }}
-          />
+          <ErrorBoundary compact label="Chain transmute">
+            <ChainTransmuteOpportunities
+              priceBook={priceBook}
+              presets={presets}
+              feeSettings={{
+                saleMode: 'marketplace',
+                taxProfile: settings.taxProfile === 'normal' ? 'normal' : settings.taxProfile === 'custom' ? 'custom' : 'premium',
+                customSalesTaxPct: settings.marketplaceTaxPercent,
+                customSetupFeePct: settings.setupFeePercent,
+                entrySource: settings.entryPriceSource,
+                exitSource: settings.exitPriceSource,
+              }}
+            />
+          </ErrorBoundary>
+          <ErrorBoundary compact label="Buy-order opportunities">
+            <BuyOrderOpportunities
+              priceBook={priceBook}
+              presets={presets}
+              feeSettings={{
+                saleMode: 'marketplace',
+                taxProfile: settings.taxProfile === 'normal' ? 'normal' : settings.taxProfile === 'custom' ? 'custom' : 'premium',
+                customSalesTaxPct: settings.marketplaceTaxPercent,
+                customSetupFeePct: settings.setupFeePercent,
+                entrySource: 'buyOrder',
+                exitSource: settings.exitPriceSource,
+              }}
+            />
+          </ErrorBoundary>
           <PresetCostsEditor presets={presets} onChange={(next) => setPresets(normalizePresets(next))} />
         </div>
       </div>

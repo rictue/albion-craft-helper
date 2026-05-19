@@ -33,6 +33,7 @@ const MATERIAL_LABELS: Record<string, string> = {
   LEATHER: 'Leather',
   STONEBLOCK: 'Stone Blocks',
 };
+import ErrorBoundary from '../common/ErrorBoundary';
 import ItemSearch from './ItemSearch';
 import CraftingSettings from './CraftingSettings';
 import RecipeDisplay from './RecipeDisplay';
@@ -443,7 +444,11 @@ export default function CraftingCalculator() {
 
               <ReturnRateSlider subcategory={selectedItem.subcategory} baseId={selectedItem.baseId} itemName={selectedItem.name} />
 
-              {result && <RecipeDisplay result={result} prices={prices} />}
+              {result && (
+                <ErrorBoundary compact label="Recipe">
+                  <RecipeDisplay result={result} prices={prices} />
+                </ErrorBoundary>
+              )}
 
               <JournalBoostCard
                 onNetChange={setJournalNet}
@@ -468,7 +473,9 @@ export default function CraftingCalculator() {
         {/* Right sidebar - Profit summary + market liquidity */}
         <div className="lg:col-span-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto space-y-4">
           {result ? (
-            <ProfitSummary result={result} prices={prices} itemId={craftedItemId} altItemId={altVariantId} journalNet={journalNet} />
+            <ErrorBoundary compact label="Profit summary">
+              <ProfitSummary result={result} prices={prices} itemId={craftedItemId} altItemId={altVariantId} journalNet={journalNet} />
+            </ErrorBoundary>
           ) : (
             <div className="bg-surface rounded-xl border border-surface-lighter p-6 text-center">
               <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Profit</div>

@@ -1,12 +1,17 @@
 /**
- * Top-level error boundary so a single component crash doesn't blank the
- * entire site. Wraps the route Suspense in App.tsx.
+ * Error boundary used both at the top level (full-page fallback) AND
+ * around individual panels (compact fallback so a single crash doesn't
+ * take down the surrounding calculator). Pass `compact` to switch to
+ * the inline failure card; optional `label` is shown in the compact
+ * variant so it's easy to spot WHICH panel died.
  */
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
+  compact?: boolean;
+  label?: string;
 }
 
 interface State {
@@ -32,6 +37,28 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      if (this.props.compact) {
+        return (
+          <div className="bg-zinc-900 rounded-lg border border-red-500/30 p-3 text-xs">
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <span className="text-red-400 font-bold">
+                {this.props.label ?? 'Panel'} failed to render
+              </span>
+              <button
+                onClick={this.reset}
+                className="px-2 py-0.5 bg-gold/15 border border-gold/30 rounded text-gold text-[10px] font-semibold hover:bg-gold/25"
+              >
+                Retry
+              </button>
+            </div>
+            {this.state.error && (
+              <pre className="bg-black/40 border border-zinc-800 rounded p-2 text-[10px] text-red-300/80 font-mono whitespace-pre-wrap break-words max-h-24 overflow-auto">
+                {this.state.error.message}
+              </pre>
+            )}
+          </div>
+        );
+      }
       return (
         <div className="max-w-[600px] mx-auto px-4 py-12">
           <div className="bg-zinc-900 rounded-xl border border-red-500/30 p-6">
