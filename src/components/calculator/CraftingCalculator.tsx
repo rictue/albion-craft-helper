@@ -1,10 +1,28 @@
 import { useEffect, useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
 import { fetchPrices, buildPriceMap } from '../../services/api';
 import { calculateCrafting } from '../../utils/profitCalculator';
 import { calculateReturnRate } from '../../utils/returnRate';
 import { resolveItemId, resolveMaterialId, resolveArtifactId } from '../../utils/itemIdParser';
 import { formatPercent } from '../../utils/formatters';
+import { ALL_ITEMS } from '../../data/items';
+
+const RECENT_ITEMS_LS = 'albion-recent-items-v1';
+const RECENT_ITEMS_LIMIT = 8;
+
+function loadRecentBaseIds(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_ITEMS_LS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter((x): x is string => typeof x === 'string');
+    }
+  } catch {
+    // localStorage unavailable or corrupt JSON — start fresh.
+  }
+  return [];
+}
 
 // Short labels for the material-budget widget so the user knows what unit
 // they are entering into the input (e.g. "999 Planks").
@@ -24,7 +42,8 @@ import JournalBoostCard from './JournalBoostCard';
 import LiquidityCard from './LiquidityCard';
 import TierSelector from '../common/TierSelector';
 import EnchantmentSelector from '../common/EnchantmentSelector';
-import type { Tier, Enchantment } from '../../types';
+import type { Tier, Enchantment, ItemDefinition } from '../../types';
+import ItemIcon from '../common/ItemIcon';
 
 export default function CraftingCalculator() {
   const {
@@ -33,6 +52,66 @@ export default function CraftingCalculator() {
     settings, updateSettings, prices, setPrices, pricesLoading, setPricesLoading,
     customPrices,
   } = useAppStore();
+
+  // URL state sync — shareable links like /calculator?item=MAIN_SWORD&t=6&e=2.
+  // URL wins on mount (so a shared link applies cleanly); subsequent state
+  // changes then push back into the URL with replace so we don't spam history.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [urlHydrated, setUrlHydrated] = useState(false);
+
+  useEffect(() => {
+    if (urlHydrated) return;
+    const itemId = searchParams.get('item');
+    const t = searchParams.get('t');
+    const e = searchParams.get('e');
+    if (itemId) {
+      const found = ALL_ITEMS.find(i => i.baseId === itemId);
+      if (found) setSelectedItem(found);
+    }
+    if (t) {
+      const parsedT = parseInt(t);
+      if ([4, 5, 6, 7, 8].includes(parsedT)) setTier(parsedT as Tier);
+    }
+    if (e) {
+      const parsedE = parseInt(e);
+      if ([0, 1, 2, 3, 4].includes(parsedE)) setEnchantment(parsedE as Enchantment);
+    }
+    setUrlHydrated(true);
+  }, [urlHydrated, searchParams, setSelectedItem, setTier, setEnchantment]);
+
+  useEffect(() => {
+    if (!urlHydrated) return;
+    const params = new URLSearchParams();
+    if (selectedItem) params.set('item', selectedItem.baseId);
+    if (tier !== 4) params.set('t', String(tier));
+    if (enchantment !== 0) params.set('e', String(enchantment));
+    setSearchParams(params, { replace: true });
+  }, [urlHydrated, selectedItem, tier, enchantment, setSearchParams]);
+
+  // Recently-used items chip row — last N base item IDs the user picked,
+  // persisted to localStorage so it survives reloads. We dedupe-and-prepend
+  // on every selection so the most recent is always at index 0.
+  const [recentBaseIds, setRecentBaseIds] = useState<string[]>(() => loadRecentBaseIds());
+
+  useEffect(() => {
+    if (!selectedItem) return;
+    setRecentBaseIds(prev => {
+      const filtered = prev.filter(id => id !== selectedItem.baseId);
+      const next = [selectedItem.baseId, ...filtered].slice(0, RECENT_ITEMS_LIMIT);
+      try {
+        localStorage.setItem(RECENT_ITEMS_LS, JSON.stringify(next));
+      } catch {
+        // localStorage full or unavailable — keep in-memory only.
+      }
+      return next;
+    });
+  }, [selectedItem]);
+
+  const recentItems = useMemo<ItemDefinition[]>(() => {
+    return recentBaseIds
+      .map(id => ALL_ITEMS.find(i => i.baseId === id))
+      .filter((i): i is ItemDefinition => i !== undefined);
+  }, [recentBaseIds]);
 
   // Material budget widget — user enters 'I have X of the primary material'
   // and the quantity input is auto-computed based on the recipe's primary
@@ -164,9 +243,17 @@ export default function CraftingCalculator() {
     // Materials: use the filtered cheapest across ALL cities. The craft
     // city's individual price is no longer authoritative — in thin markets
     // the craft city might be the one hosting the outlier listing.
-    allCitiesMaterials.forEach((v, k) => map.set(k, v));
-    // (Craft-city override removed: prevents a single 70k outlier at the
-    // current craft city from dominating the cost calculation.)
+    //
+    // CRITICAL: skip the crafted item ID itself. allCitiesMaterials.get
+    // returns the CHEAPEST sell price across cities, which is what a buyer
+    // pays — never what a crafter receives. Letting it land in the map
+    // for the output item used to "leak" through if the sellMap+sellPrice
+    // fallback below both came back empty, making the calc treat the
+    // output as costing the same as the cheapest sell elsewhere → fake
+    // catastrophic loss.
+    allCitiesMaterials.forEach((v, k) => {
+      if (k !== craftedItemId) map.set(k, v);
+    });
 
     // Resolve sell price for crafted item. Match ONLY the exact itemId —
     // the old altId (2H_↔MAIN_) fallback cross-contaminated distinct items
@@ -180,6 +267,9 @@ export default function CraftingCalculator() {
         sellPrice = allCitiesSell.get(itemId) ?? 0;
       }
       if (sellPrice > 0) map.set(itemId, sellPrice);
+      // No fallback set: the calc will see 0 sellPrice and naturally
+      // report 0 revenue rather than a misleading "cheapest material price"
+      // sneaking in from allCitiesMaterials.
     }
 
     // Custom prices (highest priority). Skip entries with price <= 0 so
@@ -233,7 +323,34 @@ export default function CraftingCalculator() {
 
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left sidebar - Item selection */}
-        <div className="lg:col-span-3 lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto lg:sticky lg:top-20">
+        <div className="lg:col-span-3 lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto lg:sticky lg:top-20 space-y-2">
+          {recentItems.length > 0 && (
+            <div className="bg-surface rounded-xl border border-surface-lighter p-2.5">
+              <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500 mb-1.5 px-1">
+                Recent · click to reload
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {recentItems.map(item => {
+                  const active = selectedItem?.baseId === item.baseId;
+                  return (
+                    <button
+                      key={item.baseId}
+                      onClick={() => setSelectedItem(item)}
+                      title={item.name}
+                      className={`flex items-center gap-1 px-1.5 py-1 rounded-md border transition-colors ${
+                        active
+                          ? 'bg-gold/20 border-gold/60 text-gold-light'
+                          : 'bg-zinc-900 border-zinc-700 hover:border-zinc-500 text-zinc-300'
+                      }`}
+                    >
+                      <ItemIcon itemId={`T4_${item.baseId}`} size={20} quality={1} className="rounded shrink-0" />
+                      <span className="text-[10px] font-semibold truncate max-w-[80px]">{item.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <ItemSearch onSelect={setSelectedItem} selectedItem={selectedItem} />
         </div>
 

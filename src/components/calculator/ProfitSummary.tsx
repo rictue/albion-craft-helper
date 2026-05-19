@@ -25,17 +25,23 @@ interface Props {
 
 interface CityPrice {
   city: string;
-  /** Cheapest sell listing (what you pay to BUY this item in this city). */
+  /** PRIMARY price used for profit calc — buy_price_max if user's exit
+   *  source is buyOrder (instant sell), otherwise sell_price_min. For
+   *  Black Market this is always buy_price_max since BM is buy-order-only. */
   price: number;
   profit: number;
+  /** True when `price` came from a buy order (instant sell). Drives the
+   *  "(buy)" label in the city list. */
   isBuy: boolean;
   hasData: boolean;
   isCraftCity: boolean;
   ageHours: number;
   isOutlier: boolean;
-  /** Highest buy order in this city (what you'd get if you INSTANT-SELL). */
-  buyOrderPrice: number;
-  buyOrderAge: number;
+  /** THE OTHER SIDE — sell_price_min if primary is buy_price_max, or
+   *  buy_price_max if primary is sell_price_min. Shown as a small side
+   *  number next to the primary so the user can see the spread. */
+  altPrice: number;
+  altAge: number;
 }
 
 // Rough crafting focus cost per tier (base, no specialization reduction).
@@ -100,71 +106,75 @@ export default function ProfitSummary({ result, prices, itemId, journalNet = 0 }
   const cityPrices = useMemo(() => {
     const results: CityPrice[] = [];
 
+    // Which side of the order book the user is realistically getting paid
+    // on. Default settings have exitSource=buyOrder = instant sell into
+    // existing buy orders, so the per-city primary should be buy_price_max
+    // not sell_price_min — using sell_price_min overstates revenue by the
+    // spread. Black Market is always buy-order-only.
+    const exitIsBuyOrder = settings.feeSettings.exitSource === 'buyOrder';
+
     for (const city of CITIES) {
       if (city.id === 'Caerleon') continue; // Caerleon AH is no-op for crafts
-      let bestSell = 0;
-      let bestDate: string | undefined;
-      let isBuy = false;
 
-      // Also track buy orders (buy_price_max) for royal cities so the
-      // user can see both "cheapest sell listing" AND "instant-sell buy
-      // order" side by side. This solves the 300K-sell vs 27K-buy
-      // confusion — user sees both and picks the right interpretation.
-      let bestBuyOrder = 0;
-      let bestBuyDate: string | undefined;
+      // Track both order book sides for every city; we pick primary vs.
+      // alt below based on the user's exit-source setting.
+      let bestSellMin = 0;
+      let bestSellMinDate: string | undefined;
+      let bestBuyMax = 0;
+      let bestBuyMaxDate: string | undefined;
 
       for (const p of prices) {
         if (p.city !== city.id) continue;
         if (p.item_id !== itemId) continue;
 
-        if (city.id === 'Black Market') {
-          if (p.buy_price_max > bestSell) {
-            bestSell = p.buy_price_max;
-            bestDate = p.buy_price_max_date;
-            isBuy = true;
-          }
-        } else {
-          if (p.sell_price_min > 0 && (bestSell === 0 || p.sell_price_min < bestSell)) {
-            bestSell = p.sell_price_min;
-            bestDate = p.sell_price_min_date;
-            isBuy = false;
-          }
-          // Best buy order in this city (what you'd get for an instant sell)
-          if (p.buy_price_max > bestBuyOrder) {
-            bestBuyOrder = p.buy_price_max;
-            bestBuyDate = p.buy_price_max_date;
-          }
+        if (p.sell_price_min > 0 && (bestSellMin === 0 || p.sell_price_min < bestSellMin)) {
+          bestSellMin = p.sell_price_min;
+          bestSellMinDate = p.sell_price_min_date;
+        }
+        if (p.buy_price_max > bestBuyMax) {
+          bestBuyMax = p.buy_price_max;
+          bestBuyMaxDate = p.buy_price_max_date;
         }
       }
 
-      const hasData = bestSell > 0 || bestBuyOrder > 0;
-      const totalSell = bestSell * qty;
-      const profit = bestSell > 0 ? totalSell * saleMultiplier - result.investment : 0;
+      // Black Market is buy-order-only. Royal cities flip primary based on
+      // exitSource. Primary = what we use for profit calc; alt = the spread
+      // partner shown as info.
+      const useBuyMax = city.id === 'Black Market' || exitIsBuyOrder;
+      const primaryPrice = useBuyMax ? bestBuyMax : bestSellMin;
+      const primaryDate  = useBuyMax ? bestBuyMaxDate : bestSellMinDate;
+      const altPriceVal  = useBuyMax ? bestSellMin : bestBuyMax;
+      const altDateVal   = useBuyMax ? bestSellMinDate : bestBuyMaxDate;
+      const isBuy        = useBuyMax;
+
+      const hasData = primaryPrice > 0 || altPriceVal > 0;
+      const totalSell = primaryPrice * qty;
+      const profit = primaryPrice > 0 ? totalSell * saleMultiplier - result.investment : 0;
       results.push({
         city: city.name,
-        price: bestSell,
+        price: primaryPrice,
         profit,
         isBuy,
         hasData,
         isCraftCity: city.id === settings.craftingCity,
-        ageHours: ageHoursOf(bestDate),
+        ageHours: ageHoursOf(primaryDate),
         isOutlier: false,
-        buyOrderPrice: bestBuyOrder,
-        buyOrderAge: ageHoursOf(bestBuyDate),
+        altPrice: altPriceVal,
+        altAge: ageHoursOf(altDateVal),
       });
     }
 
-    // Outlier detection on royal-city sell prices (2x median). We no longer
-    // hide the outliers — the user explicitly wants to see why a city has
-    // an absurd price so they can read the age and dismiss it themselves.
-    // We only mark them with isOutlier = true so the row renders dimly.
-    const royalWithData = results.filter(r => !r.isBuy && r.hasData);
+    // Outlier detection on royal-city primary prices (2x median). Black
+    // Market is excluded because its order-book economics are different
+    // (single buy-order side, no spread). We tag rather than hide so the
+    // user can see why a city has an absurd price and dismiss it themselves.
+    const royalWithData = results.filter(r => r.city !== 'Black Market' && r.hasData && r.price > 0);
     if (royalWithData.length >= 2) {
       const sorted = [...royalWithData].sort((a, b) => a.price - b.price);
       const median = sorted[Math.floor(sorted.length / 2)].price;
       const cutoff = median * 2;
       for (const r of results) {
-        if (!r.isBuy && r.hasData && r.price > cutoff) {
+        if (r.city !== 'Black Market' && r.hasData && r.price > cutoff) {
           r.isOutlier = true;
         }
       }
@@ -184,7 +194,7 @@ export default function ProfitSummary({ result, prices, itemId, journalNet = 0 }
       if (ra !== rb) return ra - rb;
       return (cityOrder.get(a.city) ?? 99) - (cityOrder.get(b.city) ?? 99);
     });
-  }, [prices, itemId, result.investment, saleMultiplier, qty, settings.craftingCity]);
+  }, [prices, itemId, result.investment, saleMultiplier, qty, settings.craftingCity, settings.feeSettings.exitSource]);
 
   // For the headline "Total Profit" card we want the best *actual* profit,
   // not the pinned craft city — otherwise the header would flash red when
@@ -481,16 +491,21 @@ export default function ProfitSummary({ result, prices, itemId, journalNet = 0 }
                               {formatSilver(cp.price)}
                               {cp.isBuy && <span className="text-blue-400">(buy)</span>}
                             </>
-                          ) : cp.buyOrderPrice > 0 ? (
-                            <span className="text-blue-400">{formatSilver(cp.buyOrderPrice)} (buy)</span>
+                          ) : cp.altPrice > 0 ? (
+                            <span className="text-zinc-500">{formatSilver(cp.altPrice)} ({cp.isBuy ? 'sell' : 'buy'})</span>
                           ) : (
                             <span className="text-zinc-600">no data</span>
                           )}
                           {cp.isOutlier && <span className="text-amber-400 text-[9px]" title="Flagged outlier — likely stale">⚠</span>}
-                          {/* Show buy order alongside sell when both exist */}
-                          {!cp.isBuy && cp.buyOrderPrice > 0 && cp.price > 0 && (
-                            <span className="text-[9px] text-blue-400/70" title={`Instant-sell buy order: ${formatSilver(cp.buyOrderPrice)}`}>
-                              / {formatSilver(cp.buyOrderPrice)}
+                          {/* Show the spread partner (the OTHER side of the order book) when both exist */}
+                          {cp.altPrice > 0 && cp.price > 0 && (
+                            <span
+                              className={`text-[9px] ${cp.isBuy ? 'text-zinc-500/70' : 'text-blue-400/70'}`}
+                              title={cp.isBuy
+                                ? `Cheapest sell order: ${formatSilver(cp.altPrice)}`
+                                : `Instant-sell buy order: ${formatSilver(cp.altPrice)}`}
+                            >
+                              / {formatSilver(cp.altPrice)}
                             </span>
                           )}
                         </span>

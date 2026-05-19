@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ALL_ITEMS } from '../../data/items';
 import { CITIES } from '../../data/cities';
 import { resolveItemId } from '../../utils/itemIdParser';
@@ -73,6 +74,7 @@ function rollupByCity(prices: MarketPrice[], itemId: string): CityRow[] {
 }
 
 export default function MarketBrowser() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<ItemDefinition | null>(null);
   const [tier, setTier] = useState<Tier>(4);
@@ -82,7 +84,43 @@ export default function MarketBrowser() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [urlHydrated, setUrlHydrated] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // URL state sync — supports shareable links like
+  // /market?item=ARMOR_CLOTH_MORGANA&t=6&e=2. Mount reads URL → state once,
+  // then state changes get pushed back as URL params.
+  useEffect(() => {
+    if (urlHydrated) return;
+    const itemId = searchParams.get('item');
+    const t = searchParams.get('t');
+    const e = searchParams.get('e');
+    if (itemId) {
+      const found = ALL_ITEMS.find(i => i.baseId === itemId);
+      if (found) {
+        setSelectedItem(found);
+        setQuery(found.name);
+      }
+    }
+    if (t) {
+      const parsedT = parseInt(t);
+      if ([4, 5, 6, 7, 8].includes(parsedT)) setTier(parsedT as Tier);
+    }
+    if (e) {
+      const parsedE = parseInt(e);
+      if ([0, 1, 2, 3, 4].includes(parsedE)) setEnchant(parsedE as Enchantment);
+    }
+    setUrlHydrated(true);
+  }, [urlHydrated, searchParams]);
+
+  useEffect(() => {
+    if (!urlHydrated) return;
+    const params = new URLSearchParams();
+    if (selectedItem) params.set('item', selectedItem.baseId);
+    if (tier !== 4) params.set('t', String(tier));
+    if (enchant !== 0) params.set('e', String(enchant));
+    setSearchParams(params, { replace: true });
+  }, [urlHydrated, selectedItem, tier, enchant, setSearchParams]);
 
   // Close the suggestions dropdown when the user clicks anywhere outside
   // the search wrapper.

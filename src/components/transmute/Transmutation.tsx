@@ -2,6 +2,7 @@
 // lived at the root with its own <main>; here we drop that wrapper and slot
 // the panels into the existing layout.
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Calculator, Shield } from "lucide-react";
 import type {
   OrderPriceSide,
@@ -71,6 +72,34 @@ export default function Transmutation() {
   const [isFetching, setIsFetching] = useState(false);
   const [lastFetch, setLastFetch] = useState<FetchResult | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // URL state sync — /transmute?city=Lymhurst&resource=Hide. Mount reads
+  // URL once and overrides the localStorage-restored defaults so shared
+  // links land where the sender intended; subsequent state changes flow
+  // back into the URL.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [urlHydrated, setUrlHydrated] = useState(false);
+
+  useEffect(() => {
+    if (urlHydrated) return;
+    const cityParam = searchParams.get("city");
+    const resourceParam = searchParams.get("resource");
+    if (cityParam && (SCANNER_CITIES as readonly string[]).includes(cityParam)) {
+      setFetchCity(cityParam);
+    }
+    if (resourceParam && (RESOURCE_TYPES as readonly string[]).includes(resourceParam)) {
+      setActiveResource(resourceParam as ResourceType);
+    }
+    setUrlHydrated(true);
+  }, [urlHydrated, searchParams]);
+
+  useEffect(() => {
+    if (!urlHydrated) return;
+    const params = new URLSearchParams();
+    if (fetchCity) params.set("city", fetchCity);
+    if (activeResource) params.set("resource", activeResource);
+    setSearchParams(params, { replace: true });
+  }, [urlHydrated, fetchCity, activeResource, setSearchParams]);
 
   const saleMultiplier = useMemo(() => getSaleMultiplier(settings), [settings]);
   const entryMultiplier = useMemo(() => getEntryMultiplier(settings), [settings]);
