@@ -25,7 +25,11 @@ function getApiBase(): string {
 
 const CACHE_TTL = 30 * 1000; // 30 seconds for near-live mode
 const LS_CACHE_KEY = 'albion-price-cache-v2';
-const LS_CACHE_MAX_ENTRIES = 40; // cap to avoid localStorage quota issues
+// Bumped from 40 → 200 — each entry is keyed by (sorted item IDs + cities)
+// so quickly hopping between calculator items / chain targets / market
+// browser queries was thrashing the cache and forcing AODP refetches
+// even though we'd just pulled the same data 2 minutes ago.
+const LS_CACHE_MAX_ENTRIES = 200;
 
 interface CacheEntry {
   data: MarketPrice[];
