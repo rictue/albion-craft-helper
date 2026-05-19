@@ -63,6 +63,59 @@ export function formatAge(h: number): string {
 }
 
 /**
+ * Verbose age label used in tooltips — always exact ("3h 42m", "1d 5h").
+ * The compact `formatAge` is for inline space-constrained UI; this one
+ * is for hover/title attributes where precision helps.
+ */
+export function formatAgeVerbose(h: number): string {
+  if (!Number.isFinite(h)) return 'unknown';
+  if (h <= 0) return 'just now';
+  if (h < 1 / 60) return 'just now';
+  if (h < 1) {
+    const m = Math.max(1, Math.round(h * 60));
+    return `${m} minute${m === 1 ? '' : 's'} ago`;
+  }
+  if (h < 24) {
+    const fullHours = Math.floor(h);
+    const minutes = Math.round((h - fullHours) * 60);
+    if (minutes === 0) return `${fullHours}h ago`;
+    if (minutes === 60) return `${fullHours + 1}h ago`;
+    return `${fullHours}h ${minutes}m ago`;
+  }
+  const days = Math.floor(h / 24);
+  const remHours = Math.round(h - days * 24);
+  if (remHours === 0) return `${days}d ago`;
+  if (remHours === 24) return `${days + 1}d ago`;
+  return `${days}d ${remHours}h ago`;
+}
+
+/**
+ * Tier label for confidence in an AODP record, combining staleness AND
+ * any signal the caller passes about listing depth / outlier status.
+ * Used to summarize "should I trust this price?" in tooltips.
+ */
+export type Confidence = 'high' | 'medium' | 'low' | 'unknown';
+
+export function confidenceFromAge(h: number, isOutlier = false): Confidence {
+  if (!Number.isFinite(h)) return 'unknown';
+  if (isOutlier) return 'low';
+  if (h < 1) return 'high';
+  if (h < 6) return 'medium';
+  return 'low';
+}
+
+const CONFIDENCE_LABELS: Record<Confidence, string> = {
+  high: 'High confidence — fresh AODP signal',
+  medium: 'Medium confidence — a few hours old',
+  low: 'Low confidence — stale or outlier listing',
+  unknown: 'Unknown — no AODP timestamp',
+};
+
+export function describeConfidence(c: Confidence): string {
+  return CONFIDENCE_LABELS[c];
+}
+
+/**
  * Tailwind classname for age-colour: emerald < 1h, yellow < 3h, orange < 8h,
  * red otherwise. Returns zinc-600 when the age is unknown.
  */

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import type { CraftingResult } from '../../utils/profitCalculator';
 import type { MarketPrice } from '../../types';
 import { formatSilver } from '../../utils/formatters';
-import { ageHoursOf, formatAge, ageColor } from '../../utils/dataAge';
+import { ageHoursOf, formatAge, formatAgeVerbose, ageColor, confidenceFromAge, describeConfidence } from '../../utils/dataAge';
 import { useAppStore } from '../../store/appStore';
 import { CITIES } from '../../data/cities';
 import ItemIcon from '../common/ItemIcon';
@@ -516,7 +516,9 @@ export default function ProfitSummary({ result, prices, itemId, journalNet = 0 }
                     </div>
                     <span
                       className={`text-[10px] tabular-nums w-10 text-right shrink-0 ${ageColor(cp.ageHours)}`}
-                      title={cp.hasData ? `Price record from ${formatAge(cp.ageHours)} ago` : 'No data'}
+                      title={cp.hasData
+                        ? `${formatAgeVerbose(cp.ageHours)} — ${describeConfidence(confidenceFromAge(cp.ageHours, cp.isOutlier))}`
+                        : 'No data'}
                     >
                       {cp.hasData ? formatAge(cp.ageHours) : '—'}
                     </span>

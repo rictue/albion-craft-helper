@@ -196,7 +196,10 @@ export function ScannerControls({
           value={bestProfit === undefined ? "N/A" : formatStat(bestProfit)}
           tone={bestProfit === undefined ? "neutral" : bestProfit < 0 ? "bad" : "good"}
         />
-        <label className="flex min-h-14 cursor-pointer items-center justify-between gap-3 rounded-md border border-white/10 bg-ash-950/35 px-3 py-2">
+        <label
+          className="flex min-h-14 cursor-pointer items-center justify-between gap-3 rounded-md border border-white/10 bg-ash-950/35 px-3 py-2"
+          title="Hide rows where profit-per-unit is zero or negative. Useful for narrowing down to actionable trades, but loses visibility into 'almost profitable' rows you might want to manually re-evaluate."
+        >
           <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-vellum/55">
             <Filter size={14} />
             Profitable only
@@ -210,7 +213,10 @@ export function ScannerControls({
             className="h-4 w-4 accent-oldgold-400"
           />
         </label>
-        <label className="flex min-h-14 cursor-pointer items-center justify-between gap-3 rounded-md border border-white/10 bg-ash-950/35 px-3 py-2">
+        <label
+          className="flex min-h-14 cursor-pointer items-center justify-between gap-3 rounded-md border border-white/10 bg-ash-950/35 px-3 py-2"
+          title="For each target tier.enchant, only the single most profitable source row is kept. Off = see every viable path to the target (useful when you want to compare them); On = compact view focused on the highest-profit play."
+        >
           <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-vellum/55">
             <Filter size={14} />
             Best route only

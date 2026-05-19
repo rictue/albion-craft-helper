@@ -16,7 +16,7 @@ import { CITIES } from '../../data/cities';
 import { resolveItemId } from '../../utils/itemIdParser';
 import { fetchPrices } from '../../services/api';
 import type { Tier, Enchantment, MarketPrice, ItemDefinition } from '../../types';
-import { ageHoursOf, ageColor, formatAge } from '../../utils/dataAge';
+import { ageHoursOf, ageColor, formatAge, formatAgeVerbose, confidenceFromAge, describeConfidence } from '../../utils/dataAge';
 import { formatSilver } from '../../utils/formatters';
 import ItemIcon from '../common/ItemIcon';
 import { PageHeader, EmptyState, WarningBox } from '../ui';
@@ -342,10 +342,20 @@ export default function MarketBrowser() {
                             ? <span className={r.spreadPct > 30 ? 'text-amber-300' : 'text-zinc-400'}>{r.spreadPct.toFixed(1)}%</span>
                             : <span className="text-zinc-700">—</span>}
                         </td>
-                        <td className={`px-3 py-2 text-right tabular-nums text-xs font-bold ${ageColor(r.sellAgeH)}`}>
+                        <td
+                          className={`px-3 py-2 text-right tabular-nums text-xs font-bold ${ageColor(r.sellAgeH)}`}
+                          title={r.sellMin > 0
+                            ? `Sell side ${formatAgeVerbose(r.sellAgeH)} — ${describeConfidence(confidenceFromAge(r.sellAgeH))}`
+                            : 'No sell-side data'}
+                        >
                           {formatAge(r.sellAgeH)}
                         </td>
-                        <td className={`px-3 py-2 text-right tabular-nums text-xs font-bold ${ageColor(r.buyAgeH)}`}>
+                        <td
+                          className={`px-3 py-2 text-right tabular-nums text-xs font-bold ${ageColor(r.buyAgeH)}`}
+                          title={r.buyMax > 0
+                            ? `Buy side ${formatAgeVerbose(r.buyAgeH)} — ${describeConfidence(confidenceFromAge(r.buyAgeH))}`
+                            : 'No buy-side data'}
+                        >
                           {formatAge(r.buyAgeH)}
                         </td>
                       </tr>
