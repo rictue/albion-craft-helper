@@ -37,7 +37,7 @@ const ENTRIES: ChangelogEntry[] = [
     date: '2026-04-19',
     changes: [
       { kind: 'added',   text: 'Refining: transport weight card + mount selector.' },
-      { kind: 'added',   text: 'Discord sell mode (no tax, −5%).' },
+      { kind: 'added',   text: 'Direct trade sell mode (no tax, full sticker price).' },
       { kind: 'changed', text: 'Sticky city selection in price picker across tier/enchant.' },
     ],
   },

@@ -2,7 +2,7 @@ import type { ItemDefinition, CategoryGroup } from '../types';
 
 // Auto-generated from Albion Online game data + localization (ao-bin-dumps)
 // Run: node scripts/generate-items.mjs
-// Generated: 2026-05-19T19:35:51.831Z
+// Generated: 2026-05-20T01:15:21.177Z
 
 const SWORD: ItemDefinition[] = [
   { baseId: 'MAIN_SWORD', name: 'Broadsword', category: 'weapon_1h', subcategory: 'sword', recipe: [{ materialBase: 'METALBAR', count: 16 }, { materialBase: 'LEATHER', count: 8 }] },

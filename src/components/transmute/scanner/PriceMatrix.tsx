@@ -1,9 +1,66 @@
 // Ported from Codex 2026-05-14 transmutation scanner.
-import { useState } from "react";
-import { Boxes, Gem, Loader2, RefreshCw } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Boxes, ClipboardPaste, Gem, Loader2, RefreshCw } from "lucide-react";
 import type { OrderPriceSide, PriceBook, ResourceType } from "./types";
 import { RESOURCE_TYPES } from "./calculations";
 import { SCANNER_CITIES } from "./fetchAODPPrices";
+
+interface ParsedPasteRow {
+  tier: string;
+  side: OrderPriceSide;
+  value: string;
+}
+
+// Lenient parser for bulk price input. Accepts:
+//   "4.0 110 108"      → sell=110, buy=108
+//   "T4.0 110 108"
+//   "4.0  110  108"    (extra spaces / tabs)
+//   "4.0,110,108"
+//   "4.0; 110; 108"
+//   "4.0 sell 110"     (explicit side)
+//   "4.0 buy 108"
+//   "4.0 s 110"        (short side label)
+// Anything we can't parse on a line is silently skipped — keeps the workflow
+// forgiving when users paste mixed copy from spreadsheets / Discord.
+export function parsePasteRows(text: string): ParsedPasteRow[] {
+  const out: ParsedPasteRow[] = [];
+  for (const rawLine of text.split(/\r?\n+/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const tokens = line.split(/[\t,;]+|\s+/).map(t => t.trim()).filter(Boolean);
+    if (tokens.length < 2) continue;
+
+    const tierMatch = tokens[0].match(/^T?(\d)\.(\d)/i);
+    if (!tierMatch) continue;
+    const tier = `${tierMatch[1]}.${tierMatch[2]}`;
+    const rest = tokens.slice(1);
+
+    const cleanNumber = (s: string) => s.replace(/[.,_\s]/g, '');
+    const sideOf = (token: string): OrderPriceSide | null => {
+      const t = token.toLowerCase();
+      if (t === 's' || t === 'sell' || t === 'sellorder') return 'sellOrder';
+      if (t === 'b' || t === 'buy' || t === 'buyorder') return 'buyOrder';
+      return null;
+    };
+
+    const explicitSide = sideOf(rest[0]);
+    if (explicitSide && rest[1]) {
+      const v = cleanNumber(rest[1]);
+      if (/^\d+$/.test(v)) out.push({ tier, side: explicitSide, value: v });
+      continue;
+    }
+
+    // Positional: first number = sell, second = buy
+    const numbers = rest.filter(t => /^\d/.test(t)).map(cleanNumber);
+    if (numbers[0] && /^\d+$/.test(numbers[0])) {
+      out.push({ tier, side: 'sellOrder', value: numbers[0] });
+    }
+    if (numbers[1] && /^\d+$/.test(numbers[1])) {
+      out.push({ tier, side: 'buyOrder', value: numbers[1] });
+    }
+  }
+  return out;
+}
 
 const TIERS = [4, 5, 6, 7, 8];
 const ENCHANTS = [0, 1, 2, 3, 4];
@@ -52,6 +109,20 @@ export function PriceMatrix({
   fetchError,
 }: PriceMatrixProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("both");
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+
+  // Preview parsing as the user types so they see what'll be applied
+  // before clicking the button. Cheap on small inputs, keep it inline.
+  const parsedPasteRows = useMemo(() => parsePasteRows(pasteText), [pasteText]);
+
+  const applyPaste = () => {
+    for (const row of parsedPasteRows) {
+      onPriceChange(activeResource, row.tier, row.side, row.value);
+    }
+    setPasteText("");
+    setPasteOpen(false);
+  };
 
   return (
     <section className="panel">
@@ -125,6 +196,63 @@ export function PriceMatrix({
             <span className="text-vellum/45">125 cells × 5 resources — buy orders are rarer in AODP than sells.</span>
           )}
         </div>
+      </div>
+
+      {/* Bulk paste toggle */}
+      <div className="mb-3">
+        <button
+          type="button"
+          onClick={() => setPasteOpen(o => !o)}
+          className="inline-flex items-center gap-1.5 rounded border border-white/10 bg-ash-950/35 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-vellum/70 hover:border-white/20 hover:text-vellum"
+          title="Paste in-game prices in bulk — accepts rows like '4.0 110 108' (tier sell buy), one per line."
+        >
+          <ClipboardPaste size={13} />
+          {pasteOpen ? 'Hide bulk paste' : 'Paste prices'}
+        </button>
+        {pasteOpen && (
+          <div className="mt-2 rounded-md border border-oldgold-300/30 bg-ash-950/55 p-3 space-y-2">
+            <div className="text-[10px] text-vellum/55 leading-relaxed">
+              Bulk-fill <span className="text-oldgold-300 font-bold">{activeResource}</span>.
+              One row per line. Tier first, then sell + buy (or explicit{" "}
+              <code className="text-vellum/70">sell 110</code> / <code className="text-vellum/70">buy 108</code>).
+              Recognised: <code className="text-vellum/70">4.0 110 108</code>,{" "}
+              <code className="text-vellum/70">T5.3 12.093 11.717</code>,{" "}
+              <code className="text-vellum/70">6.3,35987,31979</code>.
+            </div>
+            <textarea
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              rows={6}
+              placeholder={"4.0 110 108\n4.1 209 204\n4.2 1410 1402\n..."}
+              spellCheck={false}
+              className="w-full rounded bg-ash-900 border border-white/10 px-2 py-1.5 text-xs font-mono text-vellum placeholder:text-vellum/30 focus:outline-none focus:border-oldgold-300/60 resize-y"
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-vellum/55 tabular-nums">
+                {parsedPasteRows.length === 0
+                  ? 'Nothing parseable yet.'
+                  : `${parsedPasteRows.length} cell update${parsedPasteRows.length === 1 ? '' : 's'} ready.`}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setPasteText(""); setPasteOpen(false); }}
+                  className="rounded border border-white/10 bg-ash-900 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-vellum/55 hover:text-vellum"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={applyPaste}
+                  disabled={parsedPasteRows.length === 0}
+                  className="rounded border border-oldgold-300/45 bg-oldgold-500/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-oldgold-300 hover:border-oldgold-300/70 hover:bg-oldgold-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Apply {parsedPasteRows.length > 0 ? `${parsedPasteRows.length} update${parsedPasteRows.length === 1 ? '' : 's'}` : ''}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Resource selector */}

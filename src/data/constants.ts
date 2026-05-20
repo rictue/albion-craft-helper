@@ -12,8 +12,9 @@
 export const TAX_PREMIUM = 0.065;
 /** Non-premium: 2.5% setup + 8% sales = 10.5% total */
 export const TAX_NON_PREMIUM = 0.105;
-/** Discord-style direct sale discount — sellers offer -5%, no tax */
-export const DISCORD_DISCOUNT = 0.05;
+/** Direct trade / private sale — no marketplace tax, no built-in discount.
+ *  Sellers receive the full sticker price they agreed on in chat / Discord. */
+export const DIRECT_TRADE_DISCOUNT = 0;
 
 // ====================== LPB / RETURN RATE ======================
 /** Base local production bonus everywhere — applies to refining and crafting */

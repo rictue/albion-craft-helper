@@ -19,8 +19,10 @@
  *     - Instant buy (buys from a sell order): pay sticker price, no fee
  *     - Buy order (posts a buy order):        pay sticker + setup fee
  *
- * Discord (private) sales bypass the marketplace entirely with the
- * conventional -5% discount, no tax, no setup.
+ * Direct trade / private sale bypasses the marketplace entirely — buyer
+ * and seller agree on a price in chat or Discord, then trade in-game.
+ * No tax, no setup, and (by user request) no built-in discount: the
+ * price the user types is the price they get.
  */
 
 export type TaxProfile = 'premium' | 'normal' | 'custom';
@@ -50,8 +52,10 @@ export const TAX_PRESETS: Record<Exclude<TaxProfile, 'custom'>, TaxRates> = {
   normal:  { salesTaxPct: 8, setupFeePct: 2.5 },
 };
 
-/** Private sale (Discord) is a flat -5% off market, no tax, no setup. */
-export const PRIVATE_SALE_MULTIPLIER = 0.95;
+/** Direct trade / private sale: buyer and seller agree on a sticker price
+ *  and trade in-game. No marketplace tax, no setup fee, no built-in
+ *  discount — the price the user types IS the price they receive. */
+export const PRIVATE_SALE_MULTIPLIER = 1.0;
 
 export const DEFAULT_FEE_SETTINGS: MarketFeeSettings = {
   saleMode:    'marketplace',

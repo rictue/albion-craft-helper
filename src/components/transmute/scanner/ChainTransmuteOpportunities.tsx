@@ -72,13 +72,13 @@ interface Row {
 const EXIT_LABELS: Record<ExitMode, string> = {
   sellOrder:   'Sell order',
   instantSell: 'Buy order',
-  discord:     'Discord −5%',
+  discord:     'Direct trade',
 };
 
 const EXIT_HINTS: Record<ExitMode, string> = {
   sellOrder:   'Post, wait',
   instantSell: 'Sell into top buy now',
-  discord:     'Private sale, no tax',
+  discord:     'In-game trade at sticker price',
 };
 
 const ONE_HOUR = 3_600_000;
@@ -115,9 +115,10 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
   const entryMult = getEntryMultiplier(feeSettings);
 
   // Three exit multipliers — sell-order (post + wait), instant-sell (sell
-  // into a buy order), and Discord (-5%, no tax). Memoize so the object
-  // identity is stable across renders; otherwise the downstream useMemo
-  // would re-run on every keystroke.
+  // into a buy order), and direct trade (no tax, no discount — full
+  // sticker price). Memoize so the object identity is stable across
+  // renders; otherwise the downstream useMemo would re-run on every
+  // keystroke.
   const exitMults = useMemo<Record<ExitMode, number>>(() => ({
     sellOrder:   getSaleMultiplier({ ...feeSettings, saleMode: 'marketplace', exitSource: 'sellOrder' }),
     instantSell: getSaleMultiplier({ ...feeSettings, saleMode: 'marketplace', exitSource: 'buyOrder'  }),

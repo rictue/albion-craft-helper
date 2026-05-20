@@ -419,7 +419,7 @@ export default function SimpleRefine() {
     const totalCost = rawCost + prevCost + feeTotal;
 
     // Sale-side multiplier handles all four cases: marketplace prem/normal,
-    // sell order vs instant sell, and private (Discord) sale.
+    // sell order vs instant sell, and direct trade (no tax, full price).
     const saleMult = getSaleMultiplier(feeSettings);
     const effectiveSellPrice = sellPrice * saleMult;
 

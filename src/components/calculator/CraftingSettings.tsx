@@ -40,7 +40,7 @@ export default function CraftingSettings() {
         </div>
 
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 cursor-pointer" title="Tax profile, sell-order vs instant sell, and private (Discord) sale live in the right panel under the profit card.">
+          <label className="flex items-center gap-1.5 cursor-pointer" title="Tax profile, sell-order vs instant sell, and direct trade sale live in the right panel under the profit card.">
             <input
               type="checkbox"
               checked={settings.useFocus}

@@ -69,8 +69,8 @@ export default function MarketFeeControls({ value, onChange, compact }: Props) {
         />
         <ModeButton
           active={value.saleMode === 'private'}
-          label="Private (Discord)"
-          hint="−5%, no tax"
+          label="Direct trade"
+          hint="no tax, full price"
           icon={<HandCoins size={13} />}
           onClick={() => setMode('private')}
         />
