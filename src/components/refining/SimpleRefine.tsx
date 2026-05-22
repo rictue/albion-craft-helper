@@ -19,6 +19,7 @@ import {
 import type { MarketFeeSettings } from '../../utils/marketFees';
 import { getDecision, SILVER_PER_UNIT_THRESHOLDS } from '../../utils/decision';
 import { usePageMeta } from '../../hooks/usePageMeta';
+import ToolExplainer from '../common/ToolExplainer';
 
 const BASE_LPB = 18;
 const CITY_LPB = 40;
@@ -886,6 +887,54 @@ export default function SimpleRefine() {
           )}
         </main>
       </div>
+
+      <ToolExplainer title="About the Refining Calculator">
+        <p>
+          Refining is the engine room of the Albion Online economy.
+          Almost every crafted item starts as raw resources gathered in
+          the open world, fed through a refining station with its
+          return-rate buffs applied, and turned into refined materials
+          that crafters then bid for. This calculator walks the full
+          pipeline — raw to refined, single-pass or reinvest-loop — for
+          every tier and enchant of every resource family.
+        </p>
+        <p>
+          The return-rate math here uses the LPB pool formula{' '}
+          <code>RR = LPB / (100 + LPB)</code>. Base station gives 18 LPB,
+          the city specialization adds 40 LPB for refining (Fort Sterling
+          = wood, Lymhurst = fiber, Bridgewatch = stone, Martlock = hide,
+          Thetford = ore), focus adds 59 LPB, and any daily production
+          bonus is added on top. Stack everything and you sit just under
+          70% return rate, which roughly triples your effective output
+          per raw resource at the cost of 30k focus per day.
+        </p>
+        <p>
+          The reinvest loop is what makes refining feel magical: every
+          time the station hands you back a fraction of your input, that
+          fraction goes right back into the next batch. With city + focus
+          stacked you can run a 5,000 raw run that nets you well over
+          10,000 refined units across all passes. The "focus budget"
+          input caps how many crafts get the focus bonus before falling
+          back to no-focus passes — handy if you're not refining a full
+          inventory.
+        </p>
+        <p>
+          Transport is built in. Pick a mount (T4–T8 Transport Ox or T5+
+          Mammoth) and the right column shows trips, total weight and
+          break-even silver-per-unit including the cross-zone risk of
+          ganks (which the calculator does <em>not</em> model — that's on
+          you). Raw resources weigh 0.1 kg each, refined materials weigh
+          0.2 kg, so the post-refine load is usually smaller than the
+          incoming raw load.
+        </p>
+        <p>
+          Workflow: LIVE mode polls AODP every 15 seconds so the numbers
+          stay current while you're standing at the station. Use the
+          inline price override (click any cell) when AODP looks stale,
+          and check the data-age dots in the corner of each cell — green
+          is &lt;1h, red is older than a day.
+        </p>
+      </ToolExplainer>
     </div>
   );
 }

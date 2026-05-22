@@ -8,6 +8,7 @@ import { resolveItemId, resolveMaterialId, resolveArtifactId } from '../../utils
 import { formatPercent } from '../../utils/formatters';
 import { ALL_ITEMS } from '../../data/items';
 import { usePageMeta } from '../../hooks/usePageMeta';
+import ToolExplainer from '../common/ToolExplainer';
 
 const RECENT_ITEMS_LS = 'albion-recent-items-v1';
 const RECENT_ITEMS_LIMIT = 8;
@@ -493,6 +494,56 @@ export default function CraftingCalculator() {
           )}
         </div>
       </div>
+
+      <ToolExplainer title="About the Crafting Calculator">
+        <p>
+          The Crafting Calculator answers the most common question in
+          Albion Online's economy: <em>does it actually pay to craft this
+          item right now?</em> Pick any tier and enchant of any equipment
+          piece, set your crafting city, and the calculator pulls live
+          prices for every input material from the Albion Online Data
+          Project, applies your return-rate and tax assumptions, and
+          shows the net silver per craft and per batch.
+        </p>
+        <p>
+          Three numbers drive the result. <strong>Return rate</strong>{' '}
+          determines what fraction of your raw materials comes back as
+          extra output — base station gives 18 LPB (15.25% RR), the
+          city's local production bonus for that subcategory adds 15 LPB,
+          and using focus adds 59 LPB. Stack all three and you sit around
+          47.9% RR, almost doubling your effective output per material.
+          The slider on the page lets you override the auto-calculated
+          number if your spec or daily bonuses push it higher.
+        </p>
+        <p>
+          The <strong>fee chain</strong> is the other half. The default
+          is the Albion premium player buying inputs instantly off sell
+          orders (no setup fee, full sticker price) and selling outputs
+          instantly into buy orders (4% sales tax, no setup fee). You can
+          flip either side: posting a sell order earns the spread but
+          adds the 2.5% setup fee, and posting a buy order saves a few
+          percent on materials at the cost of waiting for the order to
+          fill. The Market Fees panel makes the trade-offs visible so you
+          can match the math to how you actually play.
+        </p>
+        <p>
+          Material prices come from AODP and are outlier-filtered (2×
+          median) to suppress the joke listings that occasionally pollute
+          thin markets. The crafted item's sell price comes from the same
+          source. If a slice of the market is genuinely empty, type your
+          own price in the cell — your override is highlighted in gold
+          and persists across sessions on your machine only.
+        </p>
+        <p>
+          Common workflow: set your spec city, pick the item, toggle
+          focus depending on whether you're spending your daily 30k or
+          not, look at the city breakdown to see whether selling locally
+          or transporting to a different royal city beats the spread, and
+          adjust the inline override if AODP is hours stale. The "I have
+          X materials" budget input multiplies up the craft quantity for
+          when you're planning a full inventory run.
+        </p>
+      </ToolExplainer>
     </div>
   );
 }

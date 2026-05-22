@@ -19,6 +19,7 @@ import type { LaborerType } from '../../data/laborers';
 import { formatSilver } from '../../utils/formatters';
 import { IconLaborer } from '../shell/navIcons';
 import { usePageMeta } from '../../hooks/usePageMeta';
+import ToolExplainer from '../common/ToolExplainer';
 
 const TIERS = [3, 4, 5, 6, 7, 8] as const;
 
@@ -303,6 +304,42 @@ export default function LaborersCalculator() {
           </section>
         </div>
       </div>
+
+      <ToolExplainer title="About the Laborer Calculator">
+        <p>
+          Laborers are Albion's idle-income tier: pay them a wage, feed
+          them a journal full of crafting or gathering fame, and they
+          hand back resources every 24 hours whether you log in or not.
+          The Laborer Calculator works out the net silver per cycle for
+          each laborer type (lumberjack, miner, fisherman, farmer,
+          stonemason, butcher, and the equipment-tier laborers) at the
+          tier and happiness level you actually have.
+        </p>
+        <p>
+          The two big variables are <strong>journal cost</strong> and{' '}
+          <strong>happiness</strong>. Filled journals come from your own
+          crafting fame, which is effectively "free" but only if you'd be
+          crafting anyway — otherwise their marketplace cost is the real
+          input. Happiness below 70% triggers a yield penalty, so if
+          you're churning a lot of laborer output without keeping wages
+          paid you're leaving silver on the table.
+        </p>
+        <p>
+          Premium status doubles laborer yield, which means premium
+          flips a marginally-profitable laborer into a clear winner
+          instantly. The calculator's premium toggle reflects this so
+          you can see the real return-on-house-upgrade math: upgrading a
+          shack to a hall might pay back in a week with premium and
+          three weeks without.
+        </p>
+        <p>
+          Worth flagging: the reward quantities used here are
+          conservative community estimates (60/80/110/140/180/220 from
+          T3 to T8). Real laborer output varies with map zone and a few
+          other factors, so override the qty cell with your actual
+          observed return for a sharper number.
+        </p>
+      </ToolExplainer>
     </div>
   );
 }

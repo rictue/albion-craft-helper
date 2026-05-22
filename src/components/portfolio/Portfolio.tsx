@@ -7,6 +7,7 @@ import { ALL_ITEMS } from '../../data/items';
 import { resolveItemId } from '../../utils/itemIdParser';
 import type { Tier, Enchantment } from '../../types';
 import { usePageMeta } from '../../hooks/usePageMeta';
+import ToolExplainer from '../common/ToolExplainer';
 
 /**
  * Portfolio Tracker
@@ -380,6 +381,33 @@ export default function Portfolio() {
           <p className="text-sm text-zinc-500">Add your cash and items to start tracking net worth.</p>
         </div>
       )}
+
+      <ToolExplainer title="About the Portfolio Tracker">
+        <p>
+          Most Albion players know roughly how much silver they have on
+          their character. Far fewer know their real net worth — silver
+          plus the marketplace value of every refined material, weapon,
+          consumable and mount sitting in their banks. Without that
+          number you can't really tell whether you're growing the empire
+          or just churning trades in a circle.
+        </p>
+        <p>
+          The Portfolio Tracker lets you log cash on hand and the
+          quantity of every item you own, and it values the items at
+          live AODP market prices. Snapshots let you freeze the total at
+          any moment ("end of week", "before the big invest"), and the
+          delta from snapshot to snapshot is the real signal of whether
+          the silver is moving up or down.
+        </p>
+        <p>
+          Everything is stored in your browser's localStorage, so the
+          data never leaves your machine. Use the export button (or just
+          browser sync) if you want to back it up. The tracker doesn't
+          interact with the game client in any way — it's a manual
+          ledger, not a tracking tool, and won't put you at any risk
+          with Sandbox Interactive's terms of service.
+        </p>
+      </ToolExplainer>
     </div>
   );
 }

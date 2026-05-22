@@ -22,6 +22,7 @@ import ItemIcon from '../common/ItemIcon';
 import { PageHeader, EmptyState, WarningBox } from '../ui';
 import { IconScales } from '../shell/navIcons';
 import { usePageMeta } from '../../hooks/usePageMeta';
+import ToolExplainer from '../common/ToolExplainer';
 
 const TIERS: Tier[] = [4, 5, 6, 7, 8];
 const ENCHANTS: Enchantment[] = [0, 1, 2, 3, 4];
@@ -388,6 +389,44 @@ export default function MarketBrowser() {
         how much you'd lose flipping in/out of a city in one move. Prices come from the Albion Online Data Project — niche
         items can be hours stale; cross-check the in-game window before any big trade.
       </p>
+
+      <ToolExplainer title="About the Market Browser">
+        <p>
+          The in-game market window only shows one city at a time. The
+          Market Browser shows all six — Bridgewatch, Fort Sterling,
+          Lymhurst, Martlock, Thetford, and the Black Market — side by
+          side for the exact item and tier-enchant variant you're
+          interested in. It's the fastest way to find a regional
+          arbitrage or just confirm that the price you're seeing in front
+          of you is in line with the rest of the continent.
+        </p>
+        <p>
+          Each row shows the city's cheapest sell order, highest buy
+          order, the spread between them, and the age of each side of
+          the book. The age column is the most important indicator after
+          the prices themselves: a green dot means the listing was
+          uploaded to AODP less than an hour ago, yellow means less than
+          three hours, orange less than eight, and red means it's a day
+          or more stale and you should treat the number with suspicion
+          before any large trade.
+        </p>
+        <p>
+          The Black Market is special — it only accepts buy orders, no
+          sell orders, so its row shows the highest bid that bots and
+          players are willing to pay for that item. When the Black Market
+          bid is well above any royal city's sell price, it's a clear
+          arbitrage signal: buy refined materials or equipment in a royal
+          city, transport to Caerleon, instant-sell into the Black Market
+          bid for the spread. The risk of red-zone transport is on you,
+          but the math is right here.
+        </p>
+        <p>
+          If a cell shows "no data", AODP simply has no recent listings
+          for that variant in that city — which itself is information
+          (the slice is illiquid). Niche tiers and high enchants are the
+          usual suspects.
+        </p>
+      </ToolExplainer>
     </div>
   );
 }

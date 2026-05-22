@@ -24,6 +24,11 @@ const About              = lazy(() => import('./components/legal/About'));
 const Privacy            = lazy(() => import('./components/legal/Privacy'));
 const Terms              = lazy(() => import('./components/legal/Terms'));
 const Contact            = lazy(() => import('./components/legal/Contact'));
+const GuidesIndex        = lazy(() => import('./components/guides/GuidesIndex'));
+const RefiningCityGuide  = lazy(() => import('./components/guides/RefiningCityGuide'));
+const PremiumVsNonPremium = lazy(() => import('./components/guides/PremiumVsNonPremium'));
+const FocusEfficiencyGuide = lazy(() => import('./components/guides/FocusEfficiencyGuide'));
+const TransmutationChainStrategy = lazy(() => import('./components/guides/TransmutationChainStrategy'));
 const MetaItems          = lazy(() => import('./components/meta/MetaItems'));
 const Laborers           = lazy(() => import('./components/laborers/LaborersCalculator'));
 const Settings           = lazy(() => import('./components/settings/Settings'));
@@ -74,6 +79,11 @@ export default function App() {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/contact" element={<Contact />} />
+              <Route path="/guides" element={<GuidesIndex />} />
+              <Route path="/guides/refining-city-guide" element={<RefiningCityGuide />} />
+              <Route path="/guides/premium-vs-non-premium" element={<PremiumVsNonPremium />} />
+              <Route path="/guides/focus-efficiency-guide" element={<FocusEfficiencyGuide />} />
+              <Route path="/guides/transmutation-chain-strategy" element={<TransmutationChainStrategy />} />
 
               {/* Old market browser bookmark → new market page */}
               <Route path="/prices" element={<Navigate to="/market" replace />} />

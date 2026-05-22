@@ -41,6 +41,7 @@ import SidebarLayout from '../common/SidebarLayout';
 import StepHeader from '../common/StepHeader';
 import ItemIcon from '../common/ItemIcon';
 import { usePageMeta } from '../../hooks/usePageMeta';
+import ToolExplainer from '../common/ToolExplainer';
 
 // Cooking accent matches in-game station: warm orange/amber
 const COOKING_ACCENT = { ring: 'orange-500', text: 'orange-300' };
@@ -859,6 +860,44 @@ function BulkScan() {
           </table>
         </div>
       )}
+
+      <ToolExplainer title="About the Cooking Calculator">
+        <p>
+          Cooking is the most beginner-friendly profit loop in Albion
+          Online — low focus cost per craft, easy ingredients from your
+          own farm or the marketplace, and stable demand from every
+          guild's open-world fights and ZvZ logistics. This calculator
+          works out which meal pays best at the current AODP prices on
+          your server.
+        </p>
+        <p>
+          Each recipe is scored on the same three legs as the other
+          calculators: ingredient cost (the most expensive part — feeding
+          a T8 meal can run tens of thousands of silver per batch), focus
+          cost (heavily reduced by your cook spec), and meal sell price
+          on the marketplace. The calculator also folds in the city
+          specialisation bonus where relevant — every royal city
+          specialises in a different cooking subcategory, and the +15 LPB
+          adds a meaningful 5–6% to your effective output.
+        </p>
+        <p>
+          Fish sauce is the secret weapon at higher tiers. Adding fish
+          sauce to your enchanted meals lets you skip the matching
+          tier-of-fish requirement, which is often the bottleneck for T6+
+          food production. The calculator includes the fish-sauce path so
+          you can compare "pay extra silver for fish sauce" against "hunt
+          down rare fish on the AH" and pick the cheaper option per
+          recipe.
+        </p>
+        <p>
+          Common workflow: pick your spec city if it matches a meal
+          subcategory, scan the recipe list sorted by silver-per-focus to
+          find the best focus-efficient meal, and double-check the
+          ingredient list against your farm output — if you grow your own
+          carrots and beans the silver/focus figure understates the real
+          margin because input cost is effectively zero.
+        </p>
+      </ToolExplainer>
     </div>
   );
 }

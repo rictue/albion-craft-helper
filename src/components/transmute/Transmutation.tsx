@@ -37,6 +37,7 @@ import { fetchScannerPrices, SCANNER_CITIES } from "./scanner/fetchAODPPrices";
 import type { FetchResult } from "./scanner/fetchAODPPrices";
 import { useAppStore } from "../../store/appStore";
 import { usePageMeta } from "../../hooks/usePageMeta";
+import ToolExplainer from "../common/ToolExplainer";
 
 const STORAGE_KEYS = {
   prices:    "albion-scanner-prices-v1",
@@ -310,6 +311,50 @@ export default function Transmutation() {
           {toast}
         </div>
       ) : null}
+
+      <ToolExplainer title="About the Transmutation Scanner">
+        <p>
+          Resource transmutation is one of the most overlooked silver
+          machines in Albion. The basic mechanic is simple: you spend a
+          fixed silver fee to convert a lower-tier or lower-enchant
+          resource into a higher one, with no return rate involved. When
+          the gap between input price and output price is wider than the
+          transmutation fee, you print silver — and because most players
+          don't track every step, those gaps stay open for a long time.
+        </p>
+        <p>
+          The scanner has three views. The main grid lets you punch in
+          prices for every tier-enchant cell of every resource family
+          (wood, ore, fiber, hide, stone), either by hand or auto-filled
+          from AODP for the city of your choice. The auto-scan table on
+          the left then computes profit, ROI and break-even sell price
+          for every single-step transmutation in the game — usually 40+
+          rows per resource. The Chain Transmute panel on the right goes
+          one further and finds the cheapest multi-hop path to any
+          target tier-enchant, surfacing routes like T5.2 → T5.3 → T6.3
+          that beat the direct one-step path.
+        </p>
+        <p>
+          Intermediate tier prices don't matter for chain math — you
+          never buy or sell the substrate, you just pay the step fee.
+          What the chain panel <em>does</em> use intermediate prices for
+          is the "vs direct 1-step" comparison, which checks whether
+          buying the target's direct precursor would be cheaper than
+          chaining. If the answer is yes, the chain still shows (because
+          it might be the only realistic way to source volume when the
+          intermediate tier is illiquid), but the badge tells you the
+          shortcut exists.
+        </p>
+        <p>
+          The bulk-paste button at the top of the price matrix is the
+          workflow unlock — copy 25 prices from a spreadsheet or the
+          in-game market window in one shot, paste, click Apply, scan.
+          Combined with the End Goal filter (set it to e.g. T6.3 to only
+          see chains that produce that target), the scanner turns from
+          "drown me in numbers" into "show me the three plays that
+          actually matter today."
+        </p>
+      </ToolExplainer>
     </div>
   );
 }

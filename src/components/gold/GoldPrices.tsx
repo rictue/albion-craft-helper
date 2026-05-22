@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { formatSilver } from '../../utils/formatters';
 import { usePageMeta } from '../../hooks/usePageMeta';
+import ToolExplainer from '../common/ToolExplainer';
 
 interface GoldPrice {
   price: number;
@@ -259,6 +260,34 @@ export default function GoldPrices() {
           </div>
         )}
       </div>
+
+      <ToolExplainer title="About Gold Prices">
+        <p>
+          Premium time in Albion Online can be bought in two ways: with
+          real money straight from the Sandbox Interactive store, or by
+          spending in-game gold that other players have put on the
+          exchange. The gold price chart on this page tracks the silver
+          cost per unit of gold across 24-hour, 7-day, and 4-week
+          windows so you can time your premium purchase.
+        </p>
+        <p>
+          Two patterns repeat. First, gold tends to climb during major
+          content releases (new patches, season starts, Xbox launch
+          weeks) because newer or returning players buy gold with cards
+          to skip the silver grind, and that gold immediately enters the
+          exchange. Second, gold dips after the release euphoria fades
+          when those same players run out of cards and the silver supply
+          catches up. Buying premium with silver-converted-to-gold is
+          usually best one or two weeks <em>after</em> a release wave.
+        </p>
+        <p>
+          The data here comes directly from Albion's public gold history
+          endpoint, the same source the in-game gold exchange uses. It
+          refreshes whenever you reload the page; the chart automatically
+          scales the Y-axis to the visible window so even small
+          movements stay readable.
+        </p>
+      </ToolExplainer>
     </div>
   );
 }

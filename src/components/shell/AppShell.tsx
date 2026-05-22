@@ -17,6 +17,7 @@ export default function AppShell({ children }: Props) {
       </main>
       <footer className="border-t border-[color:var(--color-border)] mt-6 px-4 sm:px-6 lg:px-8 py-5 text-[11px] leading-relaxed text-zinc-500 max-w-[1500px] mx-auto">
         <nav className="flex flex-wrap gap-x-4 gap-y-2 mb-3 text-zinc-400 font-semibold">
+          <Link to="/guides" className="hover:text-gold-light">Guides</Link>
           <Link to="/about" className="hover:text-gold-light">About</Link>
           <Link to="/privacy" className="hover:text-gold-light">Privacy</Link>
           <Link to="/terms" className="hover:text-gold-light">Terms</Link>

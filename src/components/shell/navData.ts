@@ -55,6 +55,7 @@ export const HEADER: HeaderEntry[] = [
   { kind: 'link', to: '/portfolio',     label: 'Portfolio' },
   { kind: 'link', to: '/gold',          label: 'Gold' },
   { kind: 'link', to: '/craft-history', label: 'History' },
+  { kind: 'link', to: '/guides',        label: 'Guides' },
 ];
 
 /** Community + Account live in the user/account dropdown on the right. */
