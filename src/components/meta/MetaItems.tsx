@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { getRecentEvents } from '../../services/gameinfo';
 import type { KillEvent } from '../../services/gameinfo';
 import ItemIcon from '../common/ItemIcon';
+import { usePageMeta } from '../../hooks/usePageMeta';
+import ToolExplainer from '../common/ToolExplainer';
 
 // Strip enchant suffix @1/@2/@3 from item IDs
 function baseId(id: string): string {
@@ -61,8 +63,14 @@ const MIN_PARTICIPANT_OPTIONS = [
 ];
 
 export default function MetaItems() {
+  usePageMeta({
+    title: 'Meta Items',
+    description: 'Most-used Albion Online PvP gear by slot, derived live from the last ~255 kill events. Filter by fight size (solo, small-scale, ZvZ) to see what builds the meta is rewarding right now.',
+  });
+
   const [stats, setStats] = useState<ItemStat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [eventsAnalyzed, setEventsAnalyzed] = useState(0);
   const [groupEventsFound, setGroupEventsFound] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -81,6 +89,7 @@ export default function MetaItems() {
   // the effect body — keeps react-hooks/set-state-in-effect happy.
   useEffect(() => {
     let cancelled = false;
+    setError(false);
     (async () => {
       // Fetch 5 pages × 51 = up to 255 recent kill events in parallel
       const pages = await Promise.all([
@@ -94,8 +103,20 @@ export default function MetaItems() {
       if (cancelled) return;
 
       const allEvents: KillEvent[] = [];
+      let anyPageSucceeded = false;
       for (const page of pages) {
-        if (page) allEvents.push(...page);
+        if (page) {
+          anyPageSucceeded = true;
+          allEvents.push(...page);
+        }
+      }
+      // If every proxy attempt for every page returned null we have
+      // nothing to render — surface a clear error instead of looking
+      // like the data is just empty.
+      if (!anyPageSucceeded) {
+        setError(true);
+        setLoading(false);
+        return;
       }
 
       // numberOfParticipants is 0 for many solo kills — treat 0 as 1.
@@ -256,6 +277,16 @@ export default function MetaItems() {
           <div className="text-zinc-500 text-sm animate-pulse">Fetching kill events…</div>
           <div className="text-zinc-700 text-xs mt-2">Scanning 5 pages × 51 events</div>
         </div>
+      ) : error ? (
+        <div className="bg-zinc-900 rounded-xl border border-red-500/30 p-12 text-center">
+          <div className="text-red-400 text-sm font-bold mb-1">Gameinfo API unreachable</div>
+          <div className="text-zinc-500 text-xs mb-4">
+            Every CORS proxy failed for all five event pages. Try Refresh in a minute.
+          </div>
+          <button onClick={load} className="px-4 py-2 rounded-lg text-xs font-bold bg-gold/20 hover:bg-gold/30 text-gold border border-gold/30">
+            Try again
+          </button>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-16 text-center">
           <div className="text-zinc-400 text-sm">No items found</div>
@@ -349,6 +380,39 @@ export default function MetaItems() {
           </div>
         </div>
       )}
+
+      <ToolExplainer title="About Meta Items">
+        <p>
+          Meta Items shows you what equipment is currently winning (and
+          losing) PvP fights in Albion Online. It aggregates the gear off
+          the killer AND victim sides of the last ~255 kill events from
+          the official gameinfo API, groups identical items, and ranks
+          them by usage count.
+        </p>
+        <p>
+          Use the <strong>Fight Size</strong> filter to focus on the
+          content you actually play. "All" mixes solo ganks with 50-man
+          ZvZ pushes, which usually muddles the picture. "5+" filters out
+          most solo PvP and surfaces small-scale meta. "20+" or "50+ (ZvZ)"
+          isolate the gear that's running large-scale Avalonian / season
+          fights.
+        </p>
+        <p>
+          The enchant breakdown column on the right shows how players
+          distribute across +0, +1, +2, +3, +4 variants of each item.
+          When a meta weapon is consistently used at +3/+4, that signals
+          serious investment from the playerbase — and a corresponding
+          crafting opportunity if you've got the spec and the refining
+          chain ready.
+        </p>
+        <p>
+          The Min Tier filter trims out novelty kills (someone running T4
+          gear into a ZvZ for fun) and focuses you on the tiers that
+          matter for actual content. T7+ is where most of the "real"
+          meta lives; T4+ catches everything down to mid-tier
+          Hellgates.
+        </p>
+      </ToolExplainer>
     </div>
   );
 }

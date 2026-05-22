@@ -2,28 +2,43 @@ import { useState, useEffect } from 'react';
 import { getTopKillFame } from '../../services/gameinfo';
 import type { PlayerSearchResult } from '../../services/gameinfo';
 import { formatSilver } from '../../utils/formatters';
+import { usePageMeta } from '../../hooks/usePageMeta';
+import ToolExplainer from '../common/ToolExplainer';
 
 type Range = 'day' | 'week' | 'month';
 
 export default function TopKillFame() {
+  usePageMeta({
+    title: 'Top Kill Fame',
+    description: 'Albion Online kill fame leaderboard — the top PvP players ranked by total kill fame over the last day, week, or month. Pulled live from the official gameinfo API.',
+  });
+
   const [range, setRange] = useState<Range>('week');
   const [players, setPlayers] = useState<PlayerSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   // Reset loading/players when the range changes — adjust state during render
   // instead of setState-in-effect (React's "reset on prop change" pattern).
   const [prevRange, setPrevRange] = useState(range);
   if (prevRange !== range) {
     setPrevRange(range);
     setLoading(true);
+    setError(false);
     setPlayers([]);
   }
 
   useEffect(() => {
     let cancelled = false;
+    setError(false);
     (async () => {
       const data = await getTopKillFame(range, 50);
       if (cancelled) return;
-      setPlayers(data || []);
+      if (!data) {
+        setError(true);
+        setLoading(false);
+        return;
+      }
+      setPlayers(data);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -57,7 +72,22 @@ export default function TopKillFame() {
         </div>
       )}
 
-      {!loading && players.length > 0 && (
+      {!loading && error && (
+        <div className="bg-zinc-900 rounded-xl border border-red-500/30 p-8 text-center">
+          <div className="text-red-400 text-sm font-bold mb-1">Gameinfo API unreachable</div>
+          <div className="text-zinc-500 text-xs">
+            The leaderboard endpoint isn't responding. Switch the timeframe or wait a minute and try again.
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && players.length === 0 && (
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 text-center text-zinc-500 text-sm">
+          No leaderboard entries for this timeframe yet.
+        </div>
+      )}
+
+      {!loading && !error && players.length > 0 && (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <div className="divide-y divide-zinc-800">
             {players.map((p, idx) => {
@@ -83,6 +113,30 @@ export default function TopKillFame() {
           </div>
         </div>
       )}
+
+      <ToolExplainer title="About the Top Kill Fame leaderboard">
+        <p>
+          Every PvP kill in Albion Online awards kill fame to the killer
+          based on the victim's gear value. The leaderboard ranks players
+          by total fame earned in the last day, week, or month — a clean
+          shorthand for who's been most active in PvP. Click the timeframe
+          toggle to switch between the three windows.
+        </p>
+        <p>
+          The list is fetched directly from Albion's gameinfo API
+          (<code>/events/killfame</code>). It includes alliance and guild
+          tags where available so you can quickly see which guild is
+          dominating the season. Rank colors at the top: gold for #1,
+          silver for #2, bronze for #3.
+        </p>
+        <p>
+          A few quirks: fame only counts kills against players whose IP
+          exceeds the gameinfo cutoff (currently 700 IP), so very
+          low-gear ganks don't pad the leaderboard. The week and month
+          windows lag a few minutes behind real-time but the day window
+          is essentially live.
+        </p>
+      </ToolExplainer>
     </div>
   );
 }

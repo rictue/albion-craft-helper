@@ -3,6 +3,8 @@ import { getRecentEvents } from '../../services/gameinfo';
 import type { KillEvent } from '../../services/gameinfo';
 import { formatSilver } from '../../utils/formatters';
 import ItemIcon from '../common/ItemIcon';
+import { usePageMeta } from '../../hooks/usePageMeta';
+import ToolExplainer from '../common/ToolExplainer';
 
 const EQUIPMENT_SLOTS: Array<{ key: keyof KillEvent['Killer']['Equipment']; label: string }> = [
   { key: 'MainHand', label: 'Main Hand' },
@@ -50,8 +52,14 @@ function EquipmentGrid({ equipment }: { equipment: KillEvent['Killer']['Equipmen
 }
 
 export default function Killboard() {
+  usePageMeta({
+    title: 'Killboard',
+    description: 'Recent Albion Online PvP kill feed across the server — last 50 events with full killer + victim equipment breakdowns, IP, and kill fame. Pulled directly from the official gameinfo API.',
+  });
+
   const [events, setEvents] = useState<KillEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -66,10 +74,18 @@ export default function Killboard() {
   // effect body, which keeps the react-hooks/set-state-in-effect rule happy.
   useEffect(() => {
     let cancelled = false;
+    setError(false);
     (async () => {
       const data = await getRecentEvents(51, 0);
       if (cancelled) return;
-      setEvents(data || []);
+      if (!data) {
+        // null = every CORS proxy failed. Don't blank the UI; flag the
+        // error so the empty state can offer a retry.
+        setError(true);
+        setLoading(false);
+        return;
+      }
+      setEvents(data);
       setLastRefresh(new Date());
       setLoading(false);
     })();
@@ -94,6 +110,24 @@ export default function Killboard() {
 
       {loading && events.length === 0 && (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-12 text-center text-zinc-500">Loading killboard...</div>
+      )}
+
+      {!loading && error && events.length === 0 && (
+        <div className="bg-zinc-900 rounded-xl border border-red-500/30 p-8 text-center">
+          <div className="text-red-400 text-sm font-bold mb-1">Gameinfo API unreachable</div>
+          <div className="text-zinc-500 text-xs mb-4">
+            The Albion gameinfo proxy chain isn't responding. This usually clears in a minute.
+          </div>
+          <button onClick={load} className="px-4 py-2 rounded-lg text-xs font-bold bg-gold/20 hover:bg-gold/30 text-gold border border-gold/30">
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && events.length === 0 && (
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 text-center text-zinc-500 text-sm">
+          No recent kill events returned by the API. Try Refresh in a few seconds.
+        </div>
       )}
 
       {events.length > 0 && (
@@ -172,6 +206,30 @@ export default function Killboard() {
           </div>
         </div>
       )}
+
+      <ToolExplainer title="About the Killboard">
+        <p>
+          The Killboard streams the most recent PvP kill events across the
+          Albion Online server you're connected to — Europe by default, with
+          Americas and Asia available via the server switcher in the top bar.
+          Each row shows the killer, the victim, their main-hand weapons, kill
+          fame awarded, and how many other players were involved in the fight.
+        </p>
+        <p>
+          Click any row to expand a side-by-side equipment breakdown: every
+          gear slot, item quality (Normal / Good / Outstanding / Excellent /
+          Masterpiece), and effective item power. Useful for analysing what
+          builds are pulling kills in current PvP — especially when filtered
+          by ZvZ-size fights via the Meta Items page.
+        </p>
+        <p>
+          Data comes from Albion's public gameinfo API, routed through a
+          rotating CORS proxy chain because the API itself doesn't set
+          cross-origin headers. If all three proxies are momentarily down
+          you'll see the "API unreachable" card — usually clears in under a
+          minute.
+        </p>
+      </ToolExplainer>
     </div>
   );
 }

@@ -206,5 +206,9 @@ export async function getRecentEvents(limit: number = 51, offset: number = 0): P
 }
 
 export async function getTopKillFame(range: 'day' | 'week' | 'month' = 'week', limit: number = 10): Promise<PlayerSearchResult[] | null> {
-  return await fetchJson<PlayerSearchResult[]>(`/events/playerfame?range=${range}&limit=${limit}&offset=0`);
+  // Albion's gameinfo API deprecated /events/playerfame — it now returns an
+  // empty array for every range. The replacement endpoint /events/killfame
+  // serves the same player-by-killfame leaderboard. Verified live against
+  // gameinfo-ams.albiononline.com (May 2026).
+  return await fetchJson<PlayerSearchResult[]>(`/events/killfame?range=${range}&limit=${limit}&offset=0`);
 }
