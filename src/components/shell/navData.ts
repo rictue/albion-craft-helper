@@ -13,15 +13,8 @@
 
 import type { ReactNode } from 'react';
 import {
-  IconHammer,
-  IconFurnace,
-  IconLaborer,
-  IconScales,
-  IconLedger,
   IconCog,
-  IconPouch,
   IconShield,
-  IconFlame,
   IconCrown,
   IconBook,
   IconSearch,
@@ -48,45 +41,20 @@ export type HeaderEntry =
   | { kind: 'link'; to: string; label: string }
   | { kind: 'mega'; label: string; sections: MegaSection[]; minWidth?: number };
 
-export const TOOLS_DROPDOWN: MegaSection[] = [
-  {
-    title: 'Crafting',
-    items: [
-      { to: '/calculator', label: 'Crafting Calculator', blurb: 'Cost, return rate, focus and net profit for any item.', icon: IconHammer, badge: 'POPULAR' },
-      { to: '/refining',   label: 'Refining Calculator', blurb: 'Raw → refined chain with city + focus + transport.',  icon: IconFurnace, badge: 'POPULAR' },
-      { to: '/cooking',    label: 'Cooking Calculator',  blurb: 'Recipe-by-recipe meal profit with city bonus.',       icon: IconFlame },
-    ],
-  },
-  {
-    title: 'Economy',
-    items: [
-      { to: '/laborers',   label: 'Laborer Calculator',  blurb: 'House, journal, happiness and upgrade ROI.',                  icon: IconLaborer, badge: 'NEW' },
-      { to: '/transmute',  label: 'Transmutation Profit', blurb: 'Auto-fill recipe cost, live profit/ROI, batch compare flips.', icon: IconFurnace, badge: 'NEW' },
-      { to: '/portfolio',  label: 'Portfolio',           blurb: 'Track silver positions across items.',        icon: IconPouch },
-    ],
-  },
-  {
-    title: 'Market',
-    items: [
-      { to: '/market', label: 'Market Browser', blurb: 'Live AODP prices for every item, per city.', icon: IconScales },
-      { to: '/gold',   label: 'Gold Prices',    blurb: 'Premium gold spot history and trends.',      icon: IconCrown },
-    ],
-  },
-  {
-    title: 'Records',
-    items: [
-      { to: '/craft-history', label: 'Profit History', blurb: 'Log finished runs to see real margin over time.', icon: IconLedger },
-    ],
-  },
-];
-
+// All tabs live directly in the header now — the old Tools mega
+// dropdown got dissolved by user request. The first five entries are
+// fixed in this order (most-used tabs at the start); secondary tools
+// trail after Market.
 export const HEADER: HeaderEntry[] = [
-  { kind: 'link', to: '/calculator', label: 'Crafting' },
-  { kind: 'link', to: '/refining',   label: 'Refining' },
-  { kind: 'link', to: '/cooking',    label: 'Cooking' },
-  { kind: 'link', to: '/laborers',   label: 'Laborers' },
-  { kind: 'link', to: '/market',     label: 'Market' },
-  { kind: 'mega', label: 'Tools',  sections: TOOLS_DROPDOWN,  minWidth: 880 },
+  { kind: 'link', to: '/calculator',    label: 'Crafting' },
+  { kind: 'link', to: '/refining',      label: 'Refining' },
+  { kind: 'link', to: '/cooking',       label: 'Cooking' },
+  { kind: 'link', to: '/transmute',     label: 'Transmutation' },
+  { kind: 'link', to: '/market',        label: 'Market' },
+  { kind: 'link', to: '/laborers',      label: 'Laborers' },
+  { kind: 'link', to: '/portfolio',     label: 'Portfolio' },
+  { kind: 'link', to: '/gold',          label: 'Gold' },
+  { kind: 'link', to: '/craft-history', label: 'History' },
 ];
 
 /** Community + Account live in the user/account dropdown on the right. */
