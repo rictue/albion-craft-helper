@@ -20,6 +20,10 @@ const TopKillFame        = lazy(() => import('./components/killboard/TopKillFame
 const Transmutation      = lazy(() => import('./components/transmute/Transmutation'));
 const Portfolio          = lazy(() => import('./components/portfolio/Portfolio'));
 const CraftHistory       = lazy(() => import('./components/history/CraftHistory'));
+const About              = lazy(() => import('./components/legal/About'));
+const Privacy            = lazy(() => import('./components/legal/Privacy'));
+const Terms              = lazy(() => import('./components/legal/Terms'));
+const Contact            = lazy(() => import('./components/legal/Contact'));
 const MetaItems          = lazy(() => import('./components/meta/MetaItems'));
 const Laborers           = lazy(() => import('./components/laborers/LaborersCalculator'));
 const Settings           = lazy(() => import('./components/settings/Settings'));
@@ -66,6 +70,10 @@ export default function App() {
               <Route path="/meta" element={<MetaItems />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/contact" element={<Contact />} />
 
               {/* Old market browser bookmark → new market page */}
               <Route path="/prices" element={<Navigate to="/market" replace />} />
