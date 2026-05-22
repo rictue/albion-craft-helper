@@ -1,0 +1,57 @@
+# Render Infrastructure-as-Code.
+#
+# Why this file exists: with BrowserRouter (introduced in commit 39385be),
+# subroutes like /calculator and /guides/refining-city-guide need the
+# server to rewrite to /index.html so the SPA can take over. The
+# _redirects file in public/ was meant to handle this, but Render's
+# Static Site environment was not consistently serving subroutes — direct
+# fetches of /calculator returned 404 even though sitemap.xml worked.
+# Explicit `routes` in render.yaml is the canonical Render way to set
+# this up and takes precedence over any dashboard config drift.
+
+services:
+  - type: web
+    name: albioncrafts
+    runtime: static
+    buildCommand: npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /ads.txt
+        name: Content-Type
+        value: text/plain
+      - path: /robots.txt
+        name: Content-Type
+        value: text/plain
+      - path: /sitemap.xml
+        name: Content-Type
+        value: application/xml
+    routes:
+      # Pass-through for static assets so they don't fall into the SPA
+      # rewrite. Order matters — Render evaluates routes top-to-bottom.
+      - type: rewrite
+        source: /assets/*
+        destination: /assets/:splat
+      - type: rewrite
+        source: /ads.txt
+        destination: /ads.txt
+      - type: rewrite
+        source: /robots.txt
+        destination: /robots.txt
+      - type: rewrite
+        source: /sitemap.xml
+        destination: /sitemap.xml
+      - type: rewrite
+        source: /favicon.svg
+        destination: /favicon.svg
+      - type: rewrite
+        source: /icons.svg
+        destination: /icons.svg
+      # Everything else → the SPA shell. React Router takes over once
+      # the JS bundle parses the URL.
+      - type: rewrite
+        source: /*
+        destination: /index.html
