@@ -41,10 +41,27 @@ export type HeaderEntry =
   | { kind: 'link'; to: string; label: string }
   | { kind: 'mega'; label: string; sections: MegaSection[]; minWidth?: number };
 
+// Community lives in its own mega dropdown to the right of Guides —
+// player / guild / killboard lookups are a distinct workflow from the
+// economy tools, so giving them their own header chip keeps the main
+// nav scannable while still surfacing them in one click.
+export const COMMUNITY_DROPDOWN: MegaSection[] = [
+  {
+    title: 'Community',
+    items: [
+      { to: '/players',  label: 'Player Search', blurb: 'Look up player profile, kills, fame.',   icon: IconShield },
+      { to: '/guilds',   label: 'Guild Search',  blurb: 'Guild composition, recent activity.',    icon: IconCrown },
+      { to: '/killboard',label: 'Killboard',     blurb: 'Recent kill feed across the server.',    icon: IconShield },
+      { to: '/top-fame', label: 'Top Kill Fame', blurb: 'Daily / weekly fame leaderboards.',      icon: IconCrown },
+      { to: '/meta',     label: 'Meta Items',    blurb: 'Popular items reference.',               icon: IconBook },
+    ],
+  },
+];
+
 // All tabs live directly in the header now — the old Tools mega
 // dropdown got dissolved by user request. The first five entries are
 // fixed in this order (most-used tabs at the start); secondary tools
-// trail after Market.
+// trail after Market, then Guides + Community sit at the right end.
 export const HEADER: HeaderEntry[] = [
   { kind: 'link', to: '/calculator',    label: 'Crafting' },
   { kind: 'link', to: '/refining',      label: 'Refining' },
@@ -56,20 +73,11 @@ export const HEADER: HeaderEntry[] = [
   { kind: 'link', to: '/gold',          label: 'Gold' },
   { kind: 'link', to: '/craft-history', label: 'History' },
   { kind: 'link', to: '/guides',        label: 'Guides' },
+  { kind: 'mega', label: 'Community', sections: COMMUNITY_DROPDOWN, minWidth: 320 },
 ];
 
-/** Community + Account live in the user/account dropdown on the right. */
+/** Profile + Settings live in the user/account dropdown on the right. */
 export const ACCOUNT_DROPDOWN: MegaSection[] = [
-  {
-    title: 'Community',
-    items: [
-      { to: '/players',  label: 'Player Search', blurb: 'Look up player profile, kills, fame.',   icon: IconShield },
-      { to: '/guilds',   label: 'Guild Search',  blurb: 'Guild composition, recent activity.',    icon: IconCrown },
-      { to: '/killboard',label: 'Killboard',     blurb: 'Recent kill feed across the server.',    icon: IconShield },
-      { to: '/top-fame', label: 'Top Kill Fame', blurb: 'Daily / weekly fame leaderboards.',      icon: IconCrown },
-      { to: '/meta',     label: 'Meta Items',    blurb: 'Popular items reference.',               icon: IconBook },
-    ],
-  },
   {
     title: 'Account',
     items: [
