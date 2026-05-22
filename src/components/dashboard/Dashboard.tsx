@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import HeroPanel from './panels/HeroPanel';
+import NewsPanel from './panels/NewsPanel';
 import QuickToolsPanel from './panels/QuickToolsPanel';
 import ProfitOpportunitiesPanel from './panels/ProfitOpportunitiesPanel';
 import TimersPanel from './panels/TimersPanel';
 import ChangelogPanel from './panels/ChangelogPanel';
 import RecentSessionsPanel from './panels/RecentSessionsPanel';
+import ErrorBoundary from '../common/ErrorBoundary';
 import { StatCard, WarningBox } from '../ui';
 import { formatSilver } from '../../utils/formatters';
 import { getLastFetchTime } from '../../services/api';
@@ -111,10 +113,18 @@ export default function Dashboard() {
         </WarningBox>
       )}
 
-      {/* 2. Quick Tools */}
+      {/* 2: News & Patch Notes — Garmoth-style card feed pulled from
+              Steam Community Announcements. Wrapped in an error boundary
+              because the proxy chain can fail and we don't want one bad
+              fetch to take down the whole dashboard. */}
+      <ErrorBoundary compact label="News feed">
+        <NewsPanel />
+      </ErrorBoundary>
+
+      {/* 3. Quick Tools */}
       <QuickToolsPanel />
 
-      {/* 3: Profit Opportunities */}
+      {/* 4: Profit Opportunities */}
       <ProfitOpportunitiesPanel />
 
       {/* 4: Timers */}
