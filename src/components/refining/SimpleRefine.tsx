@@ -18,6 +18,7 @@ import {
 } from '../../utils/marketFees';
 import type { MarketFeeSettings } from '../../utils/marketFees';
 import { getDecision, SILVER_PER_UNIT_THRESHOLDS } from '../../utils/decision';
+import { usePageMeta } from '../../hooks/usePageMeta';
 
 const BASE_LPB = 18;
 const CITY_LPB = 40;
@@ -64,6 +65,11 @@ function loadFeeSettings(): MarketFeeSettings {
 }
 
 export default function SimpleRefine() {
+  usePageMeta({
+    title: 'Refining Calculator',
+    description: 'Refining profit calculator for Albion Online: raw to refined materials with LPB return rate, focus cost per craft, city specialization bonus, transport weight, and live AODP prices. Reinvest loop simulation included.',
+  });
+
   const [resource, setResource] = useState('wood');
   const [tier, setTier] = useState(6);
   const [enchant, setEnchant] = useState(1);

@@ -40,6 +40,7 @@ import {
 import SidebarLayout from '../common/SidebarLayout';
 import StepHeader from '../common/StepHeader';
 import ItemIcon from '../common/ItemIcon';
+import { usePageMeta } from '../../hooks/usePageMeta';
 
 // Cooking accent matches in-game station: warm orange/amber
 const COOKING_ACCENT = { ring: 'orange-500', text: 'orange-300' };
@@ -114,6 +115,11 @@ interface ScanResult {
 type Mode = 'single' | 'scan';
 
 export default function Cooking() {
+  usePageMeta({
+    title: 'Cooking Calculator',
+    description: 'Recipe-by-recipe meal profit calculator for Albion Online. Picks the best city per recipe, factors in fish sauce bonuses, focus costs, and current AODP market prices for both ingredients and finished meals.',
+  });
+
   const [mode, setMode] = useState<Mode>('single');
   return (
     <div>

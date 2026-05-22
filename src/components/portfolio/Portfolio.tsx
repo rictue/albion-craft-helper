@@ -6,6 +6,7 @@ import Fuse from 'fuse.js';
 import { ALL_ITEMS } from '../../data/items';
 import { resolveItemId } from '../../utils/itemIdParser';
 import type { Tier, Enchantment } from '../../types';
+import { usePageMeta } from '../../hooks/usePageMeta';
 
 /**
  * Portfolio Tracker
@@ -62,6 +63,11 @@ function saveSnapshots(snaps: Snapshot[]) {
 }
 
 export default function Portfolio() {
+  usePageMeta({
+    title: 'Portfolio Tracker',
+    description: 'Track your Albion Online net worth: cash plus owned items at live market prices. Snapshot your portfolio over time to see whether you are growing your silver or just churning trades.',
+  });
+
   const initial = loadPortfolio();
   const [cash, setCash] = useState(initial.cash);
   const [items, setItems] = useState<PortfolioItem[]>(initial.items);

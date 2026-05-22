@@ -11,6 +11,7 @@ import ErrorBoundary from '../common/ErrorBoundary';
 import { StatCard, WarningBox } from '../ui';
 import { formatSilver } from '../../utils/formatters';
 import { getLastFetchTime } from '../../services/api';
+import { usePageMeta } from '../../hooks/usePageMeta';
 
 type CraftType = 'refining' | 'crafting' | 'butcher' | 'cooking' | 'farming' | 'flipping' | 'other';
 export interface CraftEntry {
@@ -35,6 +36,11 @@ function loadCraftHistory(): CraftEntry[] {
 }
 
 export default function Dashboard() {
+  usePageMeta({
+    title: 'Dashboard',
+    description: 'Albion Online companion: live AODP market prices, refining + crafting profit calculators, transmutation scanner, gold price tracker, and the latest Sandbox Interactive announcements all in one place.',
+  });
+
   const [craftHistory] = useState<CraftEntry[]>(() => loadCraftHistory());
   const [lastFetchAge, setLastFetchAge] = useState<number | null>(() => {
     const t = getLastFetchTime();

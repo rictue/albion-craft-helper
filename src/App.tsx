@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import AppShell from './components/shell/AppShell';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -44,7 +44,7 @@ const REDIRECTS = [
 
 export default function App() {
   return (
-    <HashRouter>
+    <BrowserRouter>
       <AppShell>
         <ErrorBoundary>
           <Suspense fallback={<RouteFallback />}>
@@ -80,6 +80,6 @@ export default function App() {
           </Suspense>
         </ErrorBoundary>
       </AppShell>
-    </HashRouter>
+    </BrowserRouter>
   );
 }

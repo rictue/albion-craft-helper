@@ -36,6 +36,7 @@ import ErrorBoundary from "../common/ErrorBoundary";
 import { fetchScannerPrices, SCANNER_CITIES } from "./scanner/fetchAODPPrices";
 import type { FetchResult } from "./scanner/fetchAODPPrices";
 import { useAppStore } from "../../store/appStore";
+import { usePageMeta } from "../../hooks/usePageMeta";
 
 const STORAGE_KEYS = {
   prices:    "albion-scanner-prices-v1",
@@ -52,6 +53,11 @@ function resolveFetchCity(stored: unknown, fallback: string): string {
 }
 
 export default function Transmutation() {
+  usePageMeta({
+    title: 'Transmutation Profit Scanner',
+    description: 'Resource transmutation profit scanner for Albion Online: enter live AODP prices or paste a price sheet, see profit, ROI and break-even per step across every tier and enchant, plus multi-hop chain transmute opportunities and buy-order plays.',
+  });
+
   const globalCity = useAppStore(s => s.settings.craftingCity);
 
   const [activeResource, setActiveResource] = useState<ResourceType>("Wood / Logs");

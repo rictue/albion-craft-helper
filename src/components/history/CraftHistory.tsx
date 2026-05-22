@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { formatSilver, formatPercent } from '../../utils/formatters';
+import { usePageMeta } from '../../hooks/usePageMeta';
 
 /**
  * Done Crafts History
@@ -41,6 +42,11 @@ function saveHistory(entries: CraftEntry[]) {
 }
 
 export default function CraftHistory() {
+  usePageMeta({
+    title: 'Profit History',
+    description: 'Log every finished crafting and refining run, see real margin over time, sort by item, type or date. A personal trade journal stored entirely in your browser — no account required.',
+  });
+
   const [entries, setEntries] = useState<CraftEntry[]>(loadHistory());
   const [filterType, setFilterType] = useState<CraftType | 'all'>('all');
 

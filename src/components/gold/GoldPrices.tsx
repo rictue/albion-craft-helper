@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { formatSilver } from '../../utils/formatters';
+import { usePageMeta } from '../../hooks/usePageMeta';
 
 interface GoldPrice {
   price: number;
@@ -33,6 +34,11 @@ function downsample(arr: GoldPrice[], target: number): GoldPrice[] {
 }
 
 export default function GoldPrices() {
+  usePageMeta({
+    title: 'Gold Prices',
+    description: 'Live premium gold to silver exchange rate for Albion Online. Switch between 24h, 7-day and 4-week timeframes, see the current spot price and percent change at a glance.',
+  });
+
   const [prices, setPrices] = useState<GoldPrice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

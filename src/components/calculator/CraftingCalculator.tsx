@@ -7,6 +7,7 @@ import { calculateReturnRate } from '../../utils/returnRate';
 import { resolveItemId, resolveMaterialId, resolveArtifactId } from '../../utils/itemIdParser';
 import { formatPercent } from '../../utils/formatters';
 import { ALL_ITEMS } from '../../data/items';
+import { usePageMeta } from '../../hooks/usePageMeta';
 
 const RECENT_ITEMS_LS = 'albion-recent-items-v1';
 const RECENT_ITEMS_LIMIT = 8;
@@ -47,6 +48,11 @@ import type { Tier, Enchantment, ItemDefinition } from '../../types';
 import ItemIcon from '../common/ItemIcon';
 
 export default function CraftingCalculator() {
+  usePageMeta({
+    title: 'Crafting Calculator',
+    description: 'Live Albion Online crafting calculator: per-item material cost, return rate, focus efficiency, station fees, marketplace taxes, and net profit. Picks the cheapest cities across the royal continent automatically.',
+  });
+
   const {
     selectedItem, tier, enchantment,
     setSelectedItem, setTier, setEnchantment,

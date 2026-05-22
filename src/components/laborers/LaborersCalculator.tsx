@@ -18,10 +18,16 @@ import {
 import type { LaborerType } from '../../data/laborers';
 import { formatSilver } from '../../utils/formatters';
 import { IconLaborer } from '../shell/navIcons';
+import { usePageMeta } from '../../hooks/usePageMeta';
 
 const TIERS = [3, 4, 5, 6, 7, 8] as const;
 
 export default function LaborersCalculator() {
+  usePageMeta({
+    title: 'Laborer Calculator',
+    description: 'Albion Online laborer ROI calculator: lumberjack, miner, fisherman, farmer and the rest. Factor in happiness, journal cost, upkeep, and premium bonus to find net silver per 24-hour cycle and house upgrade payback.',
+  });
+
   const [laborerType, setLaborerType] = useState<LaborerType>('lumberjack');
   const [tier, setTier] = useState<number>(6);
   const [happinessPct, setHappinessPct] = useState<number>(100);

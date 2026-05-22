@@ -21,6 +21,7 @@ import { formatSilver } from '../../utils/formatters';
 import ItemIcon from '../common/ItemIcon';
 import { PageHeader, EmptyState, WarningBox } from '../ui';
 import { IconScales } from '../shell/navIcons';
+import { usePageMeta } from '../../hooks/usePageMeta';
 
 const TIERS: Tier[] = [4, 5, 6, 7, 8];
 const ENCHANTS: Enchantment[] = [0, 1, 2, 3, 4];
@@ -74,6 +75,11 @@ function rollupByCity(prices: MarketPrice[], itemId: string): CityRow[] {
 }
 
 export default function MarketBrowser() {
+  usePageMeta({
+    title: 'Market Browser',
+    description: 'Live AODP market prices for every craftable Albion Online item across all six royal cities and the Black Market. Pick an item, tier and enchant — see sell orders, buy orders, spread and freshness side by side.',
+  });
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<ItemDefinition | null>(null);
