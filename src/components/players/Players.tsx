@@ -167,17 +167,25 @@ export default function Players() {
               </div>
               <div className="divide-y divide-zinc-800">
                 {kills.map(k => (
-                  <div key={k.EventId} className="px-4 py-2 flex justify-between items-center text-sm">
+                  <a
+                    key={k.EventId}
+                    href={`https://albiononline.com/killboard/kill/${k.EventId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 flex justify-between items-center text-sm hover:bg-zinc-800/40 transition-colors group"
+                    title="View full kill detail on the official Albion killboard"
+                  >
                     <div>
                       <span className="text-zinc-400">Killed </span>
-                      <span className="text-zinc-200 font-medium">{k.Victim.Name}</span>
+                      <span className="text-zinc-200 font-medium group-hover:text-green-300">{k.Victim.Name}</span>
                       {k.Victim.GuildName && <span className="text-zinc-600"> [{k.Victim.GuildName}]</span>}
                     </div>
                     <div className="flex items-center gap-3 text-xs">
                       <span className="text-green-400">+{formatSilver(k.TotalVictimKillFame)}</span>
                       <span className="text-zinc-600">{new Date(k.TimeStamp).toLocaleDateString()}</span>
+                      <span className="text-zinc-700 group-hover:text-gold-light text-[10px]">↗</span>
                     </div>
-                  </div>
+                  </a>
                 ))}
               </div>
             </div>
@@ -191,17 +199,25 @@ export default function Players() {
               </div>
               <div className="divide-y divide-zinc-800">
                 {deaths.map(d => (
-                  <div key={d.EventId} className="px-4 py-2 flex justify-between items-center text-sm">
+                  <a
+                    key={d.EventId}
+                    href={`https://albiononline.com/killboard/kill/${d.EventId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 flex justify-between items-center text-sm hover:bg-zinc-800/40 transition-colors group"
+                    title="View full kill detail on the official Albion killboard"
+                  >
                     <div>
                       <span className="text-zinc-400">Died to </span>
-                      <span className="text-zinc-200 font-medium">{d.Killer.Name}</span>
+                      <span className="text-zinc-200 font-medium group-hover:text-red-300">{d.Killer.Name}</span>
                       {d.Killer.GuildName && <span className="text-zinc-600"> [{d.Killer.GuildName}]</span>}
                     </div>
                     <div className="flex items-center gap-3 text-xs">
                       <span className="text-red-400">-{formatSilver(d.TotalVictimKillFame)}</span>
                       <span className="text-zinc-600">{new Date(d.TimeStamp).toLocaleDateString()}</span>
+                      <span className="text-zinc-700 group-hover:text-gold-light text-[10px]">↗</span>
                     </div>
-                  </div>
+                  </a>
                 ))}
               </div>
             </div>

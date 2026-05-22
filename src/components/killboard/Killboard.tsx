@@ -174,6 +174,16 @@ export default function Killboard() {
                         <div className="text-[10px] text-zinc-500">{ev.numberOfParticipants} players</div>
                       )}
                     </div>
+                    <a
+                      href={`https://albiononline.com/killboard/kill/${ev.EventId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="shrink-0 text-[10px] uppercase tracking-wider text-zinc-600 hover:text-gold-light font-bold px-2 py-1 rounded hover:bg-zinc-800"
+                      title="View full detail on the official Albion killboard"
+                    >
+                      Albion ↗
+                    </a>
                     <svg className={`w-4 h-4 text-zinc-600 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>

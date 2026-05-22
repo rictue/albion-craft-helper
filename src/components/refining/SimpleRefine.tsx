@@ -93,7 +93,14 @@ export default function SimpleRefine() {
   const [sellCitySel, setSellCitySel] = useState<string | null>(null);
   // Transport mount for weight calculation
   const [mount, setMount] = useState('t8ox');
-  const [feePerCraft, setFeePerCraft] = useState(300);
+  // Station fee per craft action — Albion's in-game station fee scales with
+  // tier and the station owner's "usage fee per 100 nutrition" setting. For
+  // T3 .0 refining at a default 100/100 station that's ~2-5 silver; for T8
+  // refined materials it can be 300-1000+ silver. Default to 0 so the calc
+  // reports REAL profit unless the user specifically models a fee — the old
+  // 300-silver default phantom-cost a T3 run at 2M silver and made
+  // profitable refining look like a catastrophic loss.
+  const [feePerCraft, setFeePerCraft] = useState(0);
   const [prices, setPrices] = useState<CityPriceData | null>(null);
   const [loading, setLoading] = useState(false);
   const [liveMode, setLiveMode] = useState(false);
@@ -579,7 +586,16 @@ export default function SimpleRefine() {
             <MarketFeeControls value={feeSettings} onChange={setFeeSettings} />
             <div>
               <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Station fee / craft</label>
-              <input type="number" min={0} value={feePerCraft} onChange={(e) => setFeePerCraft(parseInt(e.target.value) || 0)} className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
+              <input
+                type="number"
+                min={0}
+                value={feePerCraft}
+                onChange={(e) => setFeePerCraft(parseInt(e.target.value) || 0)}
+                className="w-full bg-[color:var(--color-bg-overlay)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm text-zinc-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              />
+              <div className="text-[10px] text-zinc-600 mt-1 leading-snug">
+                Silver per craft action. Read this off the in-game refining UI — it scales with tier and the station owner's "usage fee per 100 nutrition" setting. Typical: ~2-5 for T3, ~30-80 for T6, ~300+ for T8. Leave at 0 to ignore.
+              </div>
             </div>
           </div>
 
