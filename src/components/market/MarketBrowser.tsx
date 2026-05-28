@@ -139,10 +139,19 @@ export default function MarketBrowser() {
   }, [urlHydrated, selectedItem, enchant, setSearchParams]);
 
   const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (q.length === 0) return [];
+    // Normalize _/@ to spaces and split into tokens (AND match). Crucially we
+    // search the id too, not just the display name: players look up resources
+    // by tier ("T6 leather"), but the localized name is "Hardened Leather" —
+    // the tier only lives in the id (T6_LEATHER). Without this, every tier
+    // search for resources/refined mats returns nothing.
+    const tokens = query.trim().toLowerCase().replace(/[_@]/g, ' ').split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return [];
     return catalog
-      .filter(it => (categoryFilter === 'all' || it.c === categoryFilter) && it.name.toLowerCase().includes(q))
+      .filter(it => {
+        if (categoryFilter !== 'all' && it.c !== categoryFilter) return false;
+        const hay = `${it.name} ${it.id}`.toLowerCase().replace(/[_@]/g, ' ');
+        return tokens.every(t => hay.includes(t));
+      })
       .slice(0, 25);
   }, [query, catalog, categoryFilter]);
 
