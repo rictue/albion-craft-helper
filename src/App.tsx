@@ -37,6 +37,9 @@ const CityBonuses        = lazy(() => import('./components/reference/CityBonuses
 const ReturnRates        = lazy(() => import('./components/reference/ReturnRates'));
 const ItemValues         = lazy(() => import('./components/reference/ItemValues'));
 const MarketFeesRef      = lazy(() => import('./components/reference/MarketFeesRef'));
+const ResourcesBiomes    = lazy(() => import('./components/reference/ResourcesBiomes'));
+const MasteryTracker     = lazy(() => import('./components/mastery/MasteryTracker'));
+const Timers             = lazy(() => import('./components/timers/Timers'));
 
 function RouteFallback() {
   return (
@@ -96,6 +99,9 @@ export default function App() {
               <Route path="/reference/return-rates" element={<ReturnRates />} />
               <Route path="/reference/item-values" element={<ItemValues />} />
               <Route path="/reference/market-fees" element={<MarketFeesRef />} />
+              <Route path="/reference/resources-biomes" element={<ResourcesBiomes />} />
+              <Route path="/mastery" element={<MasteryTracker />} />
+              <Route path="/timers" element={<Timers />} />
 
               {/* Old market browser bookmark → new market page */}
               <Route path="/prices" element={<Navigate to="/market" replace />} />

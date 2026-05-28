@@ -101,6 +101,21 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://albioncrafts.com/reference/resources-biomes</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://albioncrafts.com/mastery</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://albioncrafts.com/timers</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://albioncrafts.com/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>

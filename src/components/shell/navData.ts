@@ -66,10 +66,12 @@ export const REFERENCE_DROPDOWN: MegaSection[] = [
   {
     title: 'Reference',
     items: [
-      { to: '/reference/city-bonuses', label: 'City Bonuses',     blurb: 'Crafting + refining specialization per city.', icon: IconCrown },
-      { to: '/reference/return-rates', label: 'Return Rates',     blurb: 'RR by city bonus + focus, the LPB math.',      icon: IconFurnace },
-      { to: '/reference/item-values',  label: 'Item Values',      blurb: 'Value by tier + enchant (station fee math).',  icon: IconBook },
-      { to: '/reference/market-fees',  label: 'Market Tax & Fees', blurb: 'Sales tax, setup fee, direct-trade rates.',   icon: IconScales },
+      { to: '/reference/city-bonuses',     label: 'City Bonuses',      blurb: 'Crafting + refining specialization per city.', icon: IconCrown },
+      { to: '/reference/return-rates',     label: 'Return Rates',      blurb: 'RR by city bonus + focus, the LPB math.',      icon: IconFurnace },
+      { to: '/reference/resources-biomes', label: 'Resources & Biomes', blurb: 'Resource lines, home city, raw-per-tier.',    icon: IconFurnace },
+      { to: '/reference/item-values',      label: 'Item Values',       blurb: 'Value by tier + enchant (station fee math).',  icon: IconBook },
+      { to: '/reference/market-fees',      label: 'Market Tax & Fees', blurb: 'Sales tax, setup fee, direct-trade rates.',   icon: IconScales },
+      { to: '/timers',                     label: 'Timers',            blurb: 'Daily / weekly reset + market refresh.',       icon: IconBook },
     ],
   },
 ];
@@ -86,6 +88,7 @@ export const HEADER: HeaderEntry[] = [
   { kind: 'link', to: '/market',        label: 'Market' },
   { kind: 'link', to: '/laborers',      label: 'Laborers' },
   { kind: 'link', to: '/portfolio',     label: 'Portfolio' },
+  { kind: 'link', to: '/mastery',       label: 'Mastery' },
   { kind: 'link', to: '/gold',          label: 'Gold' },
   { kind: 'link', to: '/craft-history', label: 'History' },
   { kind: 'link', to: '/guides',        label: 'Guides' },
