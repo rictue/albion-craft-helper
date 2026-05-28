@@ -32,6 +32,11 @@ const TransmutationChainStrategy = lazy(() => import('./components/guides/Transm
 const MetaItems          = lazy(() => import('./components/meta/MetaItems'));
 const Laborers           = lazy(() => import('./components/laborers/LaborersCalculator'));
 const Settings           = lazy(() => import('./components/settings/Settings'));
+const ReferenceIndex     = lazy(() => import('./components/reference/ReferenceIndex'));
+const CityBonuses        = lazy(() => import('./components/reference/CityBonuses'));
+const ReturnRates        = lazy(() => import('./components/reference/ReturnRates'));
+const ItemValues         = lazy(() => import('./components/reference/ItemValues'));
+const MarketFeesRef      = lazy(() => import('./components/reference/MarketFeesRef'));
 
 function RouteFallback() {
   return (
@@ -84,6 +89,13 @@ export default function App() {
               <Route path="/guides/premium-vs-non-premium" element={<PremiumVsNonPremium />} />
               <Route path="/guides/focus-efficiency-guide" element={<FocusEfficiencyGuide />} />
               <Route path="/guides/transmutation-chain-strategy" element={<TransmutationChainStrategy />} />
+
+              {/* Reference / data tables */}
+              <Route path="/reference" element={<ReferenceIndex />} />
+              <Route path="/reference/city-bonuses" element={<CityBonuses />} />
+              <Route path="/reference/return-rates" element={<ReturnRates />} />
+              <Route path="/reference/item-values" element={<ItemValues />} />
+              <Route path="/reference/market-fees" element={<MarketFeesRef />} />
 
               {/* Old market browser bookmark → new market page */}
               <Route path="/prices" element={<Navigate to="/market" replace />} />

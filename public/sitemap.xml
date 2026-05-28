@@ -76,6 +76,31 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://albioncrafts.com/reference</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://albioncrafts.com/reference/city-bonuses</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://albioncrafts.com/reference/return-rates</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://albioncrafts.com/reference/item-values</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://albioncrafts.com/reference/market-fees</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://albioncrafts.com/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>

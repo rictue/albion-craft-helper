@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { HEADER, ACCOUNT_DROPDOWN } from './navData';
+import { HEADER, ACCOUNT_DROPDOWN, REFERENCE_DROPDOWN, COMMUNITY_DROPDOWN } from './navData';
 import type { MegaSection } from './navData';
 import { IconClose, IconChevron, IconSearch } from './navIcons';
 
@@ -136,6 +136,8 @@ export default function MobileDrawer({ open, onClose }: Props) {
             ))}
           </div>
 
+          <AccordionGroup title="Reference" sections={REFERENCE_DROPDOWN} onItemClick={onClose} />
+          <AccordionGroup title="Community" sections={COMMUNITY_DROPDOWN} onItemClick={onClose} />
           <AccordionGroup title="Account" sections={ACCOUNT_DROPDOWN} onItemClick={onClose} />
         </div>
 

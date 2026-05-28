@@ -17,6 +17,8 @@ import {
   IconShield,
   IconCrown,
   IconBook,
+  IconScales,
+  IconFurnace,
   IconSearch,
 } from './navIcons';
 
@@ -58,6 +60,20 @@ export const COMMUNITY_DROPDOWN: MegaSection[] = [
   },
 ];
 
+// Reference / data tables — pure look-up content (city bonuses, RR math,
+// item values, fees). Distinct from Guides (long-form articles).
+export const REFERENCE_DROPDOWN: MegaSection[] = [
+  {
+    title: 'Reference',
+    items: [
+      { to: '/reference/city-bonuses', label: 'City Bonuses',     blurb: 'Crafting + refining specialization per city.', icon: IconCrown },
+      { to: '/reference/return-rates', label: 'Return Rates',     blurb: 'RR by city bonus + focus, the LPB math.',      icon: IconFurnace },
+      { to: '/reference/item-values',  label: 'Item Values',      blurb: 'Value by tier + enchant (station fee math).',  icon: IconBook },
+      { to: '/reference/market-fees',  label: 'Market Tax & Fees', blurb: 'Sales tax, setup fee, direct-trade rates.',   icon: IconScales },
+    ],
+  },
+];
+
 // All tabs live directly in the header now — the old Tools mega
 // dropdown got dissolved by user request. The first five entries are
 // fixed in this order (most-used tabs at the start); secondary tools
@@ -73,6 +89,7 @@ export const HEADER: HeaderEntry[] = [
   { kind: 'link', to: '/gold',          label: 'Gold' },
   { kind: 'link', to: '/craft-history', label: 'History' },
   { kind: 'link', to: '/guides',        label: 'Guides' },
+  { kind: 'mega', label: 'Reference', sections: REFERENCE_DROPDOWN, minWidth: 320 },
   { kind: 'mega', label: 'Community', sections: COMMUNITY_DROPDOWN, minWidth: 320 },
 ];
 
