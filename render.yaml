@@ -45,6 +45,9 @@ services:
         source: /sitemap.xml
         destination: /sitemap.xml
       - type: rewrite
+        source: /market-catalog.json
+        destination: /market-catalog.json
+      - type: rewrite
         source: /favicon.svg
         destination: /favicon.svg
       - type: rewrite

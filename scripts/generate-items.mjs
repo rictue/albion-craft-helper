@@ -169,6 +169,67 @@ async function main() {
 
   writeFileSync('src/data/items.ts', ts);
   console.log(`Generated ${items.length} items in ${catGroups.length} categories`);
+
+  // ----- Market catalog (everything tradeable, flat) -----
+  // The crafting calculators only care about the 221 craftable base items
+  // above. The Market Browser wants EVERYTHING — mounts, resources,
+  // consumables, journals, furniture, etc. We emit a separate flat JSON
+  // (lazy-loaded at runtime, kept out of the main bundle) with full,
+  // tier-prefixed item IDs straight from the dump.
+  generateMarketCatalog(data, locData);
+}
+
+function generateMarketCatalog(data, locData) {
+  // Full localization name map (all categories, not just T4 equipment).
+  const nameMap = {};
+  for (const tu of (locData?.tmx?.body?.tu || [])) {
+    const id = tu?.['@tuid'] || '';
+    if (!id.startsWith('@ITEMS_') || id.endsWith('_DESC')) continue;
+    const tuvs = Array.isArray(tu.tuv) ? tu.tuv : [tu.tuv];
+    const en = tuvs.find(v => v?.['@xml:lang'] === 'EN-US');
+    if (en?.seg && typeof en.seg === 'string') nameMap[id.replace('@ITEMS_', '')] = en.seg;
+  }
+
+  // category key in the dump → human label shown in the Market filter
+  const CATS = {
+    weapon: 'Weapon',
+    equipmentitem: 'Armor & Gear',
+    mount: 'Mount',
+    mountskin: 'Mount Skin',
+    simpleitem: 'Resource & Material',
+    consumableitem: 'Consumable',
+    journalitem: 'Journal',
+    farmableitem: 'Farmable',
+    furnitureitem: 'Furniture',
+    labourercontract: 'Laborer',
+  };
+
+  // Which categories support enchant variants (@1-@4). The Market UI shows
+  // the enchant toggle only for these; mounts/journals/etc. have none.
+  const ENCHANTABLE = new Set(['Weapon', 'Armor & Gear', 'Resource & Material', 'Consumable']);
+
+  const out = [];
+  const seen = new Set();
+  for (const [key, label] of Object.entries(CATS)) {
+    const arr = Array.isArray(data.items[key]) ? data.items[key] : [data.items[key]];
+    for (const it of arr) {
+      const id = it?.['@uniquename'];
+      if (!id || seen.has(id)) continue;
+      // Skip test/dev junk and pre-expanded enchant/level variants — we add
+      // enchants at runtime via the @N suffix toggle instead.
+      if (/TEST|_DEV|UNIQUE_|_LEVEL[0-9]|@[0-9]/.test(id)) continue;
+      const name = nameMap[id];
+      if (!name) continue;
+      seen.add(id);
+      out.push({ id, name, c: label, e: ENCHANTABLE.has(label) ? 1 : 0 });
+    }
+  }
+  out.sort((a, b) => a.name.localeCompare(b.name));
+
+  writeFileSync('public/market-catalog.json', JSON.stringify(out));
+  const byCat = {};
+  out.forEach(o => { byCat[o.c] = (byCat[o.c] || 0) + 1; });
+  console.log(`Generated market-catalog.json: ${out.length} items`, byCat);
 }
 
 main().catch(console.error);

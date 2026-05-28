@@ -1,31 +1,37 @@
 /**
- * Market Browser — in-game-style single-item lookup.
+ * Market Browser — universal price checker.
  *
- * Flow mirrors the Albion market window:
- *   1. Type an item name (typeahead against ALL_ITEMS)
- *   2. Pick a tier (T4–T8) and enchant (.0–.4)
- *   3. Live AODP prices for that exact variant render across every
- *      royal city + Black Market, with sell/buy ages colored by
- *      freshness (green/yellow/orange/red).
+ * Searches the full Albion item catalog (weapons, armor, mounts, mount
+ * skins, resources, consumables, journals, farmables, furniture, laborer
+ * contracts) — not just the 221 craftable equipment items the calculators
+ * use. The catalog (~3400 items) is lazy-loaded from /market-catalog.json
+ * so it stays out of the main bundle.
+ *
+ * Flow: type a name → pick the exact item → (optional enchant for gear /
+ * resources) → see live AODP prices across every royal city + Black
+ * Market, with sell/buy ages colored by freshness.
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ALL_ITEMS } from '../../data/items';
 import { CITIES } from '../../data/cities';
-import { resolveItemId } from '../../utils/itemIdParser';
 import { fetchPrices } from '../../services/api';
-import type { Tier, Enchantment, MarketPrice, ItemDefinition } from '../../types';
+import type { MarketPrice } from '../../types';
 import { ageHoursOf, ageColor, formatAge, formatAgeVerbose, confidenceFromAge, describeConfidence } from '../../utils/dataAge';
 import { formatSilver } from '../../utils/formatters';
 import ItemIcon from '../common/ItemIcon';
 import { PageHeader, EmptyState, WarningBox } from '../ui';
 import { IconScales } from '../shell/navIcons';
 import { usePageMeta } from '../../hooks/usePageMeta';
-import ToolExplainer from '../common/ToolExplainer';
 
-const TIERS: Tier[] = [4, 5, 6, 7, 8];
-const ENCHANTS: Enchantment[] = [0, 1, 2, 3, 4];
+interface CatalogItem {
+  id: string;   // full, tier-prefixed item id (e.g. T6_MOUNT_HORSE)
+  name: string;
+  c: string;    // category label
+  e: 0 | 1;     // 1 = supports enchant variants
+}
+
+const ENCHANTS = [0, 1, 2, 3, 4] as const;
 
 interface CityRow {
   city: string;
@@ -36,19 +42,11 @@ interface CityRow {
   buyAgeH: number;
 }
 
-/** Collapse AODP rows for a single item ID across qualities, per city.
- *  We take the lowest sell ask and the highest buy bid — the qualities
- *  that produced those prices set the age for each side. */
 function rollupByCity(prices: MarketPrice[], itemId: string): CityRow[] {
   return CITIES.map(c => {
-    let sellMin = Infinity;
-    let buyMax = 0;
-    let sellAgeH = Infinity;
-    let buyAgeH = Infinity;
-
+    let sellMin = Infinity, buyMax = 0, sellAgeH = Infinity, buyAgeH = Infinity;
     for (const p of prices) {
       if (p.item_id !== itemId || p.city !== c.id) continue;
-
       if (p.sell_price_min > 0 && p.sell_price_min < sellMin) {
         sellMin = p.sell_price_min;
         sellAgeH = ageHoursOf(p.sell_price_min_date);
@@ -58,34 +56,29 @@ function rollupByCity(prices: MarketPrice[], itemId: string): CityRow[] {
         buyAgeH = ageHoursOf(p.buy_price_max_date);
       }
     }
-
     const sellMinFinal = Number.isFinite(sellMin) ? sellMin : 0;
-    const spreadPct = sellMinFinal > 0 && buyMax > 0
-      ? ((sellMinFinal - buyMax) / sellMinFinal) * 100
-      : 0;
-
-    return {
-      city: c.id,
-      sellMin: sellMinFinal,
-      buyMax,
-      spreadPct,
-      sellAgeH,
-      buyAgeH,
-    };
+    const spreadPct = sellMinFinal > 0 && buyMax > 0 ? ((sellMinFinal - buyMax) / sellMinFinal) * 100 : 0;
+    return { city: c.id, sellMin: sellMinFinal, buyMax, spreadPct, sellAgeH, buyAgeH };
   });
 }
 
 export default function MarketBrowser() {
   usePageMeta({
     title: 'Market Browser',
-    description: 'Live AODP market prices for every craftable Albion Online item across all six royal cities and the Black Market. Pick an item, tier and enchant — see sell orders, buy orders, spread and freshness side by side.',
+    description: 'Live AODP market prices for every Albion Online item — weapons, armor, mounts, resources, consumables, journals and more — across all six royal cities and the Black Market. Search any item and compare sell orders, buy orders, spread and data freshness.',
   });
 
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Lazy-loaded catalog
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState(false);
+
   const [query, setQuery] = useState('');
-  const [selectedItem, setSelectedItem] = useState<ItemDefinition | null>(null);
-  const [tier, setTier] = useState<Tier>(4);
-  const [enchant, setEnchant] = useState<Enchantment>(0);
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
+  const [enchant, setEnchant] = useState<number>(0);
   const [prices, setPrices] = useState<MarketPrice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,97 +87,84 @@ export default function MarketBrowser() {
   const [urlHydrated, setUrlHydrated] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // URL state sync — supports shareable links like
-  // /market?item=ARMOR_CLOTH_MORGANA&t=6&e=2. Mount reads URL → state once,
-  // then state changes get pushed back as URL params.
+  // Fetch the catalog once.
   useEffect(() => {
-    if (urlHydrated) return;
-    const itemId = searchParams.get('item');
-    const t = searchParams.get('t');
-    const e = searchParams.get('e');
-    if (itemId) {
-      const found = ALL_ITEMS.find(i => i.baseId === itemId);
-      if (found) {
-        setSelectedItem(found);
-        setQuery(found.name);
-      }
-    }
-    if (t) {
-      const parsedT = parseInt(t);
-      if ([4, 5, 6, 7, 8].includes(parsedT)) setTier(parsedT as Tier);
-    }
-    if (e) {
-      const parsedE = parseInt(e);
-      if ([0, 1, 2, 3, 4].includes(parsedE)) setEnchant(parsedE as Enchantment);
-    }
-    setUrlHydrated(true);
-  }, [urlHydrated, searchParams]);
+    let cancelled = false;
+    fetch('/market-catalog.json')
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then((data: CatalogItem[]) => { if (!cancelled) setCatalog(data); })
+      .catch(() => { if (!cancelled) setCatalogError(true); })
+      .finally(() => { if (!cancelled) setCatalogLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
-  useEffect(() => {
-    if (!urlHydrated) return;
-    const params = new URLSearchParams();
-    if (selectedItem) params.set('item', selectedItem.baseId);
-    if (tier !== 4) params.set('t', String(tier));
-    if (enchant !== 0) params.set('e', String(enchant));
-    setSearchParams(params, { replace: true });
-  }, [urlHydrated, selectedItem, tier, enchant, setSearchParams]);
+  // Categories present in the catalog, for the filter dropdown.
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of catalog) set.add(it.c);
+    return [...set].sort();
+  }, [catalog]);
 
-  // Close the suggestions dropdown when the user clicks anywhere outside
-  // the search wrapper.
+  // Close suggestions on outside click.
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // URL hydrate (once, after catalog loads so we can resolve the id).
+  useEffect(() => {
+    if (urlHydrated || catalog.length === 0) return;
+    const id = searchParams.get('item');
+    const e = searchParams.get('e');
+    if (id) {
+      const found = catalog.find(c => c.id === id);
+      if (found) { setSelectedItem(found); setQuery(found.name); }
+    }
+    if (e) {
+      const pe = parseInt(e);
+      if ([0, 1, 2, 3, 4].includes(pe)) setEnchant(pe);
+    }
+    setUrlHydrated(true);
+  }, [urlHydrated, catalog, searchParams]);
+
+  useEffect(() => {
+    if (!urlHydrated) return;
+    const params = new URLSearchParams();
+    if (selectedItem) params.set('item', selectedItem.id);
+    if (enchant !== 0) params.set('e', String(enchant));
+    setSearchParams(params, { replace: true });
+  }, [urlHydrated, selectedItem, enchant, setSearchParams]);
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (q.length === 0) return [];
-    return ALL_ITEMS
-      .filter(i => i.name.toLowerCase().includes(q))
-      .slice(0, 12);
-  }, [query]);
+    return catalog
+      .filter(it => (categoryFilter === 'all' || it.c === categoryFilter) && it.name.toLowerCase().includes(q))
+      .slice(0, 25);
+  }, [query, catalog, categoryFilter]);
 
-  const itemId = selectedItem ? resolveItemId(selectedItem.baseId, tier, enchant) : null;
+  // Final item id with optional enchant suffix.
+  const itemId = useMemo(() => {
+    if (!selectedItem) return null;
+    return selectedItem.e === 1 && enchant > 0 ? `${selectedItem.id}@${enchant}` : selectedItem.id;
+  }, [selectedItem, enchant]);
 
   useEffect(() => {
-    if (!itemId) {
-      setPrices([]);
-      return;
-    }
+    if (!itemId) { setPrices([]); return; }
     let cancelled = false;
     setLoading(true);
     setError(null);
     fetchPrices([itemId], CITIES.map(c => c.id), true, refreshTick > 0)
-      .then(data => {
-        if (cancelled) return;
-        setPrices(data);
-      })
-      .catch(err => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'fetch failed');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .then(data => { if (!cancelled) setPrices(data); })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'fetch failed'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [itemId, refreshTick]);
 
-  const cityRows = useMemo(() => {
-    if (!itemId) return [];
-    return rollupByCity(prices, itemId);
-  }, [prices, itemId]);
-
-  const selectItem = (item: ItemDefinition) => {
-    setSelectedItem(item);
-    setQuery(item.name);
-    setOpen(false);
-  };
-
+  const cityRows = useMemo(() => (itemId ? rollupByCity(prices, itemId) : []), [prices, itemId]);
   const noData = cityRows.length > 0 && cityRows.every(r => r.sellMin === 0 && r.buyMax === 0);
 
   return (
@@ -192,107 +172,107 @@ export default function MarketBrowser() {
       <PageHeader
         eyebrow="Market · Live AODP"
         title="Market Browser"
-        description="Type an item, pick tier and enchant, see every city's prices side-by-side — like the in-game market window."
+        description="Search any item in Albion — gear, mounts, resources, consumables, journals and more — and see live prices across every royal city and the Black Market, like the in-game market window."
         icon={IconScales}
       />
 
       <section className="medieval-panel p-4 space-y-4">
-        {/* Search */}
-        <div className="relative" ref={wrapperRef}>
-          <label className="text-xs text-zinc-500 block mb-1.5 font-medium">Search item</label>
-          <input
-            type="search"
-            value={query}
-            onChange={e => { setQuery(e.target.value); setOpen(true); }}
-            onFocus={() => setOpen(true)}
-            placeholder="e.g. Cultist Robe, Royal Sandals, Bloodletter…"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-gold/40 focus:border-gold/40"
-          />
-          {open && matches.length > 0 && (
-            <div className="absolute z-30 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg max-h-80 overflow-y-auto shadow-xl">
-              {matches.map(item => (
-                <button
-                  key={item.baseId}
-                  onClick={() => selectItem(item)}
-                  className="w-full flex items-center gap-3 px-3 py-2 hover:bg-zinc-800 text-left transition-colors"
+        {catalogError ? (
+          <WarningBox tone="warning" title="Couldn't load the item catalog">
+            The market catalog file failed to load. Refresh the page to try again.
+          </WarningBox>
+        ) : (
+          <>
+            {/* Category + search */}
+            <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr] gap-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1 block">Category</label>
+                <select
+                  value={categoryFilter}
+                  onChange={e => setCategoryFilter(e.target.value)}
+                  disabled={catalogLoading}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-gold/40"
                 >
-                  <ItemIcon itemId={`T4_${item.baseId}`} size={36} quality={1} className="rounded shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm text-zinc-200 truncate">{item.name}</div>
-                    <div className="text-[10px] text-zinc-500 font-mono truncate">
-                      {item.subcategory} · {item.baseId}
-                    </div>
+                  <option value="all">All categories</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="relative" ref={wrapperRef}>
+                <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1 block">
+                  Search item {catalogLoading ? '(loading catalog…)' : `(${catalog.length} items)`}
+                </label>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={e => { setQuery(e.target.value); setOpen(true); }}
+                  onFocus={() => setOpen(true)}
+                  disabled={catalogLoading}
+                  placeholder="Riding Horse, Cultist Robe, T6 Leather, Beef Stew…"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-gold/40 disabled:opacity-50"
+                />
+                {open && matches.length > 0 && (
+                  <div className="absolute z-30 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg max-h-80 overflow-y-auto shadow-xl">
+                    {matches.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => { setSelectedItem(item); setQuery(item.name); setOpen(false); if (item.e === 0) setEnchant(0); }}
+                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-zinc-800 text-left transition-colors"
+                      >
+                        <ItemIcon itemId={item.id} size={32} quality={1} className="rounded shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm text-zinc-200 truncate">{item.name}</div>
+                          <div className="text-[10px] text-zinc-500 truncate">{item.c} · <span className="font-mono">{item.id}</span></div>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                </button>
-              ))}
+                )}
+                {open && query.trim().length > 0 && matches.length === 0 && !catalogLoading && (
+                  <div className="absolute z-30 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-3 text-xs text-zinc-500">
+                    No items match "{query}"{categoryFilter !== 'all' ? ` in ${categoryFilter}` : ''}.
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-          {open && query.trim().length > 0 && matches.length === 0 && (
-            <div className="absolute z-30 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-3 text-xs text-zinc-500">
-              No items match "{query}". Try a shorter name fragment.
-            </div>
-          )}
-        </div>
 
-        {/* Tier + Enchant chips */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <div className="text-xs text-zinc-500 mb-1.5 font-medium">Tier</div>
-            <div className="flex flex-wrap gap-1.5">
-              {TIERS.map(t => (
-                <button
-                  key={t}
-                  onClick={() => setTier(t)}
-                  className={`px-3 py-1.5 rounded border text-xs font-bold transition-colors ${
-                    tier === t
-                      ? 'bg-gold/25 border-gold/60 text-gold-light'
-                      : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500'
-                  }`}
-                >
-                  T{t}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-zinc-500 mb-1.5 font-medium">Enchantment</div>
-            <div className="flex flex-wrap gap-1.5">
-              {ENCHANTS.map(e => (
-                <button
-                  key={e}
-                  onClick={() => setEnchant(e)}
-                  className={`px-3 py-1.5 rounded border text-xs font-bold transition-colors ${
-                    enchant === e
-                      ? 'bg-gold/25 border-gold/60 text-gold-light'
-                      : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500'
-                  }`}
-                >
-                  .{e}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+            {/* Enchant toggle — only for enchantable categories */}
+            {selectedItem?.e === 1 && (
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1 block">Enchant</label>
+                <div className="flex gap-1.5">
+                  {ENCHANTS.map(e => (
+                    <button
+                      key={e}
+                      onClick={() => setEnchant(e)}
+                      className={`px-3 py-1.5 rounded border text-xs font-bold ${
+                        enchant === e ? 'bg-gold/25 border-gold/60 text-gold-light' : 'bg-zinc-900 border-zinc-700 text-zinc-400'
+                      }`}
+                    >
+                      .{e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </section>
 
-      {!selectedItem && (
+      {!selectedItem && !catalogLoading && !catalogError && (
         <EmptyState
           title="Pick an item to start"
-          description="Type any item name in the box above. Tier and enchant pickers narrow it to the exact variant — e.g. Cultist Robe at T4 enchant 2 gives T4.2."
+          description="Type any item name above — mounts, resources, gear, consumables, journals. Pick a category first to narrow the search."
         />
       )}
 
       {selectedItem && itemId && (
         <section className="medieval-panel overflow-hidden">
-          {/* Selected item header */}
           <div className="flex items-center justify-between gap-4 p-4 border-b border-zinc-800 bg-zinc-900/50">
             <div className="flex items-center gap-4 min-w-0">
               <ItemIcon itemId={itemId} size={72} quality={1} className="rounded-lg shrink-0" />
               <div className="min-w-0">
                 <div className="medieval-title-sm truncate">{selectedItem.name}</div>
-                <div className="text-lg font-bold text-gold-light tabular-nums">
-                  T{tier}{enchant > 0 ? `.${enchant}` : ''}
-                </div>
+                <div className="text-xs text-gold-light/80 uppercase tracking-wider">{selectedItem.c}</div>
                 <div className="text-[10px] text-zinc-600 font-mono mt-1 truncate">{itemId}</div>
               </div>
             </div>
@@ -305,19 +285,15 @@ export default function MarketBrowser() {
             </button>
           </div>
 
-          {/* Price table or status */}
           {error ? (
             <div className="p-4">
-              <WarningBox tone="warning" title="AODP fetch failed">
-                {error}. Try Refresh in a few seconds — the data project is community-run and occasionally times out.
-              </WarningBox>
+              <WarningBox tone="warning" title="AODP fetch failed">{error}. Try Refresh in a few seconds.</WarningBox>
             </div>
           ) : loading && prices.length === 0 ? (
             <div className="p-8 text-center text-zinc-500">Fetching live prices…</div>
           ) : noData ? (
             <div className="p-8 text-center text-zinc-500 text-sm">
-              No AODP data for this variant in any city. Niche tier/enchant combos often have zero listings —
-              try a lower tier or enchant level.
+              No AODP data for this item in any city. Niche items (and most mount skins / furniture) often have zero uploaded listings.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -338,31 +314,19 @@ export default function MarketBrowser() {
                     return (
                       <tr key={r.city} className={`border-t border-zinc-800 ${hasAny ? '' : 'opacity-40'}`}>
                         <td className="px-3 py-2 font-medium text-zinc-200">{r.city}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {r.sellMin > 0 ? formatSilver(r.sellMin) : <span className="text-zinc-700">—</span>}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {r.buyMax > 0 ? formatSilver(r.buyMax) : <span className="text-zinc-700">—</span>}
-                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.sellMin > 0 ? formatSilver(r.sellMin) : <span className="text-zinc-700">—</span>}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{r.buyMax > 0 ? formatSilver(r.buyMax) : <span className="text-zinc-700">—</span>}</td>
                         <td className="px-3 py-2 text-right tabular-nums text-xs">
                           {r.sellMin > 0 && r.buyMax > 0
                             ? <span className={r.spreadPct > 30 ? 'text-amber-300' : 'text-zinc-400'}>{r.spreadPct.toFixed(1)}%</span>
                             : <span className="text-zinc-700">—</span>}
                         </td>
-                        <td
-                          className={`px-3 py-2 text-right tabular-nums text-xs font-bold ${ageColor(r.sellAgeH)}`}
-                          title={r.sellMin > 0
-                            ? `Sell side ${formatAgeVerbose(r.sellAgeH)} — ${describeConfidence(confidenceFromAge(r.sellAgeH))}`
-                            : 'No sell-side data'}
-                        >
+                        <td className={`px-3 py-2 text-right tabular-nums text-xs font-bold ${ageColor(r.sellAgeH)}`}
+                            title={r.sellMin > 0 ? `Sell side ${formatAgeVerbose(r.sellAgeH)} — ${describeConfidence(confidenceFromAge(r.sellAgeH))}` : 'No sell-side data'}>
                           {formatAge(r.sellAgeH)}
                         </td>
-                        <td
-                          className={`px-3 py-2 text-right tabular-nums text-xs font-bold ${ageColor(r.buyAgeH)}`}
-                          title={r.buyMax > 0
-                            ? `Buy side ${formatAgeVerbose(r.buyAgeH)} — ${describeConfidence(confidenceFromAge(r.buyAgeH))}`
-                            : 'No buy-side data'}
-                        >
+                        <td className={`px-3 py-2 text-right tabular-nums text-xs font-bold ${ageColor(r.buyAgeH)}`}
+                            title={r.buyMax > 0 ? `Buy side ${formatAgeVerbose(r.buyAgeH)} — ${describeConfidence(confidenceFromAge(r.buyAgeH))}` : 'No buy-side data'}>
                           {formatAge(r.buyAgeH)}
                         </td>
                       </tr>
@@ -373,7 +337,6 @@ export default function MarketBrowser() {
             </div>
           )}
 
-          {/* Legend */}
           <div className="flex flex-wrap items-center gap-3 text-[10px] text-zinc-500 uppercase tracking-wider p-3 border-t border-zinc-800">
             <span>Age:</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> &lt;1h</span>
@@ -385,48 +348,10 @@ export default function MarketBrowser() {
       )}
 
       <p className="text-[10px] text-zinc-600 leading-relaxed px-1">
-        Sell order = lowest ask in that city (buy from). Buy order = highest bid (sell into for instant cash). Spread is
-        how much you'd lose flipping in/out of a city in one move. Prices come from the Albion Online Data Project — niche
-        items can be hours stale; cross-check the in-game window before any big trade.
+        Prices from the Albion Online Data Project (community-uploaded). Coverage is best for actively-traded gear and
+        resources; many cosmetics, mount skins and furniture have little or no data. Cross-check the in-game window before
+        a big trade.
       </p>
-
-      <ToolExplainer title="About the Market Browser">
-        <p>
-          The in-game market window only shows one city at a time. The
-          Market Browser shows all six — Bridgewatch, Fort Sterling,
-          Lymhurst, Martlock, Thetford, and the Black Market — side by
-          side for the exact item and tier-enchant variant you're
-          interested in. It's the fastest way to find a regional
-          arbitrage or just confirm that the price you're seeing in front
-          of you is in line with the rest of the continent.
-        </p>
-        <p>
-          Each row shows the city's cheapest sell order, highest buy
-          order, the spread between them, and the age of each side of
-          the book. The age column is the most important indicator after
-          the prices themselves: a green dot means the listing was
-          uploaded to AODP less than an hour ago, yellow means less than
-          three hours, orange less than eight, and red means it's a day
-          or more stale and you should treat the number with suspicion
-          before any large trade.
-        </p>
-        <p>
-          The Black Market is special — it only accepts buy orders, no
-          sell orders, so its row shows the highest bid that bots and
-          players are willing to pay for that item. When the Black Market
-          bid is well above any royal city's sell price, it's a clear
-          arbitrage signal: buy refined materials or equipment in a royal
-          city, transport to Caerleon, instant-sell into the Black Market
-          bid for the spread. The risk of red-zone transport is on you,
-          but the math is right here.
-        </p>
-        <p>
-          If a cell shows "no data", AODP simply has no recent listings
-          for that variant in that city — which itself is information
-          (the slice is illiquid). Niche tiers and high enchants are the
-          usual suspects.
-        </p>
-      </ToolExplainer>
     </div>
   );
 }
