@@ -7,12 +7,17 @@
  * use. The catalog (~3400 items) is lazy-loaded from /market-catalog.json
  * so it stays out of the main bundle.
  *
- * Flow: type a name → pick the exact item → (optional enchant for gear /
+ * Flow: filter by category and/or tier (or just type a name) → a live
+ * results grid appears → click an item → (optional enchant for gear /
  * resources) → see live AODP prices across every royal city + Black
  * Market, with sell/buy ages colored by freshness.
+ *
+ * Search matches name AND id, so tier lookups work: a player types
+ * "t6 leather" but the localized name is "Hardened Leather" — the tier
+ * only lives in the id (T6_LEATHER).
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CITIES } from '../../data/cities';
 import { fetchPrices } from '../../services/api';
@@ -20,7 +25,7 @@ import type { MarketPrice } from '../../types';
 import { ageHoursOf, ageColor, formatAge, formatAgeVerbose, confidenceFromAge, describeConfidence } from '../../utils/dataAge';
 import { formatSilver } from '../../utils/formatters';
 import ItemIcon from '../common/ItemIcon';
-import { PageHeader, EmptyState, WarningBox } from '../ui';
+import { PageHeader, WarningBox } from '../ui';
 import { IconScales } from '../shell/navIcons';
 import { usePageMeta } from '../../hooks/usePageMeta';
 
@@ -32,6 +37,13 @@ interface CatalogItem {
 }
 
 const ENCHANTS = [0, 1, 2, 3, 4] as const;
+const TIERS = ['all', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'] as const;
+const BROWSE_LIMIT = 60;
+
+function tierOf(id: string): string | null {
+  const m = /^T([1-8])_/.exec(id);
+  return m ? `T${m[1]}` : null;
+}
 
 interface CityRow {
   city: string;
@@ -65,7 +77,7 @@ function rollupByCity(prices: MarketPrice[], itemId: string): CityRow[] {
 export default function MarketBrowser() {
   usePageMeta({
     title: 'Market Browser',
-    description: 'Live AODP market prices for every Albion Online item — weapons, armor, mounts, resources, consumables, journals and more — across all six royal cities and the Black Market. Search any item and compare sell orders, buy orders, spread and data freshness.',
+    description: 'Live AODP market prices for every Albion Online item — weapons, armor, mounts, resources, consumables, journals and more — across all six royal cities and the Black Market. Filter by category and tier, search any item, and compare sell orders, buy orders, spread and data freshness.',
   });
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -77,15 +89,14 @@ export default function MarketBrowser() {
 
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [tierFilter, setTierFilter] = useState<string>('all');
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [enchant, setEnchant] = useState<number>(0);
   const [prices, setPrices] = useState<MarketPrice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [urlHydrated, setUrlHydrated] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
 
   // Fetch the catalog once.
   useEffect(() => {
@@ -104,15 +115,6 @@ export default function MarketBrowser() {
     for (const it of catalog) set.add(it.c);
     return [...set].sort();
   }, [catalog]);
-
-  // Close suggestions on outside click.
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   // URL hydrate (once, after catalog loads so we can resolve the id).
   useEffect(() => {
@@ -138,22 +140,25 @@ export default function MarketBrowser() {
     setSearchParams(params, { replace: true });
   }, [urlHydrated, selectedItem, enchant, setSearchParams]);
 
-  const matches = useMemo(() => {
-    // Normalize _/@ to spaces and split into tokens (AND match). Crucially we
-    // search the id too, not just the display name: players look up resources
-    // by tier ("T6 leather"), but the localized name is "Hardened Leather" —
-    // the tier only lives in the id (T6_LEATHER). Without this, every tier
-    // search for resources/refined mats returns nothing.
+  // Full filtered set. Browsable: with no search text we still list items
+  // as long as a category or tier is chosen (so you can explore, not just
+  // blind-search). Search matches name + id with _/@ normalized to spaces
+  // and token AND matching, so "t6 leather" finds "Hardened Leather".
+  const filtered = useMemo(() => {
     const tokens = query.trim().toLowerCase().replace(/[_@]/g, ' ').split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return [];
-    return catalog
-      .filter(it => {
-        if (categoryFilter !== 'all' && it.c !== categoryFilter) return false;
-        const hay = `${it.name} ${it.id}`.toLowerCase().replace(/[_@]/g, ' ');
-        return tokens.every(t => hay.includes(t));
-      })
-      .slice(0, 25);
-  }, [query, catalog, categoryFilter]);
+    const browsing = tokens.length === 0;
+    if (browsing && categoryFilter === 'all' && tierFilter === 'all') return [];
+    return catalog.filter(it => {
+      if (categoryFilter !== 'all' && it.c !== categoryFilter) return false;
+      if (tierFilter !== 'all' && tierOf(it.id) !== tierFilter) return false;
+      if (browsing) return true;
+      const hay = `${it.name} ${it.id}`.toLowerCase().replace(/[_@]/g, ' ');
+      return tokens.every(t => hay.includes(t));
+    });
+  }, [query, catalog, categoryFilter, tierFilter]);
+
+  const matches = useMemo(() => filtered.slice(0, BROWSE_LIMIT), [filtered]);
+  const anyFilter = query.trim().length > 0 || categoryFilter !== 'all' || tierFilter !== 'all';
 
   // Final item id with optional enchant suffix.
   const itemId = useMemo(() => {
@@ -176,12 +181,17 @@ export default function MarketBrowser() {
   const cityRows = useMemo(() => (itemId ? rollupByCity(prices, itemId) : []), [prices, itemId]);
   const noData = cityRows.length > 0 && cityRows.every(r => r.sellMin === 0 && r.buyMax === 0);
 
+  const selectItem = (item: CatalogItem) => {
+    setSelectedItem(item);
+    if (item.e === 0) setEnchant(0);
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
       <PageHeader
         eyebrow="Market · Live AODP"
         title="Market Browser"
-        description="Search any item in Albion — gear, mounts, resources, consumables, journals and more — and see live prices across every royal city and the Black Market, like the in-game market window."
+        description="Filter by category and tier, or just type a name (even by tier — try “t6 leather”). Click any item to see live prices across every royal city and the Black Market, like the in-game market window."
         icon={IconScales}
       />
 
@@ -200,79 +210,97 @@ export default function MarketBrowser() {
                   value={categoryFilter}
                   onChange={e => setCategoryFilter(e.target.value)}
                   disabled={catalogLoading}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-gold/40"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-gold/40 disabled:opacity-50"
                 >
                   <option value="all">All categories</option>
                   {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <div className="relative" ref={wrapperRef}>
+              <div>
                 <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1 block">
-                  Search item {catalogLoading ? '(loading catalog…)' : `(${catalog.length} items)`}
+                  Search {catalogLoading ? '(loading catalog…)' : `(${catalog.length} items)`}
                 </label>
                 <input
                   type="search"
                   value={query}
-                  onChange={e => { setQuery(e.target.value); setOpen(true); }}
-                  onFocus={() => setOpen(true)}
+                  onChange={e => setQuery(e.target.value)}
                   disabled={catalogLoading}
-                  placeholder="Riding Horse, Cultist Robe, T6 Leather, Beef Stew…"
+                  placeholder="t6 leather · broadsword · riding horse · beef stew…"
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-gold/40 disabled:opacity-50"
                 />
-                {open && matches.length > 0 && (
-                  <div className="absolute z-30 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg max-h-80 overflow-y-auto shadow-xl">
-                    {matches.map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => { setSelectedItem(item); setQuery(item.name); setOpen(false); if (item.e === 0) setEnchant(0); }}
-                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-zinc-800 text-left transition-colors"
-                      >
-                        <ItemIcon itemId={item.id} size={32} quality={1} className="rounded shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm text-zinc-200 truncate">{item.name}</div>
-                          <div className="text-[10px] text-zinc-500 truncate">{item.c} · <span className="font-mono">{item.id}</span></div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {open && query.trim().length > 0 && matches.length === 0 && !catalogLoading && (
-                  <div className="absolute z-30 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-3 text-xs text-zinc-500">
-                    No items match "{query}"{categoryFilter !== 'all' ? ` in ${categoryFilter}` : ''}.
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Enchant toggle — only for enchantable categories */}
-            {selectedItem?.e === 1 && (
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1 block">Enchant</label>
-                <div className="flex gap-1.5">
-                  {ENCHANTS.map(e => (
-                    <button
-                      key={e}
-                      onClick={() => setEnchant(e)}
-                      className={`px-3 py-1.5 rounded border text-xs font-bold ${
-                        enchant === e ? 'bg-gold/25 border-gold/60 text-gold-light' : 'bg-zinc-900 border-zinc-700 text-zinc-400'
-                      }`}
-                    >
-                      .{e}
-                    </button>
-                  ))}
-                </div>
+            {/* Tier chips */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1 block">Tier</label>
+              <div className="flex flex-wrap gap-1.5">
+                {TIERS.map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setTierFilter(t)}
+                    disabled={catalogLoading}
+                    className={`px-3 py-1.5 rounded border text-xs font-bold disabled:opacity-50 ${
+                      tierFilter === t ? 'bg-gold/25 border-gold/60 text-gold-light' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                    }`}
+                  >
+                    {t === 'all' ? 'All' : t}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
+
+            {/* Results */}
+            <div className="border-t border-zinc-800 pt-3">
+              {catalogLoading ? (
+                <div className="py-6 text-center text-sm text-zinc-500">Loading catalog…</div>
+              ) : matches.length > 0 ? (
+                <>
+                  <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-2">
+                    {filtered.length} match{filtered.length === 1 ? '' : 'es'}
+                    {filtered.length > BROWSE_LIMIT ? ` · showing first ${BROWSE_LIMIT} — narrow with tier or search` : ''}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-96 overflow-y-auto pr-1">
+                    {matches.map(item => {
+                      const t = tierOf(item.id);
+                      const sel = selectedItem?.id === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => selectItem(item)}
+                          className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg border text-left transition-colors ${
+                            sel ? 'bg-gold/15 border-gold/50' : 'bg-zinc-900/60 border-zinc-800 hover:bg-zinc-800/80 hover:border-zinc-700'
+                          }`}
+                        >
+                          <ItemIcon itemId={item.id} size={36} quality={1} className="rounded shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm text-zinc-200 truncate">{item.name}</div>
+                            <div className="text-[10px] text-zinc-500 truncate">{item.c}</div>
+                          </div>
+                          {t && (
+                            <span className="shrink-0 text-[10px] font-bold text-zinc-400 bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5">{t}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : anyFilter ? (
+                <div className="py-6 text-center text-sm text-zinc-500">
+                  No items match{query.trim() ? ` “${query.trim()}”` : ''}
+                  {categoryFilter !== 'all' ? ` in ${categoryFilter}` : ''}
+                  {tierFilter !== 'all' ? ` (${tierFilter})` : ''}.
+                </div>
+              ) : (
+                <div className="py-6 text-center text-sm text-zinc-500">
+                  Pick a category or tier above, or type a name. Tier search works too — try{' '}
+                  <span className="text-zinc-300">“t6 leather”</span> or <span className="text-zinc-300">“t5 sword”</span>.
+                </div>
+              )}
+            </div>
           </>
         )}
       </section>
-
-      {!selectedItem && !catalogLoading && !catalogError && (
-        <EmptyState
-          title="Pick an item to start"
-          description="Type any item name above — mounts, resources, gear, consumables, journals. Pick a category first to narrow the search."
-        />
-      )}
 
       {selectedItem && itemId && (
         <section className="medieval-panel overflow-hidden">
@@ -281,7 +309,9 @@ export default function MarketBrowser() {
               <ItemIcon itemId={itemId} size={72} quality={1} className="rounded-lg shrink-0" />
               <div className="min-w-0">
                 <div className="medieval-title-sm truncate">{selectedItem.name}</div>
-                <div className="text-xs text-gold-light/80 uppercase tracking-wider">{selectedItem.c}</div>
+                <div className="text-xs text-gold-light/80 uppercase tracking-wider">
+                  {tierOf(selectedItem.id) ? `${tierOf(selectedItem.id)} · ` : ''}{selectedItem.c}
+                </div>
                 <div className="text-[10px] text-zinc-600 font-mono mt-1 truncate">{itemId}</div>
               </div>
             </div>
@@ -293,6 +323,26 @@ export default function MarketBrowser() {
               {loading ? 'Loading…' : 'Refresh'}
             </button>
           </div>
+
+          {/* Enchant toggle — only for enchantable categories */}
+          {selectedItem.e === 1 && (
+            <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-900/30">
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1 block">Enchant</label>
+              <div className="flex gap-1.5">
+                {ENCHANTS.map(e => (
+                  <button
+                    key={e}
+                    onClick={() => setEnchant(e)}
+                    className={`px-3 py-1.5 rounded border text-xs font-bold ${
+                      enchant === e ? 'bg-gold/25 border-gold/60 text-gold-light' : 'bg-zinc-900 border-zinc-700 text-zinc-400'
+                    }`}
+                  >
+                    .{e}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {error ? (
             <div className="p-4">
