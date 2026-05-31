@@ -115,20 +115,30 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
     ? Math.min(100, (totalFame / (journalsNeeded * capacity)) * 100)
     : 0;
 
-  // Journal math — prorated model:
-  //   - You buy one empty journal per started journal (ceil).
-  //   - Each journal's value scales with its fill ratio: 79% filled = 0.79
-  //     × fullPrice. Partials can't literally be sold, but economically
-  //     they are stored fame that will be realized when you finish them.
-  //   - netGain = (total fill fraction × fullPrice) − empties bought.
+  // Journal math — per-cycle profit model.
   //
-  //   When partial fill × fullPrice < emptyPrice, netGain goes negative,
-  //   which is a genuine signal: filling just a sliver of a journal is
-  //   usually a money loss, and the user should crank up the quantity.
+  //   You never DISCARD an empty journal: you buy it empty, fill it with
+  //   crafting fame you were producing anyway, and sell it full. So the
+  //   real profit per fully-filled journal is simply (full − empty), and a
+  //   partially-filled journal is worth that spread pro-rated by its fill
+  //   ratio (the stored fame is realized when you eventually top it off).
+  //
+  //     net = (fullPrice − emptyPrice) × totalFillFraction
+  //
+  //   The OLD model charged ceil(fraction) empties against only `fraction`
+  //   fulls, so any batch that didn't land on a whole-journal boundary
+  //   (e.g. 1.2 journals → buy 2 empty, credit 1.2 full) showed a fake
+  //   loss — which is why journals "always looked like a loss". This
+  //   model only goes negative if a full journal genuinely sells for less
+  //   than an empty one (a real, rare market inversion).
   const totalFillFraction = capacity > 0 ? totalFame / capacity : 0;
+  const hasJournalPrices = (emptyPrice || 0) > 0 && (fullPrice || 0) > 0;
+  // Physical empties you must buy up front to hold all that fame.
   const buyCost = (emptyPrice || 0) * journalsNeeded;
+  // Value of the fame you stuffed into them, pro-rated by fill.
   const fullSellTotal = (fullPrice || 0) * totalFillFraction;
-  const netGain = profession ? fullSellTotal - buyCost : 0;
+  const spreadPerJournal = (fullPrice || 0) - (emptyPrice || 0);
+  const netGain = profession && hasJournalPrices ? spreadPerJournal * totalFillFraction : 0;
 
   // Bubble the net gain up to the parent so ProfitSummary can show a combined
   // (craft + journal) total profit figure. MUST be called unconditionally to
@@ -219,17 +229,19 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
         </div>
 
         {/* Net gain */}
-        <div className={`rounded-lg border px-4 py-2.5 flex items-center justify-between ${netGain > 0 ? 'bg-green-500/10 border-green-500/20' : netGain < 0 ? 'bg-red-500/5 border-red-500/10' : 'bg-zinc-900/60 border-zinc-800'}`}>
+        <div className={`rounded-lg border px-4 py-2.5 flex items-center justify-between ${!hasJournalPrices ? 'bg-zinc-900/60 border-zinc-800' : netGain > 0 ? 'bg-green-500/10 border-green-500/20' : netGain < 0 ? 'bg-red-500/5 border-red-500/10' : 'bg-zinc-900/60 border-zinc-800'}`}>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-zinc-500">Net extra silver from journals</div>
             <div className="text-[10px] text-zinc-600">
-              {netGain >= 0
-                ? 'Partial fills counted at their pro-rata fame value'
-                : 'Partial is worth less than the empty journal — increase quantity'}
+              {!hasJournalPrices
+                ? 'No AODP price for these journals yet — check the in-game market'
+                : netGain >= 0
+                  ? `${formatSilver(spreadPerJournal)} spread/journal × ${totalFillFraction.toFixed(2)} filled`
+                  : 'Full journal sells for less than empty — skip the journal flip'}
             </div>
           </div>
-          <div className={`text-lg font-bold tabular-nums ${netGain > 0 ? 'text-green-400' : netGain < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
-            {netGain > 0 ? '+' : ''}{formatSilver(netGain)}
+          <div className={`text-lg font-bold tabular-nums ${!hasJournalPrices ? 'text-zinc-500' : netGain > 0 ? 'text-green-400' : netGain < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+            {hasJournalPrices ? `${netGain > 0 ? '+' : ''}${formatSilver(netGain)}` : '—'}
           </div>
         </div>
       </div>
