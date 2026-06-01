@@ -196,17 +196,37 @@ export default function ProfitSummary({ result, prices, itemId, journalNet = 0 }
     });
   }, [prices, itemId, result.investment, saleMultiplier, qty, settings.craftingCity, settings.feeSettings.exitSource]);
 
-  // For the headline "Total Profit" card we want the best *actual* profit,
-  // not the pinned craft city — otherwise the header would flash red when
-  // the craft city has no data even though other cities are profitable.
-  // Outliers are excluded from the headline so a 400k-on-one-stale-listing
-  // row can't inflate the "best profit" number.
-  const bestRealCity = useMemo(
-    () => cityPrices
-      .filter(c => c.hasData && !c.isOutlier)
-      .sort((a, b) => b.profit - a.profit)[0],
-    [cityPrices],
-  );
+  // For the headline "Best Profit" card we want the best price we could
+  // ACTUALLY sell into — not the pinned craft city, and crucially not a
+  // forgotten overpriced listing. The hard 2× median outlier flag is too
+  // loose: a price 1.3–2× the city consensus that is also hours stale (e.g.
+  // one city at 7.6M while everyone else sits at 4.5M, 23h old) sails past
+  // it and then wins the auto-pick, showing a fantasy multi-million profit.
+  //
+  // So the auto-pick additionally drops any candidate that is BOTH notably
+  // above the consensus AND stale. Consensus = the lower-median royal price
+  // (lower-middle element, robust against a single high outlier even with
+  // only 2–3 cities). A fresh high price is still trusted; only old + rich
+  // ones are rejected. If nothing trustworthy remains we fall back to the
+  // raw best so the card never goes empty.
+  const bestRealCity = useMemo(() => {
+    const royalPrices = cityPrices
+      .filter(c => c.city !== 'Black Market' && c.hasData && c.price > 0)
+      .map(c => c.price)
+      .sort((a, b) => a - b);
+    const consensus = royalPrices.length
+      ? royalPrices[Math.floor((royalPrices.length - 1) / 2)]
+      : 0;
+    const RICH_OVER_CONSENSUS = 1.3; // ×consensus = "notably above the rest"
+    const STALE_HOURS = 8;           // older than this = unreliable
+
+    const candidates = cityPrices.filter(c => c.hasData && c.price > 0 && !c.isOutlier);
+    const trustworthy = candidates.filter(c =>
+      !(consensus > 0 && c.price > consensus * RICH_OVER_CONSENSUS && c.ageHours > STALE_HOURS),
+    );
+    const pool = trustworthy.length > 0 ? trustworthy : candidates;
+    return [...pool].sort((a, b) => b.profit - a.profit)[0];
+  }, [cityPrices]);
 
   // Which city drives the top Investment / Best Profit card?
   //   1. If the user clicked a specific city row, use that (pin).
