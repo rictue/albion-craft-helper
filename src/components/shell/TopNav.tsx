@@ -174,7 +174,7 @@ export default function TopNav() {
       </div>
 
       {/* Primary header */}
-      <div className="max-w-[1800px] mx-auto px-3 lg:px-6 h-[3.5rem] flex items-center gap-6">
+      <div className="max-w-[1800px] mx-auto px-3 lg:px-6 h-[3.5rem] flex items-center gap-4">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 shrink-0 group">
           <div className="crest h-9 w-9 flex items-center justify-center shadow-[0_6px_14px_rgba(0,0,0,0.4)]">
@@ -190,8 +190,12 @@ export default function TopNav() {
           </div>
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden lg:flex items-center gap-0.5 flex-1 min-w-0">
+        {/* Desktop nav — the full flat row needs ~1280px+ for all 13 tabs;
+            below xl we hand off to the hamburger drawer (which lists them
+            all) instead of letting the row collide with the search/account
+            cluster. No overflow-hidden here — the mega dropdowns must escape
+            the nav box. */}
+        <nav className="hidden xl:flex items-center gap-0.5 flex-1 min-w-0">
           {HEADER.map(entry => (
             <HeaderItem
               key={entry.label}
@@ -203,16 +207,17 @@ export default function TopNav() {
           ))}
         </nav>
 
-        {/* Right: search + auth */}
-        <div className="flex items-center gap-2 ml-auto">
+        {/* Right: search + auth — shrink-0 so it always keeps its size and
+            can never be overlapped by the nav row. */}
+        <div className="flex items-center gap-2 ml-auto shrink-0">
           <button
             className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[color:var(--color-bg-raised)] border border-[color:var(--color-border)] text-[11px] text-zinc-500 hover:text-gold transition-colors"
             onClick={() => setMobileOpen(true)}
             aria-label="Open search"
           >
             <span className="text-gold/60">{IconSearch}</span>
-            <span className="hidden xl:inline">Search tools…</span>
-            <span className="hidden xl:inline-block ml-2 px-1.5 py-0.5 text-[9px] tracking-wider font-bold bg-[color:var(--color-bg-overlay)] rounded">⌘K</span>
+            <span className="hidden 2xl:inline">Search tools…</span>
+            <span className="hidden 2xl:inline-block ml-2 px-1.5 py-0.5 text-[9px] tracking-wider font-bold bg-[color:var(--color-bg-overlay)] rounded">⌘K</span>
           </button>
 
           <div className="relative" onMouseLeave={() => setAccountOpen(false)}>
@@ -256,10 +261,10 @@ export default function TopNav() {
             </button>
           )}
 
-          {/* Mobile menu trigger */}
+          {/* Menu trigger — shown until xl, where the full flat nav fits */}
           <button
             onClick={() => setMobileOpen(true)}
-            className="lg:hidden p-2 rounded-md text-zinc-300 hover:text-gold hover:bg-[color:var(--color-bg-overlay)]"
+            className="xl:hidden p-2 rounded-md text-zinc-300 hover:text-gold hover:bg-[color:var(--color-bg-overlay)]"
             aria-label="Open menu"
           >
             {IconMenu}
