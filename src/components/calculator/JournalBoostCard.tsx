@@ -24,14 +24,27 @@ const RESOURCE_ITEM_VALUE: Record<number, number> = {
   2: 4, 3: 8, 4: 16, 5: 32, 6: 64, 7: 128, 8: 256,
 };
 const ENCHANT_IV_MULT: Record<number, number> = { 0: 1, 1: 2, 2: 4, 3: 8, 4: 16 };
-// Calibrated against real in-game observation (Apr 2026):
-//   125 × T4.1 Battleaxe crafts (recipe value 768) with premium produced
-//   49.5 full Warrior journals (T4 cap 45,000) = 2,227,500 fame total
-//   = 17,820 fame per craft
-//   = 768 × 15.47 × 1.5 (premium)
-const FAME_COEFF = 15.47;
+// Calibrated against real in-game observation (Jun 2026):
+//   3 × T4.3 Longbow crafts (32 planks each) filled exactly 4 full T4
+//   journals (3,600 each) + one at 2,880/3,600 = 17,280 journal fame
+//   = 5,760 JOURNAL fame per craft.
+//   recipeValue = 32 × (T4 value 16 × enchant-3 mult 8) = 4,096
+//   5,760 = 4,096 × FAME_COEFF  →  FAME_COEFF = 1.40625
+//   Reproduces it exactly: 3 × 5,760 / 3,600 = 4 full + 2,880 left over.
+//
+// CRITICAL: journals capture BASE fame — premium/focus do NOT boost journal
+// fill. The in-game craft log "+8,640 (2,880)" shows this: 8,640 is the
+// PERSONAL fame the crafter earns (premium ×1.5), while the journal only
+// took the base rate. So the journal math below must NOT apply the premium
+// multiplier; only the personal-fame readout does.
+const FAME_COEFF = 1.40625;
+// Crafting journal fame capacity per tier — read straight from in-game item
+// tooltips (T4 "Adept's Journal" = 3,600/3,600 confirmed; T5-T8 from the
+// player's own journals). Capacities scale ≈×2 per tier, NOT the ×5/×3 the
+// old table assumed — that table (T4: 45,000) was 12.5× too high, which is
+// why the card claimed almost nothing filled when several journals really do.
 const JOURNAL_CAPACITY: Record<number, number> = {
-  2: 1800, 3: 9000, 4: 45000, 5: 135000, 6: 405000, 7: 1215000, 8: 3645000,
+  2: 900, 3: 1800, 4: 3600, 5: 7200, 6: 14400, 7: 28380, 8: 58590,
 };
 
 // Subcategory → profession mapping
@@ -105,7 +118,11 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
   for (const req of selectedItem.recipe) {
     recipeValue += req.count * resourceIV;
   }
-  const famePerCraft = recipeValue * FAME_COEFF * (hasPremium ? 1.5 : 1);
+  // Journal fill uses BASE fame — premium does NOT boost what the journal
+  // captures (verified in-game: 1× T4.3 Longbow = 5,760 journal fame, while
+  // the crafter personally earns 8,640 = 5,760 × 1.5 premium).
+  const famePerCraft = recipeValue * FAME_COEFF;
+  const personalFamePerCraft = famePerCraft * (hasPremium ? 1.5 : 1);
   const totalFame = famePerCraft * quantity;
   const capacity = JOURNAL_CAPACITY[tier] ?? 0;
   const journalsNeeded = capacity > 0 ? Math.ceil(totalFame / capacity) : 0;
@@ -166,16 +183,21 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
       <div className="p-4 space-y-3">
         {/* Fame earned */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-2.5">
-            <div className="text-[9px] uppercase text-zinc-600">Fame / craft</div>
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-2.5"
+               title="Fame that goes INTO the journal per craft. Premium/focus do NOT increase this — the journal always captures the base rate.">
+            <div className="text-[9px] uppercase text-zinc-600">Journal fame / craft</div>
             <div className="text-sm font-bold text-amber-400 mt-0.5">{Math.round(famePerCraft).toLocaleString()}</div>
+            <div className="text-[9px] text-zinc-600 mt-0.5">
+              you earn {Math.round(personalFamePerCraft).toLocaleString()}{hasPremium ? ' (prem)' : ''}
+            </div>
           </div>
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-2.5">
-            <div className="text-[9px] uppercase text-zinc-600">Total fame ({quantity}×)</div>
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-2.5"
+               title="Total journal fame across the whole batch (journal fame/craft × quantity).">
+            <div className="text-[9px] uppercase text-zinc-600">Total journal fame ({quantity}×)</div>
             <div className="text-sm font-bold text-amber-400 mt-0.5">{Math.round(totalFame).toLocaleString()}</div>
           </div>
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-2.5">
-            <div className="text-[9px] uppercase text-zinc-600">Journal capacity</div>
+            <div className="text-[9px] uppercase text-zinc-600">Journal capacity (T{tier})</div>
             <div className="text-sm font-bold text-cyan-400 mt-0.5">{capacity.toLocaleString()}</div>
           </div>
         </div>
