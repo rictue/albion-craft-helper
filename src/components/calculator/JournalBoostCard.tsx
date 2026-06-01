@@ -4,26 +4,22 @@ import { formatSilver } from '../../utils/formatters';
 import ItemIcon from '../common/ItemIcon';
 import type { ItemDefinition, Tier, Enchantment } from '../../types';
 
-// Crafting fame formula.
+// Crafting / journal fame formula.
 //
-// Albion's real fame-per-craft scales with the item's total resource value,
-// not a flat tier table. A T4 Plate Shoes (8 bars) should NOT give the same
-// fame as a T4 2H Claymore (20 bars + 12 leather) — but the old hard-coded
-// FAME_PER_TIER lookup did exactly that, making small-recipe items like
-// shoes look like ~250 crafts to fill a journal when the real number is
-// much smaller.
+//   journalFame = sum(resource_count × resource_item_value) × FAME_COEFF
 //
-// New formula:
-//   fame = sum(resource_count × resource_IV) × FAME_COEFF × premium_bonus
-//
-// Where IV ramps with tier and enchant (same numbers the usage-fee math
-// already uses in profitCalculator.ts) and FAME_COEFF is calibrated against
-// real in-game observations (≈ 10 → a T6.0 Plate Shoes journal fills in
-// ~75 crafts, a T6.0 Plate Armor in ~38 crafts, rough-but-realistic).
+// resource_item_value below are the GAME'S OWN item values, verified against
+// ao-bin-dumps (e.g. T4_PLANKS @itemvalue=16, T4_PLANKS_LEVEL3=128,
+// T8_PLANKS_LEVEL3=2048). They double per tier AND double per enchant level
+// — this is not an estimate, it's the exact in-game table. So once the single
+// FAME_COEFF anchor is set from one real measurement, EVERY tier/enchant is
+// computed exactly, no per-tier guessing:
+//   T4.3 Longbow = 32 × 128  = 4,096 → 5,760 fame   (measured ✓)
+//   T8.3 Longbow = 32 × 2048 = 65,536 → 92,160 fame (same scaling)
 const RESOURCE_ITEM_VALUE: Record<number, number> = {
-  2: 4, 3: 8, 4: 16, 5: 32, 6: 64, 7: 128, 8: 256,
+  2: 4, 3: 8, 4: 16, 5: 32, 6: 64, 7: 128, 8: 256,   // game @itemvalue, enchant 0
 };
-const ENCHANT_IV_MULT: Record<number, number> = { 0: 1, 1: 2, 2: 4, 3: 8, 4: 16 };
+const ENCHANT_IV_MULT: Record<number, number> = { 0: 1, 1: 2, 2: 4, 3: 8, 4: 16 }; // ×2 per enchant (game-exact)
 // Calibrated against real in-game observation (Jun 2026):
 //   3 × T4.3 Longbow crafts (32 planks each) filled exactly 4 full T4
 //   journals (3,600 each) + one at 2,880/3,600 = 17,280 journal fame
