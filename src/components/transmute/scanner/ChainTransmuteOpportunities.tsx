@@ -157,9 +157,10 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
     const out: Row[] = [];
     for (const { source, target, path } of pairs) {
       const hops = path.nodes.length - 1;
-      // 1-step paths are already covered by the main scanner table on the
-      // left — only multi-hop chains belong in this panel.
-      if (hops < 2) continue;
+      // Show chains within the user's hop range. Max hops can be set to 1 to
+      // include direct 1-step flips here too (heavily used), even though the
+      // main scanner table on the left also lists them.
+      if (hops < 1) continue;
       if (hops > maxHops) continue;
 
       // End-goal filter: when set, only surface chains whose final output
@@ -332,10 +333,10 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
           </span>
           <input
             type="number"
-            min={2}
+            min={1}
             max={8}
             value={maxHops}
-            onChange={(e) => setMaxHops(Math.max(2, Math.min(8, Number(e.target.value) || 2)))}
+            onChange={(e) => setMaxHops(Math.max(1, Math.min(8, Number(e.target.value) || 1)))}
             className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
           />
         </label>
