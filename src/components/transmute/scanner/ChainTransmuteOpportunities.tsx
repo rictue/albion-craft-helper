@@ -35,6 +35,10 @@ interface Props {
    *  resource you buy is sourced wherever it's cheapest, not in the single
    *  scanned city). Falls back to priceBook per-cell when absent. */
   sourcePriceBook?: PriceBook;
+  /** Highest-across-royal-cities prices, used for chain TARGETS (you sell
+   *  the transmuted result wherever it fetches the most). Falls back to
+   *  priceBook per-cell when absent. */
+  targetPriceBook?: PriceBook;
   presets: PresetCost[];
   feeSettings: MarketFeeSettings;
 }
@@ -93,11 +97,14 @@ function toNumber(value: string | undefined): number {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
-export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, presets, feeSettings }: Props) {
+export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, targetPriceBook, presets, feeSettings }: Props) {
   const [resourceFilter, setResourceFilter] = useState<ResourceType | 'all'>('all');
   const [endGoal, setEndGoal] = useState<string>('all');
   const [minProfit, setMinProfit] = useState<number>(1000);
   const [maxHops, setMaxHops] = useState<number>(4);
+  // Capital cap: hide chains whose per-unit cost exceeds your budget so the
+  // list only shows plays you can actually afford to stock. 0 = no cap.
+  const [maxBudget, setMaxBudget] = useState<number>(0);
   const [maxAgeHours, setMaxAgeHours] = useState<number>(24);
   // Default OFF: the pure-silver "is chain cheaper than 1-step direct" check
   // ignores fill speed. In practice low-enchant inputs (.0/.1/.2) fill buy
@@ -143,6 +150,15 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, preset
       return priceBook[resource]?.[node];
     };
 
+    // Target cell = dearest-across-cities price when we have it, else the
+    // scanned city's cell. You sell the transmuted result wherever it
+    // fetches the most, not necessarily in the city you scanned.
+    const targetCellOf = (resource: ResourceType, node: string) => {
+      const best = targetPriceBook?.[resource]?.[node];
+      if (best && (toNumber(best.buyOrder) > 0 || toNumber(best.sellOrder) > 0)) return best;
+      return priceBook[resource]?.[node];
+    };
+
     // For each (resource, target), remember the cheapest 1-step acquisition
     // path so we can compute savingsVsDirect on multi-step entries to the
     // same target. The map key is "resource|target".
@@ -180,7 +196,7 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, preset
       for (const resource of RESOURCE_TYPES) {
         if (resourceFilter !== 'all' && resource !== resourceFilter) continue;
         const sourceCell = sourceCellOf(resource, source);
-        const targetCell = priceBook[resource]?.[target];
+        const targetCell = targetCellOf(resource, target);
         if (!sourceCell || !targetCell) continue;
 
         const inputPriceStr = feeSettings.entrySource === 'buyOrder'
@@ -221,6 +237,8 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, preset
         }
 
         const totalCostPerUnit = inputPrice * entryMult + path.totalStepCost;
+        // Capital cap: skip chains you can't afford per unit.
+        if (maxBudget > 0 && totalCostPerUnit > maxBudget) continue;
         const scenarios: ExitScenario[] = [];
 
         const pushScenario = (mode: ExitMode, refPrice: number) => {
@@ -302,12 +320,14 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, preset
   }, [
     priceBook,
     sourcePriceBook,
+    targetPriceBook,
     presets,
     feeSettings,
     exitMults,
     entryMult,
     minProfit,
     maxHops,
+    maxBudget,
     resourceFilter,
     endGoal,
     maxAgeHours,
@@ -323,7 +343,7 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, preset
           <h2 className="panel-title">Chain transmute</h2>
           <p className="mt-1 text-xs text-vellum/45">
             2+ hop paths only. Buy cheap source → transmute multiple steps → sell target.
-            <span className="text-vellum/30"> Source priced at the cheapest royal city (where you'd actually buy it); target sold in the scanned city. 1-step flips are in the table on the left.</span>
+            <span className="text-vellum/30"> Source priced at the cheapest royal city, target sold at the dearest — both from live cross-city data. 1-step flips are in the table on the left.</span>
           </p>
         </div>
         <GitBranch className="text-oldgold-300" size={22} />
@@ -386,6 +406,22 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, preset
             value={maxAgeHours}
             onChange={(e) => setMaxAgeHours(Math.max(0, Number(e.target.value) || 0))}
             className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
+          />
+        </label>
+        <label className="block rounded border border-white/10 bg-ash-950/35 px-2 py-1.5">
+          <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-vellum/45">
+            Max cost / unit
+          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={maxBudget === 0 ? '' : maxBudget.toLocaleString('de-DE')}
+            placeholder="no cap"
+            onChange={(e) => {
+              const digits = e.target.value.replace(/[^\d]/g, '');
+              setMaxBudget(digits === '' ? 0 : Number(digits));
+            }}
+            className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none placeholder:text-vellum/25 placeholder:font-normal"
           />
         </label>
         <label className="col-span-2 block rounded border border-white/10 bg-ash-950/35 px-2 py-1.5">

@@ -97,7 +97,7 @@ interface MergedQuote {
 export async function fetchScannerPrices(
   current: PriceBook,
   city: string,
-): Promise<{ priceBook: PriceBook; sourcePriceBook: PriceBook; result: FetchResult }> {
+): Promise<{ priceBook: PriceBook; sourcePriceBook: PriceBook; targetPriceBook: PriceBook; result: FetchResult }> {
   const itemIds: string[] = [];
   const idToCell = new Map<string, { resource: ResourceType; level: string }>();
 
@@ -167,15 +167,20 @@ export async function fetchScannerPrices(
     };
   }
 
-  // Cheapest-source book: per cell, the lowest price across royal cities on
-  // each side. This is what a chain SOURCE really costs (you buy the raw
-  // resource wherever it's cheapest — ore in Fort Sterling, wood in
-  // Lymhurst, etc.), derived from live data instead of a hardcoded biome map.
-  const sourcePriceBook = buildCheapestSourceBook(prices, idToCell, itemIds, now);
+  // Two cross-city books, derived from live data (no hardcoded biome map):
+  //  - sourcePriceBook: cheapest price across royal cities per cell. A chain
+  //    SOURCE is bought wherever it's cheapest (ore in Fort Sterling, wood
+  //    in Lymhurst, …).
+  //  - targetPriceBook: highest price across royal cities per cell. The
+  //    transmuted TARGET is sold wherever it fetches the most (best buy
+  //    order to dump into / best city to post a sell order).
+  const sourcePriceBook = buildExtremeBook(prices, idToCell, itemIds, now, 'min');
+  const targetPriceBook = buildExtremeBook(prices, idToCell, itemIds, now, 'max');
 
   return {
     priceBook: next,
     sourcePriceBook,
+    targetPriceBook,
     result: {
       filledSells,
       filledBuys,
@@ -188,19 +193,24 @@ export async function fetchScannerPrices(
 }
 
 /**
- * For each resource cell, find the cheapest sell-order and cheapest
- * buy-order price across the royal cities (and which side has the freshest
- * date). Black Market is excluded — you don't source raw resources there.
+ * For each resource cell, take the extreme price across the royal cities on
+ * each side. mode='min' → cheapest (for chain sources you BUY); mode='max'
+ * → dearest (for transmuted targets you SELL). Black Market is excluded —
+ * raw resources aren't sourced/sold there.
  */
-function buildCheapestSourceBook(
+function buildExtremeBook(
   prices: MarketPrice[],
   idToCell: Map<string, { resource: ResourceType; level: string }>,
   itemIds: string[],
   now: number,
+  mode: 'min' | 'max',
 ): PriceBook {
   const royal = new Set<string>(ROYAL_CITIES);
   const quoteByCity = new Map<string, Map<string, MergedQuote>>();
   for (const c of ROYAL_CITIES) quoteByCity.set(c, mergeQuotes(prices, c));
+
+  const better = (candidate: number, current: number): boolean =>
+    current === 0 || (mode === 'min' ? candidate < current : candidate > current);
 
   const book = createEmptyPriceBook();
   const nowIso = new Date(now).toISOString();
@@ -209,24 +219,24 @@ function buildCheapestSourceBook(
     const cell = idToCell.get(id);
     if (!cell) continue;
 
-    let minSell = 0, minSellDate = 0;
-    let minBuy = 0, minBuyDate = 0;
+    let bestSell = 0, bestSellDate = 0;
+    let bestBuy = 0, bestBuyDate = 0;
     for (const [c, quotes] of quoteByCity) {
       if (!royal.has(c)) continue;
       const q = quotes.get(id);
       if (!q) continue;
-      if (q.sell > 0 && (minSell === 0 || q.sell < minSell)) { minSell = q.sell; minSellDate = q.sellDate; }
-      if (q.buy > 0 && (minBuy === 0 || q.buy < minBuy)) { minBuy = q.buy; minBuyDate = q.buyDate; }
+      if (q.sell > 0 && better(q.sell, bestSell)) { bestSell = q.sell; bestSellDate = q.sellDate; }
+      if (q.buy > 0 && better(q.buy, bestBuy)) { bestBuy = q.buy; bestBuyDate = q.buyDate; }
     }
-    if (minSell === 0 && minBuy === 0) continue;
+    if (bestSell === 0 && bestBuy === 0) continue;
 
     book[cell.resource][cell.level] = {
-      sellOrder: minSell > 0 ? String(minSell) : '',
-      buyOrder:  minBuy  > 0 ? String(minBuy)  : '',
-      sellDate: minSellDate > 0 ? new Date(minSellDate).toISOString() : undefined,
-      buyDate:  minBuyDate  > 0 ? new Date(minBuyDate).toISOString()  : undefined,
-      sellConfirmedAt: minSell > 0 ? nowIso : undefined,
-      buyConfirmedAt:  minBuy  > 0 ? nowIso : undefined,
+      sellOrder: bestSell > 0 ? String(bestSell) : '',
+      buyOrder:  bestBuy  > 0 ? String(bestBuy)  : '',
+      sellDate: bestSellDate > 0 ? new Date(bestSellDate).toISOString() : undefined,
+      buyDate:  bestBuyDate  > 0 ? new Date(bestBuyDate).toISOString()  : undefined,
+      sellConfirmedAt: bestSell > 0 ? nowIso : undefined,
+      buyConfirmedAt:  bestBuy  > 0 ? nowIso : undefined,
     };
   }
   return book;
