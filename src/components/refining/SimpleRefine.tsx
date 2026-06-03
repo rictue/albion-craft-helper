@@ -457,6 +457,16 @@ export default function SimpleRefine() {
     };
   }, [recipe, simulation, rawPrice, prevPrice, sellPrice, feePerCraft, feeSettings, focusSplit]);
 
+  // Max raw the current focus budget can fully cover. Beyond this, reinvest
+  // crafts run focus-free at the lower no-focus RR — which is usually a loss.
+  // total crafts = initial / (1 - rrFocus); for all to be focused we need
+  // total <= floor(budget / focusPerCraft), so initial <= that × (1 - rrFocus).
+  const maxRawForFocusBudget = useMemo(() => {
+    if (!recipe || !useFocus || focusCostPerCraft <= 0) return 0;
+    const maxFocusCrafts = Math.floor(focusBudget / focusCostPerCraft);
+    return Math.max(0, Math.floor(maxFocusCrafts * (1 - rrFocus) * recipe.rawPerCraft));
+  }, [recipe, useFocus, focusCostPerCraft, focusBudget, rrFocus]);
+
   // Stale price warning (>6h old). Uses the shared AODP-aware parser so
   // the user's timezone doesn't inflate ages by +3h (UTC+3 Turkey).
   const priceAge = (dateStr: string): number => ageHoursOf(dateStr);
@@ -573,7 +583,12 @@ export default function SimpleRefine() {
                     Spending <span className="text-cyan-400 tabular-nums">{focusSplit.usedFocus.toLocaleString()}</span> / {focusBudget.toLocaleString()}
                   </div>
                   {focusSplit.noFocusCrafts > 0 && (
-                    <div className="text-[10px] text-amber-400 mt-1">⚠ Budget exhausts mid-chain</div>
+                    <div className="text-[10px] text-amber-400 mt-1 leading-snug">
+                      ⚠ Budget covers only {focusSplit.focusCrafts} crafts — the other {focusSplit.noFocusCrafts} run focus-free (often a loss).
+                      {maxRawForFocusBudget > 0 && (
+                        <> Refine ≤ <button onClick={() => setRawCount(maxRawForFocusBudget)} className="font-bold underline text-cyan-300 hover:text-cyan-200">{maxRawForFocusBudget} raw</button> to focus every craft.</>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
