@@ -85,6 +85,7 @@ export const HEADER: HeaderEntry[] = [
   { kind: 'link', to: '/refining',      label: 'Refining' },
   { kind: 'link', to: '/cooking',       label: 'Cooking' },
   { kind: 'link', to: '/transmute',     label: 'Transmute' },
+  { kind: 'link', to: '/transmute-simple', label: 'Transmute 2' },
   { kind: 'link', to: '/market',        label: 'Market' },
   { kind: 'link', to: '/laborers',      label: 'Laborers' },
   { kind: 'link', to: '/portfolio',     label: 'Portfolio' },

@@ -18,6 +18,7 @@ const GoldPrices         = lazy(() => import('./components/gold/GoldPrices'));
 const Cooking            = lazy(() => import('./components/cooking/Cooking'));
 const TopKillFame        = lazy(() => import('./components/killboard/TopKillFame'));
 const Transmutation      = lazy(() => import('./components/transmute/Transmutation'));
+const TransmuteSimple    = lazy(() => import('./components/transmute/TransmuteSimple'));
 const Portfolio          = lazy(() => import('./components/portfolio/Portfolio'));
 const CraftHistory       = lazy(() => import('./components/history/CraftHistory'));
 const About              = lazy(() => import('./components/legal/About'));
@@ -72,6 +73,7 @@ export default function App() {
               <Route path="/cooking" element={<Cooking />} />
               <Route path="/laborers" element={<Laborers />} />
               <Route path="/transmute" element={<Transmutation />} />
+              <Route path="/transmute-simple" element={<TransmuteSimple />} />
               <Route path="/market" element={<MarketBrowser />} />
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/craft-history" element={<CraftHistory />} />
