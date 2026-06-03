@@ -24,6 +24,9 @@ import { RESOURCE_TYPES, TIER_LABELS } from './calculations';
 // Valid chain targets: every tier.enchant except T4.0, which is only ever
 // a source node (the cheapest raw input — you'd never transmute INTO it).
 const END_GOAL_OPTIONS = TIER_LABELS.filter((t) => t !== '4.0');
+// A chain source can be anything except the very top (you can't transmute up
+// from 8.4). Lets the user pin "I'm starting from T5.2".
+const START_OPTIONS = TIER_LABELS.filter((t) => t !== '8.4');
 import { allChainOpportunities } from './chainPathfinder';
 import type { ChainPath } from './chainPathfinder';
 import { getSaleMultiplier, getEntryMultiplier } from '../../../utils/marketFees';
@@ -92,6 +95,7 @@ function toNumber(value: string | undefined): number {
 export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }: Props) {
   const [resourceFilter, setResourceFilter] = useState<ResourceType | 'all'>('all');
   const [endGoal, setEndGoal] = useState<string>('all');
+  const [startFrom, setStartFrom] = useState<string>('all');
   const [minProfit, setMinProfit] = useState<number>(1000);
   const [maxHops, setMaxHops] = useState<number>(4);
   const [maxAgeHours, setMaxAgeHours] = useState<number>(24);
@@ -161,6 +165,9 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
       // End-goal filter: when set, only surface chains whose final output
       // matches the user's target tier.enchant (e.g. "6.3").
       if (endGoal !== 'all' && target !== endGoal) continue;
+
+      // Starting filter: only chains that begin at the source the user picked.
+      if (startFrom !== 'all' && source !== startFrom) continue;
 
       for (const resource of RESOURCE_TYPES) {
         if (resourceFilter !== 'all' && resource !== resourceFilter) continue;
@@ -284,6 +291,7 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
     endGoal,
     maxAgeHours,
     chainOnlyWins,
+    startFrom,
     now,
   ]);
 
@@ -360,7 +368,23 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
             className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
           />
         </label>
-        <label className="col-span-2 block rounded border border-white/10 bg-ash-950/35 px-2 py-1.5">
+        <label className="block rounded border border-white/10 bg-ash-950/35 px-2 py-1.5">
+          <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-vellum/45">
+            Starting
+          </span>
+          <select
+            value={startFrom}
+            onChange={(e) => setStartFrom(e.target.value)}
+            className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
+            style={{ colorScheme: 'dark' }}
+          >
+            <option value="all" style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>Any source</option>
+            {START_OPTIONS.map((t) => (
+              <option key={t} value={t} style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>T{t}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block rounded border border-white/10 bg-ash-950/35 px-2 py-1.5">
           <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-vellum/45">
             End goal
           </span>
