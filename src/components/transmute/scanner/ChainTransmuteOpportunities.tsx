@@ -239,9 +239,21 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, preset
           });
         };
 
-        pushScenario('sellOrder',   targetSellOrderPrice);
-        pushScenario('instantSell', targetBuyOrderPrice);
-        pushScenario('discord',     targetSellOrderPrice);
+        // High-enchant (.3/.4) sell orders are illiquid and inflated —
+        // nobody buys at the ask, real trades happen against the buy order.
+        // So for those targets the ONLY realistic exit is selling into the
+        // existing buy order; the sell-order and direct-trade (sticker)
+        // routes would price the chain off a fantasy number.
+        const targetEnchant = Number(target.split('.')[1] ?? 0);
+        const highEnchant = targetEnchant >= 3;
+
+        if (highEnchant) {
+          pushScenario('instantSell', targetBuyOrderPrice);
+        } else {
+          pushScenario('sellOrder',   targetSellOrderPrice);
+          pushScenario('instantSell', targetBuyOrderPrice);
+          pushScenario('discord',     targetSellOrderPrice);
+        }
 
         if (scenarios.length === 0) continue;
 
@@ -430,6 +442,8 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, preset
       <div className="mt-3 text-[10px] text-vellum/40 leading-snug">
         Math uses current Market Fees for source acquisition (entry) and target sale (exit), plus the silver
         cost of every step in the cheapest path. Intermediate prices are irrelevant — you never sell them.
+        For <span className="text-vellum/60">.3 / .4 targets</span> only the buy-order exit is shown: their sell
+        orders are illiquid and inflated, so the realistic sale is into the existing buy order.
       </div>
     </section>
   );
