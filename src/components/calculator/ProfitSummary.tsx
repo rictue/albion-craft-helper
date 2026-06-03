@@ -517,15 +517,17 @@ export default function ProfitSummary({ result, prices, itemId, journalNet = 0 }
                             <span className="text-zinc-600">no data</span>
                           )}
                           {cp.isOutlier && <span className="text-amber-400 text-[9px]" title="Flagged outlier — likely stale">⚠</span>}
-                          {/* Show the spread partner (the OTHER side of the order book) when both exist */}
+                          {/* Show the OTHER side of the order book, clearly labelled.
+                              Royal cities (exit=sell order) → primary is the sell
+                              order, so the partner is the buy order ("buy X"). */}
                           {cp.altPrice > 0 && cp.price > 0 && (
                             <span
-                              className={`text-[9px] ${cp.isBuy ? 'text-zinc-500/70' : 'text-blue-400/70'}`}
+                              className={`text-[10px] ${cp.isBuy ? 'text-zinc-400' : 'text-blue-400'}`}
                               title={cp.isBuy
                                 ? `Cheapest sell order: ${formatSilver(cp.altPrice)}`
                                 : `Instant-sell buy order: ${formatSilver(cp.altPrice)}`}
                             >
-                              / {formatSilver(cp.altPrice)}
+                              {cp.isBuy ? 'sell' : 'buy'} {formatSilver(cp.altPrice)}
                             </span>
                           )}
                         </span>
