@@ -219,14 +219,14 @@ function buildExtremeBook(
     const cell = idToCell.get(id);
     if (!cell) continue;
 
-    let bestSell = 0, bestSellDate = 0;
-    let bestBuy = 0, bestBuyDate = 0;
+    let bestSell = 0, bestSellDate = 0, bestSellCity = '';
+    let bestBuy = 0, bestBuyDate = 0, bestBuyCity = '';
     for (const [c, quotes] of quoteByCity) {
       if (!royal.has(c)) continue;
       const q = quotes.get(id);
       if (!q) continue;
-      if (q.sell > 0 && better(q.sell, bestSell)) { bestSell = q.sell; bestSellDate = q.sellDate; }
-      if (q.buy > 0 && better(q.buy, bestBuy)) { bestBuy = q.buy; bestBuyDate = q.buyDate; }
+      if (q.sell > 0 && better(q.sell, bestSell)) { bestSell = q.sell; bestSellDate = q.sellDate; bestSellCity = c; }
+      if (q.buy > 0 && better(q.buy, bestBuy)) { bestBuy = q.buy; bestBuyDate = q.buyDate; bestBuyCity = c; }
     }
     if (bestSell === 0 && bestBuy === 0) continue;
 
@@ -237,6 +237,8 @@ function buildExtremeBook(
       buyDate:  bestBuyDate  > 0 ? new Date(bestBuyDate).toISOString()  : undefined,
       sellConfirmedAt: bestSell > 0 ? nowIso : undefined,
       buyConfirmedAt:  bestBuy  > 0 ? nowIso : undefined,
+      sellCity: bestSellCity || undefined,
+      buyCity:  bestBuyCity  || undefined,
     };
   }
   return book;

@@ -51,6 +51,8 @@ interface ExitScenario {
   multiplier: number;
   /** AODP price the scenario is referenced from (sell-order or buy-order side). */
   referencePrice: number;
+  /** Royal city the reference price came from (dearest target side). */
+  referenceCity?: string;
   netRevenue: number;
   profit: number;
   marginPct: number;
@@ -64,6 +66,8 @@ interface Row {
   path: ChainPath;
   hops: number;
   inputPrice: number;
+  /** Royal city the source was bought in (cheapest). */
+  sourceCity?: string;
   totalCostPerUnit: number;
   /** Per-exit-mode breakdown so the user can pick whichever route fits. */
   scenarios: ExitScenario[];
@@ -204,6 +208,7 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
           : sourceCell.sellOrder;
         const inputPrice = toNumber(inputPriceStr);
         if (inputPrice <= 0) continue;
+        const sourceCity = feeSettings.entrySource === 'buyOrder' ? sourceCell.buyCity : sourceCell.sellCity;
 
         // Pull BOTH target sides — we'll evaluate three exit routes:
         //  sellOrder (referenced from target's sell-order price),
@@ -241,7 +246,7 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
         if (maxBudget > 0 && totalCostPerUnit > maxBudget) continue;
         const scenarios: ExitScenario[] = [];
 
-        const pushScenario = (mode: ExitMode, refPrice: number) => {
+        const pushScenario = (mode: ExitMode, refPrice: number, refCity?: string) => {
           if (refPrice <= 0) return;
           const mult = exitMults[mode];
           const netRev = refPrice * mult;
@@ -251,6 +256,7 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
             mode,
             multiplier: mult,
             referencePrice: refPrice,
+            referenceCity: refCity,
             netRevenue: Math.floor(netRev),
             profit,
             marginPct: margin,
@@ -266,11 +272,11 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
         const highEnchant = targetEnchant >= 3;
 
         if (highEnchant) {
-          pushScenario('instantSell', targetBuyOrderPrice);
+          pushScenario('instantSell', targetBuyOrderPrice, targetCell.buyCity);
         } else {
-          pushScenario('sellOrder',   targetSellOrderPrice);
-          pushScenario('instantSell', targetBuyOrderPrice);
-          pushScenario('discord',     targetSellOrderPrice);
+          pushScenario('sellOrder',   targetSellOrderPrice, targetCell.sellCity);
+          pushScenario('instantSell', targetBuyOrderPrice,  targetCell.buyCity);
+          pushScenario('discord',     targetSellOrderPrice, targetCell.sellCity);
         }
 
         if (scenarios.length === 0) continue;
@@ -304,6 +310,7 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
           path,
           hops,
           inputPrice,
+          sourceCity,
           totalCostPerUnit: Math.floor(totalCostPerUnit),
           scenarios,
           bestProfit: best.profit,
@@ -520,7 +527,10 @@ function ChainCard({ row }: { row: Row }) {
 
       {/* Cost breakdown */}
       <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] mb-2">
-        <div className="text-vellum/55">Buy {row.source} at</div>
+        <div className="text-vellum/55">
+          Buy {row.source} at
+          {row.sourceCity && <span className="text-oldgold-300/70 text-[9px] ml-1">in {row.sourceCity}</span>}
+        </div>
         <div className="text-right text-vellum tabular-nums">
           {row.inputPrice.toLocaleString('de-DE')}
         </div>
@@ -557,6 +567,7 @@ function ChainCard({ row }: { row: Row }) {
                 </span>
                 <span className="text-vellum/35 text-[9px] ml-1">
                   @{s.referencePrice.toLocaleString('de-DE')}
+                  {s.referenceCity && <span className="text-oldgold-300/60"> · {s.referenceCity}</span>}
                 </span>
               </div>
               <div className="text-vellum/55 tabular-nums text-[10px]">
