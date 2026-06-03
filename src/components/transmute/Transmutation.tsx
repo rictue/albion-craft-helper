@@ -40,12 +40,10 @@ import { usePageMeta } from "../../hooks/usePageMeta";
 import ToolExplainer from "../common/ToolExplainer";
 
 const STORAGE_KEYS = {
-  prices:       "albion-scanner-prices-v1",
-  sourcePrices: "albion-scanner-source-prices-v1",
-  targetPrices: "albion-scanner-target-prices-v1",
-  presets:      "albion-scanner-presets-v4",
-  settings:     "albion-scanner-settings-v1",
-  fetchCity:    "albion-scanner-fetch-city-v1",
+  prices:    "albion-scanner-prices-v1",
+  presets:   "albion-scanner-presets-v4",
+  settings:  "albion-scanner-settings-v1",
+  fetchCity: "albion-scanner-fetch-city-v1",
 };
 
 function resolveFetchCity(stored: unknown, fallback: string): string {
@@ -66,19 +64,6 @@ export default function Transmutation() {
   const [activeResource, setActiveResource] = useState<ResourceType>("Wood / Logs");
   const [priceBook, setPriceBook] = useState<PriceBook>(() =>
     normalizePriceBook(readStorage<unknown>(STORAGE_KEYS.prices, createEmptyPriceBook()))
-  );
-  // Cheapest-across-royal-cities prices for chain SOURCES (you buy raw
-  // resources where they're cheapest, not in the single scanned city).
-  // Filled on fetch; the chain panel falls back to priceBook per-cell when
-  // a source has no cross-city data.
-  const [sourcePriceBook, setSourcePriceBook] = useState<PriceBook>(() =>
-    normalizePriceBook(readStorage<unknown>(STORAGE_KEYS.sourcePrices, createEmptyPriceBook()))
-  );
-  // Highest-across-royal-cities prices for chain TARGETS (you sell the
-  // transmuted result wherever it fetches the most). Falls back to priceBook
-  // per-cell when a target has no cross-city data.
-  const [targetPriceBook, setTargetPriceBook] = useState<PriceBook>(() =>
-    normalizePriceBook(readStorage<unknown>(STORAGE_KEYS.targetPrices, createEmptyPriceBook()))
   );
   const [presets, setPresets] = useState<PresetCost[]>(() =>
     normalizePresets(readStorage<unknown>(STORAGE_KEYS.presets, []))
@@ -166,8 +151,6 @@ export default function Transmutation() {
     );
 
   useEffect(() => writeStorage(STORAGE_KEYS.prices, priceBook), [priceBook]);
-  useEffect(() => writeStorage(STORAGE_KEYS.sourcePrices, sourcePriceBook), [sourcePriceBook]);
-  useEffect(() => writeStorage(STORAGE_KEYS.targetPrices, targetPriceBook), [targetPriceBook]);
   useEffect(() => writeStorage(STORAGE_KEYS.presets, presets), [presets]);
   useEffect(() => writeStorage(STORAGE_KEYS.settings, settings), [settings]);
   useEffect(() => writeStorage(STORAGE_KEYS.fetchCity, fetchCity), [fetchCity]);
@@ -189,25 +172,18 @@ export default function Transmutation() {
     // dot flips to "manual" instead of falsely showing a fresh signal.
     const dateKey      = side === "sellOrder" ? "sellDate"        : "buyDate";
     const confirmedKey = side === "sellOrder" ? "sellConfirmedAt" : "buyConfirmedAt";
-    // A manual edit is authoritative for that cell. Apply it to the
-    // grid book AND both cross-city books (cheapest-source / dearest-target)
-    // so the chain panel reflects what you typed instead of a stale
-    // cross-city min/max from the last fetch.
-    const overrideCell = (current: PriceBook): PriceBook => ({
+    setPriceBook((current) => ({
       ...current,
       [resource]: {
         ...current[resource],
         [tier]: {
-          ...current[resource]?.[tier],
+          ...current[resource][tier],
           [side]: value,
           [dateKey]: undefined,
           [confirmedKey]: undefined,
         },
       },
-    });
-    setPriceBook(overrideCell);
-    setSourcePriceBook(overrideCell);
-    setTargetPriceBook(overrideCell);
+    }));
   };
 
   const exportCsv = () => {
@@ -227,10 +203,8 @@ export default function Transmutation() {
     setIsFetching(true);
     setFetchError(null);
     try {
-      const { priceBook: nextBook, sourcePriceBook: nextSourceBook, targetPriceBook: nextTargetBook, result } = await fetchScannerPrices(priceBook, fetchCity);
+      const { priceBook: nextBook, result } = await fetchScannerPrices(priceBook, fetchCity);
       setPriceBook(nextBook);
-      setSourcePriceBook(nextSourceBook);
-      setTargetPriceBook(nextTargetBook);
       setLastFetch(result);
       setToast(`${result.filledSells} sells · ${result.filledBuys} buys from ${result.city}`);
     } catch (err) {
@@ -299,8 +273,6 @@ export default function Transmutation() {
           <ErrorBoundary compact label="Chain transmute">
             <ChainTransmuteOpportunities
               priceBook={priceBook}
-              sourcePriceBook={sourcePriceBook}
-              targetPriceBook={targetPriceBook}
               presets={presets}
               feeSettings={{
                 saleMode: 'marketplace',

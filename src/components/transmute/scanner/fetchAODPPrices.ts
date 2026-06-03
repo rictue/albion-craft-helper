@@ -16,14 +16,8 @@
 
 import { fetchPrices } from '../../../services/api';
 import type { MarketPrice } from '../../../types';
-import { RESOURCE_TYPES, TIER_LABELS, createEmptyPriceBook } from './calculations';
+import { RESOURCE_TYPES, TIER_LABELS } from './calculations';
 import type { OrderBookPrice, PriceBook, ResourceType } from './types';
-
-// Royal cities only — raw resources are bought/sold here, never the Black
-// Market. Used to build the "cheapest source" book: a chain source is the
-// raw/low-enchant resource you BUY, and players buy it wherever it's
-// cheapest (its biome city), not in the single city selected for the scan.
-const ROYAL_CITIES = ['Bridgewatch', 'Fort Sterling', 'Lymhurst', 'Martlock', 'Thetford'] as const;
 
 const RESOURCE_TO_FAMILY: Record<ResourceType, string> = {
   'Wood / Logs': 'WOOD',
@@ -97,7 +91,7 @@ interface MergedQuote {
 export async function fetchScannerPrices(
   current: PriceBook,
   city: string,
-): Promise<{ priceBook: PriceBook; sourcePriceBook: PriceBook; targetPriceBook: PriceBook; result: FetchResult }> {
+): Promise<{ priceBook: PriceBook; result: FetchResult }> {
   const itemIds: string[] = [];
   const idToCell = new Map<string, { resource: ResourceType; level: string }>();
 
@@ -109,13 +103,9 @@ export async function fetchScannerPrices(
     }
   }
 
-  // Fetch the selected city (for the scanner grid + sell/target side) PLUS
-  // every royal city in one batch, so we can price chain SOURCES at the
-  // cheapest city (where players actually buy) rather than the one selected.
-  const cities = Array.from(new Set<string>([city, ...ROYAL_CITIES]));
   const prices: MarketPrice[] = await fetchPrices(
     itemIds,
-    cities,
+    [city],
     /* allQualities */ true,
     /* forceRefresh */ true,
   );
@@ -167,20 +157,8 @@ export async function fetchScannerPrices(
     };
   }
 
-  // Two cross-city books, derived from live data (no hardcoded biome map):
-  //  - sourcePriceBook: cheapest price across royal cities per cell. A chain
-  //    SOURCE is bought wherever it's cheapest (ore in Fort Sterling, wood
-  //    in Lymhurst, …).
-  //  - targetPriceBook: highest price across royal cities per cell. The
-  //    transmuted TARGET is sold wherever it fetches the most (best buy
-  //    order to dump into / best city to post a sell order).
-  const sourcePriceBook = buildExtremeBook(prices, idToCell, itemIds, now, 'min');
-  const targetPriceBook = buildExtremeBook(prices, idToCell, itemIds, now, 'max');
-
   return {
     priceBook: next,
-    sourcePriceBook,
-    targetPriceBook,
     result: {
       filledSells,
       filledBuys,
@@ -190,58 +168,6 @@ export async function fetchScannerPrices(
       staleness: ages.length > 0 ? summarizeAges(ages) : undefined,
     },
   };
-}
-
-/**
- * For each resource cell, take the extreme price across the royal cities on
- * each side. mode='min' → cheapest (for chain sources you BUY); mode='max'
- * → dearest (for transmuted targets you SELL). Black Market is excluded —
- * raw resources aren't sourced/sold there.
- */
-function buildExtremeBook(
-  prices: MarketPrice[],
-  idToCell: Map<string, { resource: ResourceType; level: string }>,
-  itemIds: string[],
-  now: number,
-  mode: 'min' | 'max',
-): PriceBook {
-  const royal = new Set<string>(ROYAL_CITIES);
-  const quoteByCity = new Map<string, Map<string, MergedQuote>>();
-  for (const c of ROYAL_CITIES) quoteByCity.set(c, mergeQuotes(prices, c));
-
-  const better = (candidate: number, current: number): boolean =>
-    current === 0 || (mode === 'min' ? candidate < current : candidate > current);
-
-  const book = createEmptyPriceBook();
-  const nowIso = new Date(now).toISOString();
-
-  for (const id of itemIds) {
-    const cell = idToCell.get(id);
-    if (!cell) continue;
-
-    let bestSell = 0, bestSellDate = 0, bestSellCity = '';
-    let bestBuy = 0, bestBuyDate = 0, bestBuyCity = '';
-    for (const [c, quotes] of quoteByCity) {
-      if (!royal.has(c)) continue;
-      const q = quotes.get(id);
-      if (!q) continue;
-      if (q.sell > 0 && better(q.sell, bestSell)) { bestSell = q.sell; bestSellDate = q.sellDate; bestSellCity = c; }
-      if (q.buy > 0 && better(q.buy, bestBuy)) { bestBuy = q.buy; bestBuyDate = q.buyDate; bestBuyCity = c; }
-    }
-    if (bestSell === 0 && bestBuy === 0) continue;
-
-    book[cell.resource][cell.level] = {
-      sellOrder: bestSell > 0 ? String(bestSell) : '',
-      buyOrder:  bestBuy  > 0 ? String(bestBuy)  : '',
-      sellDate: bestSellDate > 0 ? new Date(bestSellDate).toISOString() : undefined,
-      buyDate:  bestBuyDate  > 0 ? new Date(bestBuyDate).toISOString()  : undefined,
-      sellConfirmedAt: bestSell > 0 ? nowIso : undefined,
-      buyConfirmedAt:  bestBuy  > 0 ? nowIso : undefined,
-      sellCity: bestSellCity || undefined,
-      buyCity:  bestBuyCity  || undefined,
-    };
-  }
-  return book;
 }
 
 function summarizeAges(ages: number[]): NonNullable<FetchResult['staleness']> {

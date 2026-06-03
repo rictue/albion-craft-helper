@@ -38,14 +38,6 @@ export interface OrderBookPrice {
    */
   sellConfirmedAt?: string;
   buyConfirmedAt?: string;
-  /**
-   * For the cross-city source/target books: which royal city this side's
-   * price came from (cheapest for sources, dearest for targets). Lets the
-   * chain panel tell you WHERE to buy / sell. Undefined for the plain
-   * single-city grid book.
-   */
-  sellCity?: string;
-  buyCity?: string;
 }
 
 export type PriceBook = Record<ResourceType, Record<string, OrderBookPrice>>;

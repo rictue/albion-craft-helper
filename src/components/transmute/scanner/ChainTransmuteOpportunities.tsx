@@ -31,14 +31,6 @@ import type { MarketFeeSettings } from '../../../utils/marketFees';
 
 interface Props {
   priceBook: PriceBook;
-  /** Cheapest-across-royal-cities prices, used for chain SOURCES (the raw
-   *  resource you buy is sourced wherever it's cheapest, not in the single
-   *  scanned city). Falls back to priceBook per-cell when absent. */
-  sourcePriceBook?: PriceBook;
-  /** Highest-across-royal-cities prices, used for chain TARGETS (you sell
-   *  the transmuted result wherever it fetches the most). Falls back to
-   *  priceBook per-cell when absent. */
-  targetPriceBook?: PriceBook;
   presets: PresetCost[];
   feeSettings: MarketFeeSettings;
 }
@@ -51,8 +43,6 @@ interface ExitScenario {
   multiplier: number;
   /** AODP price the scenario is referenced from (sell-order or buy-order side). */
   referencePrice: number;
-  /** Royal city the reference price came from (dearest target side). */
-  referenceCity?: string;
   netRevenue: number;
   profit: number;
   marginPct: number;
@@ -66,8 +56,6 @@ interface Row {
   path: ChainPath;
   hops: number;
   inputPrice: number;
-  /** Royal city the source was bought in (cheapest). */
-  sourceCity?: string;
   totalCostPerUnit: number;
   /** Per-exit-mode breakdown so the user can pick whichever route fits. */
   scenarios: ExitScenario[];
@@ -101,14 +89,11 @@ function toNumber(value: string | undefined): number {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
-export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, targetPriceBook, presets, feeSettings }: Props) {
+export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }: Props) {
   const [resourceFilter, setResourceFilter] = useState<ResourceType | 'all'>('all');
   const [endGoal, setEndGoal] = useState<string>('all');
   const [minProfit, setMinProfit] = useState<number>(1000);
   const [maxHops, setMaxHops] = useState<number>(4);
-  // Capital cap: hide chains whose per-unit cost exceeds your budget so the
-  // list only shows plays you can actually afford to stock. 0 = no cap.
-  const [maxBudget, setMaxBudget] = useState<number>(0);
   const [maxAgeHours, setMaxAgeHours] = useState<number>(24);
   // Default OFF: the pure-silver "is chain cheaper than 1-step direct" check
   // ignores fill speed. In practice low-enchant inputs (.0/.1/.2) fill buy
@@ -144,25 +129,6 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
     const pairs = allChainOpportunities(presets);
     const ageCutoff = maxAgeHours > 0 ? now - maxAgeHours * ONE_HOUR : 0;
 
-    // Source cell = cheapest-across-cities price when we have it, else the
-    // scanned city's cell. Players buy the raw source wherever it's cheapest
-    // (its biome city), so the chain's input cost should reflect that, not
-    // the single city selected for the scan.
-    const sourceCellOf = (resource: ResourceType, node: string) => {
-      const cheap = sourcePriceBook?.[resource]?.[node];
-      if (cheap && (toNumber(cheap.buyOrder) > 0 || toNumber(cheap.sellOrder) > 0)) return cheap;
-      return priceBook[resource]?.[node];
-    };
-
-    // Target cell = dearest-across-cities price when we have it, else the
-    // scanned city's cell. You sell the transmuted result wherever it
-    // fetches the most, not necessarily in the city you scanned.
-    const targetCellOf = (resource: ResourceType, node: string) => {
-      const best = targetPriceBook?.[resource]?.[node];
-      if (best && (toNumber(best.buyOrder) > 0 || toNumber(best.sellOrder) > 0)) return best;
-      return priceBook[resource]?.[node];
-    };
-
     // For each (resource, target), remember the cheapest 1-step acquisition
     // path so we can compute savingsVsDirect on multi-step entries to the
     // same target. The map key is "resource|target".
@@ -170,10 +136,9 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
     for (const { source, target, path } of pairs) {
       if (path.nodes.length !== 2) continue;
       for (const resource of RESOURCE_TYPES) {
-        const directSourceCell = sourceCellOf(resource, source);
         const inputPriceStr = feeSettings.entrySource === 'buyOrder'
-          ? directSourceCell?.buyOrder
-          : directSourceCell?.sellOrder;
+          ? priceBook[resource]?.[source]?.buyOrder
+          : priceBook[resource]?.[source]?.sellOrder;
         const inputPrice = toNumber(inputPriceStr);
         if (inputPrice <= 0) continue;
         const totalAcquisitionCost = inputPrice * entryMult + path.totalStepCost;
@@ -199,8 +164,8 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
 
       for (const resource of RESOURCE_TYPES) {
         if (resourceFilter !== 'all' && resource !== resourceFilter) continue;
-        const sourceCell = sourceCellOf(resource, source);
-        const targetCell = targetCellOf(resource, target);
+        const sourceCell = priceBook[resource]?.[source];
+        const targetCell = priceBook[resource]?.[target];
         if (!sourceCell || !targetCell) continue;
 
         const inputPriceStr = feeSettings.entrySource === 'buyOrder'
@@ -208,7 +173,6 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
           : sourceCell.sellOrder;
         const inputPrice = toNumber(inputPriceStr);
         if (inputPrice <= 0) continue;
-        const sourceCity = feeSettings.entrySource === 'buyOrder' ? sourceCell.buyCity : sourceCell.sellCity;
 
         // Pull BOTH target sides — we'll evaluate three exit routes:
         //  sellOrder (referenced from target's sell-order price),
@@ -242,11 +206,9 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
         }
 
         const totalCostPerUnit = inputPrice * entryMult + path.totalStepCost;
-        // Capital cap: skip chains you can't afford per unit.
-        if (maxBudget > 0 && totalCostPerUnit > maxBudget) continue;
         const scenarios: ExitScenario[] = [];
 
-        const pushScenario = (mode: ExitMode, refPrice: number, refCity?: string) => {
+        const pushScenario = (mode: ExitMode, refPrice: number) => {
           if (refPrice <= 0) return;
           const mult = exitMults[mode];
           const netRev = refPrice * mult;
@@ -256,28 +218,15 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
             mode,
             multiplier: mult,
             referencePrice: refPrice,
-            referenceCity: refCity,
             netRevenue: Math.floor(netRev),
             profit,
             marginPct: margin,
           });
         };
 
-        // High-enchant (.3/.4) sell orders are illiquid and inflated —
-        // nobody buys at the ask, real trades happen against the buy order.
-        // So for those targets the ONLY realistic exit is selling into the
-        // existing buy order; the sell-order and direct-trade (sticker)
-        // routes would price the chain off a fantasy number.
-        const targetEnchant = Number(target.split('.')[1] ?? 0);
-        const highEnchant = targetEnchant >= 3;
-
-        if (highEnchant) {
-          pushScenario('instantSell', targetBuyOrderPrice, targetCell.buyCity);
-        } else {
-          pushScenario('sellOrder',   targetSellOrderPrice, targetCell.sellCity);
-          pushScenario('instantSell', targetBuyOrderPrice,  targetCell.buyCity);
-          pushScenario('discord',     targetSellOrderPrice, targetCell.sellCity);
-        }
+        pushScenario('sellOrder',   targetSellOrderPrice);
+        pushScenario('instantSell', targetBuyOrderPrice);
+        pushScenario('discord',     targetSellOrderPrice);
 
         if (scenarios.length === 0) continue;
 
@@ -310,7 +259,6 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
           path,
           hops,
           inputPrice,
-          sourceCity,
           totalCostPerUnit: Math.floor(totalCostPerUnit),
           scenarios,
           bestProfit: best.profit,
@@ -326,15 +274,12 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
       .slice(0, 200);
   }, [
     priceBook,
-    sourcePriceBook,
-    targetPriceBook,
     presets,
     feeSettings,
     exitMults,
     entryMult,
     minProfit,
     maxHops,
-    maxBudget,
     resourceFilter,
     endGoal,
     maxAgeHours,
@@ -349,8 +294,8 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
           <p className="eyebrow">Multi-step strategy</p>
           <h2 className="panel-title">Chain transmute</h2>
           <p className="mt-1 text-xs text-vellum/45">
-            2+ hop paths only. Buy cheap source → transmute multiple steps → sell target.
-            <span className="text-vellum/30"> Source priced at the cheapest royal city, target sold at the dearest — both from live cross-city data. 1-step flips are in the table on the left.</span>
+            2+ hop paths only. Buy cheap source → transmute multiple steps → sell target. Same city.
+            <span className="text-vellum/30"> 1-step flips are already in the scanner table on the left.</span>
           </p>
         </div>
         <GitBranch className="text-oldgold-300" size={22} />
@@ -415,22 +360,6 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
             className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
           />
         </label>
-        <label className="block rounded border border-white/10 bg-ash-950/35 px-2 py-1.5">
-          <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-vellum/45">
-            Max cost / unit
-          </span>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={maxBudget === 0 ? '' : maxBudget.toLocaleString('de-DE')}
-            placeholder="no cap"
-            onChange={(e) => {
-              const digits = e.target.value.replace(/[^\d]/g, '');
-              setMaxBudget(digits === '' ? 0 : Number(digits));
-            }}
-            className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none placeholder:text-vellum/25 placeholder:font-normal"
-          />
-        </label>
         <label className="col-span-2 block rounded border border-white/10 bg-ash-950/35 px-2 py-1.5">
           <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-vellum/45">
             End goal
@@ -485,8 +414,6 @@ export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, target
       <div className="mt-3 text-[10px] text-vellum/40 leading-snug">
         Math uses current Market Fees for source acquisition (entry) and target sale (exit), plus the silver
         cost of every step in the cheapest path. Intermediate prices are irrelevant — you never sell them.
-        For <span className="text-vellum/60">.3 / .4 targets</span> only the buy-order exit is shown: their sell
-        orders are illiquid and inflated, so the realistic sale is into the existing buy order.
       </div>
     </section>
   );
@@ -527,10 +454,7 @@ function ChainCard({ row }: { row: Row }) {
 
       {/* Cost breakdown */}
       <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] mb-2">
-        <div className="text-vellum/55">
-          Buy {row.source} at
-          {row.sourceCity && <span className="text-oldgold-300/70 text-[9px] ml-1">in {row.sourceCity}</span>}
-        </div>
+        <div className="text-vellum/55">Buy {row.source} at</div>
         <div className="text-right text-vellum tabular-nums">
           {row.inputPrice.toLocaleString('de-DE')}
         </div>
@@ -567,7 +491,6 @@ function ChainCard({ row }: { row: Row }) {
                 </span>
                 <span className="text-vellum/35 text-[9px] ml-1">
                   @{s.referencePrice.toLocaleString('de-DE')}
-                  {s.referenceCity && <span className="text-oldgold-300/60"> · {s.referenceCity}</span>}
                 </span>
               </div>
               <div className="text-vellum/55 tabular-nums text-[10px]">

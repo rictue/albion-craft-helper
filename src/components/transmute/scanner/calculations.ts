@@ -3,7 +3,6 @@ import type {
   CalculatorInput,
   CalculationResult,
   DecisionLevel,
-  OrderBookPrice,
   OrderPriceSide,
   PriceBook,
   PresetCost,
@@ -350,24 +349,20 @@ function normalizePriceString(value: unknown): string {
   return "";
 }
 
-function normalizeOrderBookPrice(value: unknown): OrderBookPrice {
+function normalizeOrderBookPrice(value: unknown): { buyOrder: string; sellOrder: string } {
   if (typeof value === "string" || typeof value === "number") {
     const price = normalizePriceString(value);
     return { buyOrder: price, sellOrder: price };
   }
 
   if (value && typeof value === "object") {
-    const quote = value as Partial<Record<"buy" | "sell" | "buyOrder" | "sellOrder" | "sellCity" | "buyCity", unknown>>;
+    const quote = value as Partial<Record<"buy" | "sell" | "buyOrder" | "sellOrder", unknown>>;
     const buyOrder = normalizePriceString(quote.buyOrder ?? quote.buy);
     const sellOrder = normalizePriceString(quote.sellOrder ?? quote.sell);
     const fallback = buyOrder || sellOrder;
     return {
       buyOrder: buyOrder || fallback,
-      sellOrder: sellOrder || fallback,
-      // Preserve the cross-city source/target city tags so "buy in X /
-      // sell in Y" survives a reload of the persisted books.
-      sellCity: typeof quote.sellCity === "string" ? quote.sellCity : undefined,
-      buyCity:  typeof quote.buyCity  === "string" ? quote.buyCity  : undefined,
+      sellOrder: sellOrder || fallback
     };
   }
 
