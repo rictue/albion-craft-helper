@@ -13,6 +13,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowRight, Wand2 } from 'lucide-react';
 import { fetchPrices } from '../../services/api';
+import { fetchPriceHistory } from '../../services/priceHistory';
 import { RESOURCE_TYPES } from './scanner/calculations';
 import type { ResourceType } from './scanner/types';
 import { shortestPathsFrom } from './scanner/chainPathfinder';
@@ -56,6 +57,11 @@ export default function TransmuteSimple() {
   const [city, setCity] = useState<typeof CITIES[number]>('Lymhurst');
   const [fetching, setFetching] = useState(false);
   const [fetchNote, setFetchNote] = useState('');
+
+  // City scan — cheapest source per city + target sell volume per city.
+  const [scanning, setScanning] = useState(false);
+  const [sourceByCity, setSourceByCity] = useState<{ city: string; buyOrder: number; instant: number }[]>([]);
+  const [targetVolByCity, setTargetVolByCity] = useState<{ city: string; volPerDay: number; price: number }[]>([]);
 
   const from = lvl(fromTier, fromEnch);
   const to = lvl(toTier, toEnch);
@@ -125,6 +131,43 @@ export default function TransmuteSimple() {
       setFetchNote('AODP fetch failed — type prices manually.');
     } finally {
       setFetching(false);
+    }
+  };
+
+  // Scan every royal city: cheapest place to acquire the SOURCE (buy-order
+  // + instant), and the TARGET's daily sell volume per city so you know
+  // where it actually moves and how much. You then type the sell price.
+  const handleScan = async () => {
+    if (!reachable) return;
+    setScanning(true);
+    try {
+      const [srcPrices, tgtHist] = await Promise.all([
+        fetchPrices([fromId], [...CITIES], true, true),
+        fetchPriceHistory(toId, [...CITIES], 14),
+      ]);
+
+      const src = CITIES.map(c => {
+        let buyOrder = 0, instant = 0;
+        for (const p of srcPrices) {
+          if (p.city !== c || p.item_id !== fromId) continue;
+          if (p.buy_price_max > 0) buyOrder = Math.max(buyOrder, p.buy_price_max);
+          if (p.sell_price_min > 0) instant = instant === 0 ? p.sell_price_min : Math.min(instant, p.sell_price_min);
+        }
+        return { city: c, buyOrder, instant };
+      }).filter(s => s.buyOrder > 0 || s.instant > 0);
+      // Cheapest acquisition first (by buy-order level, fall back to instant).
+      src.sort((a, b) => (a.buyOrder || a.instant) - (b.buyOrder || b.instant));
+      setSourceByCity(src);
+
+      const vol = tgtHist.map(s => {
+        const recent = s.data.slice(-7);
+        const avgVol = recent.length ? recent.reduce((sum, p) => sum + p.item_count, 0) / recent.length : 0;
+        const avgPrice = recent.length ? recent.reduce((sum, p) => sum + p.avg_price, 0) / recent.length : 0;
+        return { city: s.city, volPerDay: Math.round(avgVol), price: Math.round(avgPrice) };
+      }).filter(v => v.volPerDay > 0).sort((a, b) => b.volPerDay - a.volPerDay);
+      setTargetVolByCity(vol);
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -223,7 +266,11 @@ export default function TransmuteSimple() {
             </select>
             <button onClick={handleFetch} disabled={fetching || !reachable}
               className="px-3 py-1 rounded-lg text-[11px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/25 disabled:opacity-50">
-              {fetching ? 'Fetching…' : '↻ Fetch AODP'}
+              {fetching ? 'Fetching…' : '↻ Fetch'}
+            </button>
+            <button onClick={handleScan} disabled={scanning || !reachable}
+              className="px-3 py-1 rounded-lg text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 disabled:opacity-50">
+              {scanning ? 'Scanning…' : '🔍 Scan cities'}
             </button>
           </div>
         </div>
@@ -240,6 +287,49 @@ export default function TransmuteSimple() {
           </label>
         </div>
         {fetchNote && <div className="text-[10px] text-zinc-500">{fetchNote}</div>}
+
+        {/* City scan — cheapest source (click to use) + target volume */}
+        {(sourceByCity.length > 0 || targetVolByCity.length > 0) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-amber-400/80 font-bold mb-1.5">
+                Buy {from} — cheapest city <span className="text-zinc-600 normal-case font-normal">(click to use)</span>
+              </div>
+              <div className="space-y-0.5">
+                {sourceByCity.map((s, i) => {
+                  const acq = s.buyOrder || s.instant;
+                  return (
+                    <button key={s.city} onClick={() => setBuyPrice(acq)}
+                      className={`w-full flex items-center justify-between px-1.5 py-1 rounded text-[11px] transition-colors ${i === 0 ? 'bg-amber-500/10 text-amber-200 border border-amber-500/25' : 'text-zinc-400 hover:bg-zinc-800/60 border border-transparent'}`}>
+                      <span className="flex items-center gap-1.5">{i === 0 && <span className="text-amber-400 text-[9px]">★</span>}{s.city}</span>
+                      <span className="tabular-nums">
+                        buy {formatSilver(s.buyOrder)}
+                        <span className="text-zinc-600"> · inst {formatSilver(s.instant)}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-emerald-400/80 font-bold mb-1.5">
+                T{to} sells / day <span className="text-zinc-600 normal-case font-normal">(liquidity)</span>
+              </div>
+              {targetVolByCity.length > 0 ? (
+                <div className="space-y-0.5">
+                  {targetVolByCity.map((v) => (
+                    <div key={v.city} className="flex items-center justify-between px-1.5 py-1 text-[11px] text-zinc-400">
+                      <span>{v.city}</span>
+                      <span className="tabular-nums"><span className="text-emerald-300 font-bold">{v.volPerDay}</span>/day <span className="text-zinc-600">@ {formatSilver(v.price)}</span></span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[11px] text-zinc-600 px-1.5 py-1">No recent sales — illiquid, hard to offload.</div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* compact fee + qty row */}
         <div className="flex flex-wrap items-center gap-2 pt-1">
