@@ -31,6 +31,10 @@ import type { MarketFeeSettings } from '../../../utils/marketFees';
 
 interface Props {
   priceBook: PriceBook;
+  /** Cheapest-across-royal-cities prices, used for chain SOURCES (the raw
+   *  resource you buy is sourced wherever it's cheapest, not in the single
+   *  scanned city). Falls back to priceBook per-cell when absent. */
+  sourcePriceBook?: PriceBook;
   presets: PresetCost[];
   feeSettings: MarketFeeSettings;
 }
@@ -89,7 +93,7 @@ function toNumber(value: string | undefined): number {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
-export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }: Props) {
+export function ChainTransmuteOpportunities({ priceBook, sourcePriceBook, presets, feeSettings }: Props) {
   const [resourceFilter, setResourceFilter] = useState<ResourceType | 'all'>('all');
   const [endGoal, setEndGoal] = useState<string>('all');
   const [minProfit, setMinProfit] = useState<number>(1000);
@@ -129,6 +133,16 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
     const pairs = allChainOpportunities(presets);
     const ageCutoff = maxAgeHours > 0 ? now - maxAgeHours * ONE_HOUR : 0;
 
+    // Source cell = cheapest-across-cities price when we have it, else the
+    // scanned city's cell. Players buy the raw source wherever it's cheapest
+    // (its biome city), so the chain's input cost should reflect that, not
+    // the single city selected for the scan.
+    const sourceCellOf = (resource: ResourceType, node: string) => {
+      const cheap = sourcePriceBook?.[resource]?.[node];
+      if (cheap && (toNumber(cheap.buyOrder) > 0 || toNumber(cheap.sellOrder) > 0)) return cheap;
+      return priceBook[resource]?.[node];
+    };
+
     // For each (resource, target), remember the cheapest 1-step acquisition
     // path so we can compute savingsVsDirect on multi-step entries to the
     // same target. The map key is "resource|target".
@@ -136,9 +150,10 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
     for (const { source, target, path } of pairs) {
       if (path.nodes.length !== 2) continue;
       for (const resource of RESOURCE_TYPES) {
+        const directSourceCell = sourceCellOf(resource, source);
         const inputPriceStr = feeSettings.entrySource === 'buyOrder'
-          ? priceBook[resource]?.[source]?.buyOrder
-          : priceBook[resource]?.[source]?.sellOrder;
+          ? directSourceCell?.buyOrder
+          : directSourceCell?.sellOrder;
         const inputPrice = toNumber(inputPriceStr);
         if (inputPrice <= 0) continue;
         const totalAcquisitionCost = inputPrice * entryMult + path.totalStepCost;
@@ -164,7 +179,7 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
 
       for (const resource of RESOURCE_TYPES) {
         if (resourceFilter !== 'all' && resource !== resourceFilter) continue;
-        const sourceCell = priceBook[resource]?.[source];
+        const sourceCell = sourceCellOf(resource, source);
         const targetCell = priceBook[resource]?.[target];
         if (!sourceCell || !targetCell) continue;
 
@@ -274,6 +289,7 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
       .slice(0, 200);
   }, [
     priceBook,
+    sourcePriceBook,
     presets,
     feeSettings,
     exitMults,
@@ -294,8 +310,8 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
           <p className="eyebrow">Multi-step strategy</p>
           <h2 className="panel-title">Chain transmute</h2>
           <p className="mt-1 text-xs text-vellum/45">
-            2+ hop paths only. Buy cheap source → transmute multiple steps → sell target. Same city.
-            <span className="text-vellum/30"> 1-step flips are already in the scanner table on the left.</span>
+            2+ hop paths only. Buy cheap source → transmute multiple steps → sell target.
+            <span className="text-vellum/30"> Source priced at the cheapest royal city (where you'd actually buy it); target sold in the scanned city. 1-step flips are in the table on the left.</span>
           </p>
         </div>
         <GitBranch className="text-oldgold-300" size={22} />
