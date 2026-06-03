@@ -193,7 +193,7 @@ export default function TransmuteSimple() {
         </div>
         <div>
           <h1 className="text-2xl font-black text-zinc-100">Quick Transmute</h1>
-          <p className="text-sm text-zinc-500">Pick what you have and what you want — get one clear answer.</p>
+          <p className="text-sm text-zinc-500">Pick the source to buy and the target to sell — get one clear answer.</p>
         </div>
       </div>
 
@@ -224,7 +224,7 @@ export default function TransmuteSimple() {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <ItemIcon itemId={fromId} size={32} quality={1} className="rounded shrink-0" />
-              <div className="text-xs text-zinc-400 font-semibold">You have <span className="text-cyan-300">T{from}</span></div>
+              <div className="text-xs text-zinc-400 font-semibold">Buy <span className="text-cyan-300">T{from}</span> <span className="text-zinc-600 font-normal">(source)</span></div>
             </div>
             <div className="flex gap-1">{TIERS.map(t => <button key={t} onClick={() => setFromTier(t)} className={tierBtn(fromTier === t)}>T{t}</button>)}</div>
             <div className="flex gap-1">{ENCHANTS.map(e => <button key={e} onClick={() => setFromEnch(e)} className={tierBtn(fromEnch === e)}>.{e}</button>)}</div>
@@ -236,7 +236,7 @@ export default function TransmuteSimple() {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <ItemIcon itemId={toId} size={32} quality={1} className="rounded shrink-0" />
-              <div className="text-xs text-zinc-400 font-semibold">You want <span className="text-emerald-300">T{to}</span></div>
+              <div className="text-xs text-zinc-400 font-semibold">Sell <span className="text-emerald-300">T{to}</span> <span className="text-zinc-600 font-normal">(target)</span></div>
             </div>
             <div className="flex gap-1">{TIERS.map(t => <button key={t} onClick={() => setToTier(t)} className={tierBtn(toTier === t)}>T{t}</button>)}</div>
             <div className="flex gap-1">{ENCHANTS.map(e => <button key={e} onClick={() => setToEnch(e)} className={tierBtn(toEnch === e)}>.{e}</button>)}</div>
