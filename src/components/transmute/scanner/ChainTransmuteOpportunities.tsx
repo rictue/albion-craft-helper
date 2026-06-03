@@ -368,38 +368,36 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
             className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
           />
         </label>
-        <label className="block rounded border border-white/10 bg-ash-950/35 px-2 py-1.5">
+        <div className="col-span-2 rounded border border-white/10 bg-ash-950/35 px-2 py-1.5">
           <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-vellum/45">
-            Starting
+            Start → End goal
           </span>
-          <select
-            value={startFrom}
-            onChange={(e) => setStartFrom(e.target.value)}
-            className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
-            style={{ colorScheme: 'dark' }}
-          >
-            <option value="all" style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>Any source</option>
-            {START_OPTIONS.map((t) => (
-              <option key={t} value={t} style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>T{t}</option>
-            ))}
-          </select>
-        </label>
-        <label className="block rounded border border-white/10 bg-ash-950/35 px-2 py-1.5">
-          <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-vellum/45">
-            End goal
-          </span>
-          <select
-            value={endGoal}
-            onChange={(e) => setEndGoal(e.target.value)}
-            className="w-full border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
-            style={{ colorScheme: 'dark' }}
-          >
-            <option value="all" style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>All targets</option>
-            {END_GOAL_OPTIONS.map((t) => (
-              <option key={t} value={t} style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>T{t}</option>
-            ))}
-          </select>
-        </label>
+          <div className="flex items-center gap-2">
+            <select
+              value={startFrom}
+              onChange={(e) => setStartFrom(e.target.value)}
+              className="flex-1 min-w-0 border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none"
+              style={{ colorScheme: 'dark' }}
+            >
+              <option value="all" style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>Any source</option>
+              {START_OPTIONS.map((t) => (
+                <option key={t} value={t} style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>T{t}</option>
+              ))}
+            </select>
+            <span className="text-oldgold-300/70 font-black shrink-0">→</span>
+            <select
+              value={endGoal}
+              onChange={(e) => setEndGoal(e.target.value)}
+              className="flex-1 min-w-0 border-0 bg-transparent p-0 text-sm font-black tabular-nums text-vellum outline-none text-right"
+              style={{ colorScheme: 'dark' }}
+            >
+              <option value="all" style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>All targets</option>
+              {END_GOAL_OPTIONS.map((t) => (
+                <option key={t} value={t} style={{ backgroundColor: '#17100a', color: '#f3ead2' }}>T{t}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Chain-only-wins toggle */}
