@@ -189,18 +189,25 @@ export default function Transmutation() {
     // dot flips to "manual" instead of falsely showing a fresh signal.
     const dateKey      = side === "sellOrder" ? "sellDate"        : "buyDate";
     const confirmedKey = side === "sellOrder" ? "sellConfirmedAt" : "buyConfirmedAt";
-    setPriceBook((current) => ({
+    // A manual edit is authoritative for that cell. Apply it to the
+    // grid book AND both cross-city books (cheapest-source / dearest-target)
+    // so the chain panel reflects what you typed instead of a stale
+    // cross-city min/max from the last fetch.
+    const overrideCell = (current: PriceBook): PriceBook => ({
       ...current,
       [resource]: {
         ...current[resource],
         [tier]: {
-          ...current[resource][tier],
+          ...current[resource]?.[tier],
           [side]: value,
           [dateKey]: undefined,
           [confirmedKey]: undefined,
         },
       },
-    }));
+    });
+    setPriceBook(overrideCell);
+    setSourcePriceBook(overrideCell);
+    setTargetPriceBook(overrideCell);
   };
 
   const exportCsv = () => {
