@@ -245,23 +245,19 @@ export function ChainTransmuteOpportunities({ priceBook, estValue, presets, feeS
 
         // Market value = royal-continent trade average (in-game "Market
         // Value"), falling back to the sell-order price if history is missing.
-        // High-tier sell orders don't actually fill at the ask, so direct
-        // trade + the discount rows reference the market value, not the ask.
-        //
-        // BUT a manual edit always wins: the edit handler clears both the AODP
-        // date and our confirmation stamp, so a target sell price with neither
-        // is user-typed. In that case drive every est-based row from the typed
-        // price (fetch later snaps back to the AODP median). This is the
-        // "type to override, fetch to refresh" behaviour the user expects.
+        // Direct trade + the discount rows always reference this median — they
+        // model "what it actually trades at", independent of what you type.
+        const marketValue = estValue?.[resource]?.[target] || targetSellOrderPrice;
+        // The Sell order row is the only one a manual edit touches: it's the
+        // price you'd POST at. The edit handler clears both the AODP date and
+        // our confirmation stamp, so a target sell price with neither is
+        // user-typed — use it directly; otherwise reference the market median.
+        // A later fetch restores the median. Tax + setup is applied via mult.
         const targetSellIsManual =
           targetSellOrderPrice > 0 && !targetCell.sellConfirmedAt && !targetCell.sellDate;
-        const marketValue = targetSellIsManual
-          ? targetSellOrderPrice
-          : (estValue?.[resource]?.[target] || targetSellOrderPrice);
-        // Sell order references the market-value average (where it actually
-        // trades), not the inflated lowest ask, then applies the marketplace
-        // tax + setup fee. Buy order = instant sell into existing buy orders.
-        pushScenario('sellOrder',   marketValue);
+        const sellOrderRef = targetSellIsManual ? targetSellOrderPrice : marketValue;
+        // Buy order = instant sell into existing buy orders.
+        pushScenario('sellOrder',   sellOrderRef);
         pushScenario('instantSell', targetBuyOrderPrice);
         pushScenario('discord',     marketValue);
         pushScenario('est3',        marketValue);
