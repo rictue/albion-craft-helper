@@ -274,7 +274,12 @@ export function ChainTransmuteOpportunities({ priceBook, estValue, presets, feeS
           (a, b) => (b.profit > a.profit ? b : a),
           scenarios[0],
         );
-        if (best.profit < minProfit) continue;
+        // When the user has pinned a specific start AND end goal, they want to
+        // inspect THAT exact chain — show it even if every exit is a loss.
+        // The min-profit / chain-only-wins gates are for the discovery view
+        // (scanning "all" for winners), not for a deliberately chosen pair.
+        const pinnedChain = startFrom !== 'all' && endGoal !== 'all';
+        if (!pinnedChain && best.profit < minProfit) continue;
 
         const directBuyCost = directBy.get(`${resource}|${target}`);
         const isMultiStep = hops > 1;
@@ -282,7 +287,7 @@ export function ChainTransmuteOpportunities({ priceBook, estValue, presets, feeS
           ? directBuyCost - totalCostPerUnit
           : undefined;
 
-        if (chainOnlyWins && isMultiStep && savingsVsDirect !== undefined && savingsVsDirect <= 0) {
+        if (!pinnedChain && chainOnlyWins && isMultiStep && savingsVsDirect !== undefined && savingsVsDirect <= 0) {
           continue;
         }
 
