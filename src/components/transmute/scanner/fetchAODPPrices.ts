@@ -135,13 +135,11 @@ export async function fetchScannerPrices(
     let buyConfirmedAt  = existing.buyConfirmedAt;
     const nowIso = new Date(now).toISOString();
 
-    // Manual entries are authoritative: a side the user typed has a value
-    // but no AODP date and no fetch-confirmation timestamp (updatePrice
-    // clears both). Never overwrite those with AODP — the typed price wins.
-    const sellIsManual = existing.sellOrder !== '' && !existing.sellConfirmedAt && !existing.sellDate;
-    const buyIsManual  = existing.buyOrder  !== '' && !existing.buyConfirmedAt  && !existing.buyDate;
-
-    if (aodp.sell > 0 && !sellIsManual) {
+    // Fetch is authoritative — it always pulls fresh AODP, overwriting any
+    // prior value (including a manual edit). Manual edits apply only until
+    // the next fetch, which is the behaviour the user wants: type to
+    // override now, fetch to snap back to live market data.
+    if (aodp.sell > 0) {
       sellOrder = String(aodp.sell);
       sellDate = aodp.sellDate > 0 ? new Date(aodp.sellDate).toISOString() : undefined;
       // We just confirmed this side via fetch — overrides any stale AODP
@@ -150,7 +148,7 @@ export async function fetchScannerPrices(
       filledSells += 1;
       if (aodp.sellDate > 0) ages.push(now - aodp.sellDate);
     }
-    if (aodp.buy > 0 && !buyIsManual) {
+    if (aodp.buy > 0) {
       buyOrder = String(aodp.buy);
       buyDate = aodp.buyDate > 0 ? new Date(aodp.buyDate).toISOString() : undefined;
       buyConfirmedAt = nowIso;
