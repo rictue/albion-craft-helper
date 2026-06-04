@@ -3,6 +3,7 @@ import type {
   CalculatorInput,
   CalculationResult,
   DecisionLevel,
+  OrderBookPrice,
   OrderPriceSide,
   PriceBook,
   PresetCost,
@@ -349,20 +350,29 @@ function normalizePriceString(value: unknown): string {
   return "";
 }
 
-function normalizeOrderBookPrice(value: unknown): { buyOrder: string; sellOrder: string } {
+function normalizeOrderBookPrice(value: unknown): OrderBookPrice {
   if (typeof value === "string" || typeof value === "number") {
     const price = normalizePriceString(value);
     return { buyOrder: price, sellOrder: price };
   }
 
   if (value && typeof value === "object") {
-    const quote = value as Partial<Record<"buy" | "sell" | "buyOrder" | "sellOrder", unknown>>;
+    const quote = value as Partial<OrderBookPrice & Record<"buy" | "sell", unknown>>;
     const buyOrder = normalizePriceString(quote.buyOrder ?? quote.buy);
     const sellOrder = normalizePriceString(quote.sellOrder ?? quote.sell);
     const fallback = buyOrder || sellOrder;
+    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
     return {
       buyOrder: buyOrder || fallback,
-      sellOrder: sellOrder || fallback
+      sellOrder: sellOrder || fallback,
+      // CRITICAL: preserve the AODP date + fetch-confirmation timestamps
+      // across reload. Without them every reloaded fetched cell looks
+      // "manually typed" (no timestamp) to the fetch's manual-override
+      // guard, so it refuses to overwrite and prices never refresh.
+      sellDate:        str(quote.sellDate),
+      buyDate:         str(quote.buyDate),
+      sellConfirmedAt: str(quote.sellConfirmedAt),
+      buyConfirmedAt:  str(quote.buyConfirmedAt),
     };
   }
 
