@@ -14,8 +14,14 @@
  *    convention.
  */
 
-import { fetchPrices } from '../../../services/api';
+import { fetchPrices, getServer } from '../../../services/api';
 import type { MarketPrice } from '../../../types';
+
+const HISTORY_HOSTS: Record<string, string> = {
+  europe: 'https://europe.albion-online-data.com',
+  west:   'https://west.albion-online-data.com',
+  east:   'https://east.albion-online-data.com',
+};
 import { RESOURCE_TYPES, TIER_LABELS } from './calculations';
 import type { OrderBookPrice, PriceBook, ResourceType } from './types';
 
@@ -173,23 +179,11 @@ export async function fetchScannerPrices(
     };
   }
 
-  // Est. market value = average sell price across the 5 royal cities
-  // (Black Market excluded), per item — mirrors the in-game "Market Value".
-  const royalQuotes = new Map(ROYAL_CITIES.map(c => [c, mergeQuotes(prices, c)]));
-  const estValue = RESOURCE_TYPES.reduce((book, r) => {
-    book[r] = {};
-    return book;
-  }, {} as EstValueBook);
-  for (const id of itemIds) {
-    const cell = idToCell.get(id);
-    if (!cell) continue;
-    let sum = 0, n = 0;
-    for (const c of ROYAL_CITIES) {
-      const q = royalQuotes.get(c)?.get(id);
-      if (q && q.sell > 0) { sum += q.sell; n += 1; }
-    }
-    if (n > 0) estValue[cell.resource][cell.level] = Math.round(sum / n);
-  }
+  // Est. market value = the in-game "Market Value" = the volume-weighted
+  // average TRADE price across the 5 royal cities (Black Market excluded),
+  // from AODP history's avg_price. NOT the sell-order average — real trades
+  // settle below the ask, so the est value sits between buy and sell.
+  const estValue = await fetchRoyalEstValues(itemIds, idToCell);
 
   return {
     priceBook: next,
@@ -203,6 +197,53 @@ export async function fetchScannerPrices(
       staleness: ages.length > 0 ? summarizeAges(ages) : undefined,
     },
   };
+}
+
+/**
+ * Volume-weighted average trade price across the royal cities, per item,
+ * from AODP history (avg_price × item_count). This is what the in-game
+ * "Market Value" estimates. Batched; failures degrade to a partial book
+ * (the chain panel then falls back to the sell-order price for missing
+ * cells). Quality 1 only (raw resources).
+ */
+async function fetchRoyalEstValues(
+  itemIds: string[],
+  idToCell: Map<string, { resource: ResourceType; level: string }>,
+): Promise<EstValueBook> {
+  const book = RESOURCE_TYPES.reduce((b, r) => { b[r] = {}; return b; }, {} as EstValueBook);
+  const base = HISTORY_HOSTS[getServer()] || HISTORY_HOSTS.europe;
+  const royal = new Set<string>(ROYAL_CITIES);
+
+  for (let i = 0; i < itemIds.length; i += 50) {
+    const batch = itemIds.slice(i, i + 50);
+    const url = `${base}/api/v2/stats/history/${batch.join(',')}?locations=${ROYAL_CITIES.join(',')}&time-scale=24`;
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) continue;
+      const data = await res.json() as Array<{ location: string; item_id: string; quality: number; data: Array<{ avg_price: number; item_count: number }> }>;
+      // Accumulate volume-weighted price per item across royal cities (recent
+      // ~7 daily points).
+      const acc = new Map<string, { wsum: number; vol: number }>();
+      for (const entry of data) {
+        if (entry.quality !== 1 || !royal.has(entry.location)) continue;
+        for (const p of entry.data.slice(-7)) {
+          if (p.avg_price > 0 && p.item_count > 0) {
+            const a = acc.get(entry.item_id) ?? { wsum: 0, vol: 0 };
+            a.wsum += p.avg_price * p.item_count;
+            a.vol += p.item_count;
+            acc.set(entry.item_id, a);
+          }
+        }
+      }
+      for (const [id, a] of acc) {
+        const cell = idToCell.get(id);
+        if (cell && a.vol > 0) book[cell.resource][cell.level] = Math.round(a.wsum / a.vol);
+      }
+    } catch {
+      // skip this batch — chain panel falls back to sell-order price
+    }
+  }
+  return book;
 }
 
 function summarizeAges(ages: number[]): NonNullable<FetchResult['staleness']> {
