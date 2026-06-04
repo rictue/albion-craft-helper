@@ -142,7 +142,13 @@ export function ChainTransmuteOpportunities({ priceBook, estValue, presets, feeS
 
   const rows = useMemo<Row[]>(() => {
     const pairs = allChainOpportunities(presets);
-    const ageCutoff = maxAgeHours > 0 ? now - maxAgeHours * ONE_HOUR : 0;
+    // A pinned chain = both a specific Start and End goal chosen. The user is
+    // inspecting ONE deliberate path, so we relax every discovery-mode filter
+    // (hop cap, staleness, min-profit, chain-only-wins) and just show it,
+    // profit or loss. Only a genuinely missing source/target price can still
+    // hide it — there's nothing to compute without a price.
+    const pinnedChain = startFrom !== 'all' && endGoal !== 'all';
+    const ageCutoff = (maxAgeHours > 0 && !pinnedChain) ? now - maxAgeHours * ONE_HOUR : 0;
 
     // For each (resource, target), remember the cheapest 1-step acquisition
     // path so we can compute savingsVsDirect on multi-step entries to the
@@ -172,7 +178,7 @@ export function ChainTransmuteOpportunities({ priceBook, estValue, presets, feeS
       // include direct 1-step flips here too (heavily used), even though the
       // main scanner table on the left also lists them.
       if (hops < 1) continue;
-      if (hops > maxHops) continue;
+      if (!pinnedChain && hops > maxHops) continue;
 
       // End-goal filter: when set, only surface chains whose final output
       // matches the user's target tier.enchant (e.g. "6.3").
@@ -274,11 +280,8 @@ export function ChainTransmuteOpportunities({ priceBook, estValue, presets, feeS
           (a, b) => (b.profit > a.profit ? b : a),
           scenarios[0],
         );
-        // When the user has pinned a specific start AND end goal, they want to
-        // inspect THAT exact chain — show it even if every exit is a loss.
-        // The min-profit / chain-only-wins gates are for the discovery view
-        // (scanning "all" for winners), not for a deliberately chosen pair.
-        const pinnedChain = startFrom !== 'all' && endGoal !== 'all';
+        // Pinned chain (specific start + end) shows even if every exit is a
+        // loss — the min-profit gate is only for the discovery view.
         if (!pinnedChain && best.profit < minProfit) continue;
 
         const directBuyCost = directBy.get(`${resource}|${target}`);
