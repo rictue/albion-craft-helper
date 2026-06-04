@@ -247,7 +247,17 @@ export function ChainTransmuteOpportunities({ priceBook, estValue, presets, feeS
         // Value"), falling back to the sell-order price if history is missing.
         // High-tier sell orders don't actually fill at the ask, so direct
         // trade + the discount rows reference the market value, not the ask.
-        const marketValue = estValue?.[resource]?.[target] || targetSellOrderPrice;
+        //
+        // BUT a manual edit always wins: the edit handler clears both the AODP
+        // date and our confirmation stamp, so a target sell price with neither
+        // is user-typed. In that case drive every est-based row from the typed
+        // price (fetch later snaps back to the AODP median). This is the
+        // "type to override, fetch to refresh" behaviour the user expects.
+        const targetSellIsManual =
+          targetSellOrderPrice > 0 && !targetCell.sellConfirmedAt && !targetCell.sellDate;
+        const marketValue = targetSellIsManual
+          ? targetSellOrderPrice
+          : (estValue?.[resource]?.[target] || targetSellOrderPrice);
         // Sell order references the market-value average (where it actually
         // trades), not the inflated lowest ask, then applies the marketplace
         // tax + setup fee. Buy order = instant sell into existing buy orders.
