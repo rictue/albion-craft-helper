@@ -26,7 +26,7 @@ export async function fetchPriceHistory(
   const base = SERVER_HOSTS[getServer()] || SERVER_HOSTS.europe;
   const url = `${base}/api/v2/stats/history/${itemId}?locations=${locations.join(',')}&time-scale=24`;
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = await res.json() as Array<{ location: string; item_id: string; quality: number; data: HistoryPoint[] }>;
     const byCity = new Map<string, HistorySeries>();

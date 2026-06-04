@@ -125,7 +125,12 @@ export async function fetchPrices(
       const url = `${getApiBase()}/${batch.join(',')}.json?locations=${locations.join(',')}${qualityParam}`;
 
       try {
-        const response = await fetch(url);
+        // cache: 'no-store' — never let the browser's HTTP cache serve a
+        // conditional 304. AODP sends cache headers; a stale/empty body
+        // captured during a bad fetch (VPN, blocked, mid-deploy) would then
+        // be re-served forever as "0 sells / 0 buys". We always pull a fresh
+        // full response; the app's own 30s in-memory cache prevents spam.
+        const response = await fetch(url, { cache: 'no-store' });
         if (!response.ok) throw new Error(`API error: ${response.status}`);
         const data: MarketPrice[] = await response.json();
         results.push(...data);
