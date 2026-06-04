@@ -479,6 +479,10 @@ export function ChainTransmuteOpportunities({ priceBook, estValue, presets, feeS
 
 function ChainCard({ row }: { row: Row }) {
   const isWin = row.savingsVsDirect !== undefined && row.savingsVsDirect > 0;
+  // Per-card "what if I trade at exactly this price" override. Affects ONLY
+  // the Direct trade row (mode 'discord'); every other exit keeps its
+  // market-derived reference price.
+  const [directPrice, setDirectPrice] = useState('');
 
   return (
     <div className={`rounded border px-2.5 py-2 ${
@@ -534,8 +538,18 @@ function ChainCard({ row }: { row: Row }) {
           Exit options
         </div>
         {row.scenarios.map((s) => {
+          // Direct trade (mode 'discord') can be overridden with a typed
+          // price; all other rows render their computed scenario as-is.
+          const custom = s.mode === 'discord' ? toNumber(directPrice) : 0;
+          const useCustom = custom > 0;
+          const refPrice  = useCustom ? custom : s.referencePrice;
+          const netRev    = useCustom ? Math.floor(custom * s.multiplier) : s.netRevenue;
+          const profit    = useCustom ? Math.floor(custom * s.multiplier - row.totalCostPerUnit) : s.profit;
+          const marginPct = useCustom
+            ? (row.totalCostPerUnit > 0 ? (profit / row.totalCostPerUnit) * 100 : 0)
+            : s.marginPct;
           const isBest = s.mode === row.bestMode;
-          const isLoss = s.profit < 0;
+          const isLoss = profit < 0;
           return (
             <div
               key={s.mode}
@@ -543,25 +557,36 @@ function ChainCard({ row }: { row: Row }) {
                 isBest ? 'bg-moss-500/15 ring-1 ring-moss-300/30' : ''
               }`}
             >
-              <div>
+              <div className="flex items-baseline gap-1">
                 <span className={isBest ? 'text-moss-300 font-bold' : 'text-vellum/75'}>
                   {EXIT_LABELS[s.mode]}
                 </span>
-                <span className="text-vellum/35 text-[9px] ml-1">
-                  @{s.referencePrice.toLocaleString('de-DE')}
-                </span>
+                {s.mode === 'discord' ? (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={directPrice}
+                    onChange={(e) => setDirectPrice(e.target.value.replace(/[^\d]/g, ''))}
+                    placeholder={`@${s.referencePrice.toLocaleString('de-DE')}`}
+                    className="w-[68px] rounded border border-white/15 bg-ash-950/60 px-1 py-px text-[10px] tabular-nums text-oldgold-300 placeholder:text-vellum/30 focus:border-oldgold-300/50 focus:outline-none"
+                  />
+                ) : (
+                  <span className="text-vellum/35 text-[9px]">
+                    @{refPrice.toLocaleString('de-DE')}
+                  </span>
+                )}
               </div>
               <div className="text-vellum/55 tabular-nums text-[10px]">
-                net {s.netRevenue.toLocaleString('de-DE')}
+                net {netRev.toLocaleString('de-DE')}
               </div>
               <div className={`tabular-nums font-bold text-right min-w-[70px] ${
                 isLoss ? 'text-ember-400' : isBest ? 'text-moss-300' : 'text-vellum/80'
               }`}>
-                {s.profit > 0 ? '+' : ''}{s.profit.toLocaleString('de-DE')}
+                {profit > 0 ? '+' : ''}{profit.toLocaleString('de-DE')}
                 <span className={`block text-[9px] font-normal ${
                   isLoss ? 'text-ember-400/65' : 'text-vellum/40'
                 }`}>
-                  {s.marginPct.toFixed(1)}%
+                  {marginPct.toFixed(1)}%
                 </span>
               </div>
             </div>
