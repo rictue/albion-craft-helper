@@ -221,35 +221,47 @@ async function fetchRoyalEstValues(
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) continue;
       const data = await res.json() as Array<{ location: string; item_id: string; quality: number; data: Array<{ timestamp: string; avg_price: number; item_count: number }> }>;
-      // Collect daily points per item across royal cities, then volume-weight
-      // ONLY the last 7 CALENDAR days. We must align by date, not by array
-      // position: cities upload different numbers of days, so `slice(-7)` per
-      // city mixes date ranges (a sparsely-uploaded city's "last 7" can be
-      // weeks older), which drags the average toward stale, higher prices.
-      const pts = new Map<string, Array<{ day: string; price: number; count: number }>>();
+      // Collect daily points per item across royal cities. Two reasons we
+      // align by CALENDAR day rather than array position: (1) cities upload
+      // different numbers of days, so `slice(-7)` per city mixes date ranges;
+      // (2) we then collapse each day to one volume-weighted price and take
+      // the MEDIAN across the last 7 days.
+      //
+      // Median, not mean: raw-resource prices are volatile — within a week the
+      // same hide trades at 35k and 30k. A volume-weighted mean gets dragged
+      // toward whichever spike day had the most volume; the median ignores the
+      // extreme days and returns the "typical day" price, which is both more
+      // stable and closer to the in-game 7-day average.
+      const pts = new Map<string, Map<string, { wsum: number; vol: number }>>();
       for (const entry of data) {
         if (entry.quality !== 1 || !royal.has(entry.location)) continue;
         for (const p of entry.data) {
           if (p.avg_price > 0 && p.item_count > 0 && p.timestamp) {
-            const arr = pts.get(entry.item_id) ?? [];
-            arr.push({ day: p.timestamp.slice(0, 10), price: p.avg_price, count: p.item_count });
-            pts.set(entry.item_id, arr);
+            const day = p.timestamp.slice(0, 10);
+            const byDay = pts.get(entry.item_id) ?? new Map();
+            const acc = byDay.get(day) ?? { wsum: 0, vol: 0 };
+            acc.wsum += p.avg_price * p.item_count;
+            acc.vol += p.item_count;
+            byDay.set(day, acc);
+            pts.set(entry.item_id, byDay);
           }
         }
       }
-      for (const [id, arr] of pts) {
+      for (const [id, byDay] of pts) {
         const cell = idToCell.get(id);
         if (!cell) continue;
-        // Keep only points in the 7 most recent calendar days (across cities).
-        const recentDays = new Set(
-          Array.from(new Set(arr.map((p) => p.day))).sort().slice(-7),
-        );
-        let wsum = 0;
-        let vol = 0;
-        for (const p of arr) {
-          if (recentDays.has(p.day)) { wsum += p.price * p.count; vol += p.count; }
-        }
-        if (vol > 0) book[cell.resource][cell.level] = Math.round(wsum / vol);
+        // One volume-weighted price per day, then median of the last 7 days.
+        const dailyPrices = Array.from(byDay.entries())
+          .sort(([a], [b]) => (a < b ? -1 : 1))   // oldest → newest by date
+          .slice(-7)
+          .map(([, acc]) => acc.wsum / acc.vol)
+          .sort((a, b) => a - b);                 // ascending, for median
+        if (dailyPrices.length === 0) continue;
+        const mid = Math.floor(dailyPrices.length / 2);
+        const median = dailyPrices.length % 2 === 0
+          ? (dailyPrices[mid - 1] + dailyPrices[mid]) / 2
+          : dailyPrices[mid];
+        book[cell.resource][cell.level] = Math.round(median);
       }
     } catch {
       // skip this batch — chain panel falls back to sell-order price
