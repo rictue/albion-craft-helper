@@ -84,7 +84,7 @@ const EXIT_LABELS: Record<ExitMode, string> = {
 };
 
 const EXIT_HINTS: Record<ExitMode, string> = {
-  sellOrder:   'Post, wait',
+  sellOrder:   'Post at avg price · tax + setup',
   instantSell: 'Sell into top buy now',
   discord:     'In-game trade at market value (est)',
   est3:        'Direct trade 3% under market value (fast/bulk)',
@@ -248,7 +248,10 @@ export function ChainTransmuteOpportunities({ priceBook, estValue, presets, feeS
         // High-tier sell orders don't actually fill at the ask, so direct
         // trade + the discount rows reference the market value, not the ask.
         const marketValue = estValue?.[resource]?.[target] || targetSellOrderPrice;
-        pushScenario('sellOrder',   targetSellOrderPrice);
+        // Sell order references the market-value average (where it actually
+        // trades), not the inflated lowest ask, then applies the marketplace
+        // tax + setup fee. Buy order = instant sell into existing buy orders.
+        pushScenario('sellOrder',   marketValue);
         pushScenario('instantSell', targetBuyOrderPrice);
         pushScenario('discord',     marketValue);
         pushScenario('est3',        marketValue);
