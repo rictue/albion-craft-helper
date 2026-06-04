@@ -38,7 +38,7 @@ interface Props {
   feeSettings: MarketFeeSettings;
 }
 
-type ExitMode = 'sellOrder' | 'instantSell' | 'discord';
+type ExitMode = 'sellOrder' | 'instantSell' | 'discord' | 'est3' | 'est5';
 
 interface ExitScenario {
   mode: ExitMode;
@@ -76,12 +76,16 @@ const EXIT_LABELS: Record<ExitMode, string> = {
   sellOrder:   'Sell order',
   instantSell: 'Buy order',
   discord:     'Direct trade',
+  est3:        'Est −3%',
+  est5:        'Est −5%',
 };
 
 const EXIT_HINTS: Record<ExitMode, string> = {
   sellOrder:   'Post, wait',
   instantSell: 'Sell into top buy now',
   discord:     'In-game trade at sticker price',
+  est3:        'Direct trade 3% under market value (fast/bulk)',
+  est5:        'Direct trade 5% under market value (fast/bulk)',
 };
 
 const ONE_HOUR = 3_600_000;
@@ -127,6 +131,10 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
     sellOrder:   getSaleMultiplier({ ...feeSettings, saleMode: 'marketplace', exitSource: 'sellOrder' }),
     instantSell: getSaleMultiplier({ ...feeSettings, saleMode: 'marketplace', exitSource: 'buyOrder'  }),
     discord:     getSaleMultiplier({ ...feeSettings, saleMode: 'private' }),
+    // Direct-trade (no tax) at 3% / 5% under the market-value reference —
+    // the common "discount to move it fast / sell in bulk on Discord" play.
+    est3:        getSaleMultiplier({ ...feeSettings, saleMode: 'private' }) * 0.97,
+    est5:        getSaleMultiplier({ ...feeSettings, saleMode: 'private' }) * 0.95,
   }), [feeSettings]);
 
   const rows = useMemo<Row[]>(() => {
@@ -235,6 +243,11 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
         pushScenario('sellOrder',   targetSellOrderPrice);
         pushScenario('instantSell', targetBuyOrderPrice);
         pushScenario('discord',     targetSellOrderPrice);
+        // Market-value reference for the discounted direct-trade rows: the
+        // sell-order price (closest per-row proxy for "market value"). Shown
+        // at the bottom so you can model selling a bit under to move it fast.
+        pushScenario('est3',        targetSellOrderPrice);
+        pushScenario('est5',        targetSellOrderPrice);
 
         if (scenarios.length === 0) continue;
 
