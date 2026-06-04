@@ -34,7 +34,7 @@ import { BuyOrderOpportunities } from "./scanner/BuyOrderOpportunities";
 import { ChainTransmuteOpportunities } from "./scanner/ChainTransmuteOpportunities";
 import ErrorBoundary from "../common/ErrorBoundary";
 import { fetchScannerPrices, SCANNER_CITIES } from "./scanner/fetchAODPPrices";
-import type { FetchResult } from "./scanner/fetchAODPPrices";
+import type { FetchResult, EstValueBook } from "./scanner/fetchAODPPrices";
 import { useAppStore } from "../../store/appStore";
 import { usePageMeta } from "../../hooks/usePageMeta";
 import ToolExplainer from "../common/ToolExplainer";
@@ -82,6 +82,11 @@ export default function Transmutation() {
     normalizeSettings(readStorage<unknown>(STORAGE_KEYS.settings, DEFAULT_SCANNER_SETTINGS))
   );
   const [toast, setToast] = useState("");
+  // Est. market value (royal-continent avg, Black Market excluded), filled on
+  // fetch. Used for the chain panel's discounted direct-trade exit rows.
+  const [estValue, setEstValue] = useState<EstValueBook>(() =>
+    RESOURCE_TYPES.reduce((b, r) => { b[r] = {}; return b; }, {} as EstValueBook)
+  );
 
   // Auto-fill controls
   const [fetchCity, setFetchCity] = useState<string>(() =>
@@ -217,8 +222,9 @@ export default function Transmutation() {
     setIsFetching(true);
     setFetchError(null);
     try {
-      const { priceBook: nextBook, result } = await fetchScannerPrices(priceBook, fetchCity);
+      const { priceBook: nextBook, estValue: nextEst, result } = await fetchScannerPrices(priceBook, fetchCity);
       setPriceBook(nextBook);
+      setEstValue(nextEst);
       setLastFetch(result);
       setToast(`${result.filledSells} sells · ${result.filledBuys} buys from ${result.city}`);
     } catch (err) {
@@ -287,6 +293,7 @@ export default function Transmutation() {
           <ErrorBoundary compact label="Chain transmute">
             <ChainTransmuteOpportunities
               priceBook={priceBook}
+              estValue={estValue}
               presets={presets}
               feeSettings={{
                 saleMode: 'marketplace',

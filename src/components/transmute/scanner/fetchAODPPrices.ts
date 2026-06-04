@@ -27,6 +27,15 @@ const RESOURCE_TO_FAMILY: Record<ResourceType, string> = {
   'Stone':       'ROCK',
 };
 
+// The 5 royal cities. The in-game "Market Value" is the average trade price
+// across the Royal Continent — these cities, never the Black Market. We
+// average their sell prices to reproduce that est. value.
+const ROYAL_CITIES = ['Bridgewatch', 'Fort Sterling', 'Lymhurst', 'Martlock', 'Thetford'] as const;
+
+/** Per resource → per tier.enchant → est. market value (avg sell across the
+ *  5 royal cities, Black Market excluded). */
+export type EstValueBook = Record<ResourceType, Record<string, number>>;
+
 /**
  * Build the Albion item ID for a raw resource at a given tier+enchant.
  *
@@ -91,7 +100,7 @@ interface MergedQuote {
 export async function fetchScannerPrices(
   current: PriceBook,
   city: string,
-): Promise<{ priceBook: PriceBook; result: FetchResult }> {
+): Promise<{ priceBook: PriceBook; estValue: EstValueBook; result: FetchResult }> {
   const itemIds: string[] = [];
   const idToCell = new Map<string, { resource: ResourceType; level: string }>();
 
@@ -103,9 +112,12 @@ export async function fetchScannerPrices(
     }
   }
 
+  // Fetch the selected city (for the scanner grid) PLUS every royal city, so
+  // we can compute the Royal-Continent average ("est. market value").
+  const cities = Array.from(new Set<string>([city, ...ROYAL_CITIES]));
   const prices: MarketPrice[] = await fetchPrices(
     itemIds,
-    [city],
+    cities,
     /* allQualities */ true,
     /* forceRefresh */ true,
   );
@@ -161,8 +173,27 @@ export async function fetchScannerPrices(
     };
   }
 
+  // Est. market value = average sell price across the 5 royal cities
+  // (Black Market excluded), per item — mirrors the in-game "Market Value".
+  const royalQuotes = new Map(ROYAL_CITIES.map(c => [c, mergeQuotes(prices, c)]));
+  const estValue = RESOURCE_TYPES.reduce((book, r) => {
+    book[r] = {};
+    return book;
+  }, {} as EstValueBook);
+  for (const id of itemIds) {
+    const cell = idToCell.get(id);
+    if (!cell) continue;
+    let sum = 0, n = 0;
+    for (const c of ROYAL_CITIES) {
+      const q = royalQuotes.get(c)?.get(id);
+      if (q && q.sell > 0) { sum += q.sell; n += 1; }
+    }
+    if (n > 0) estValue[cell.resource][cell.level] = Math.round(sum / n);
+  }
+
   return {
     priceBook: next,
+    estValue,
     result: {
       filledSells,
       filledBuys,

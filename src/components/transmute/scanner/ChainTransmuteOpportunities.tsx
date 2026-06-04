@@ -34,6 +34,9 @@ import type { MarketFeeSettings } from '../../../utils/marketFees';
 
 interface Props {
   priceBook: PriceBook;
+  /** Est. market value per resource/level = avg sell across the 5 royal
+   *  cities (Black Market excluded). Reference for the Est −3% / −5% rows. */
+  estValue?: Record<ResourceType, Record<string, number>>;
   presets: PresetCost[];
   feeSettings: MarketFeeSettings;
 }
@@ -96,7 +99,7 @@ function toNumber(value: string | undefined): number {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
-export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }: Props) {
+export function ChainTransmuteOpportunities({ priceBook, estValue, presets, feeSettings }: Props) {
   const [resourceFilter, setResourceFilter] = useState<ResourceType | 'all'>('all');
   const [endGoal, setEndGoal] = useState<string>('all');
   const [startFrom, setStartFrom] = useState<string>('all');
@@ -243,11 +246,13 @@ export function ChainTransmuteOpportunities({ priceBook, presets, feeSettings }:
         pushScenario('sellOrder',   targetSellOrderPrice);
         pushScenario('instantSell', targetBuyOrderPrice);
         pushScenario('discord',     targetSellOrderPrice);
-        // Market-value reference for the discounted direct-trade rows: the
-        // sell-order price (closest per-row proxy for "market value"). Shown
-        // at the bottom so you can model selling a bit under to move it fast.
-        pushScenario('est3',        targetSellOrderPrice);
-        pushScenario('est5',        targetSellOrderPrice);
+        // Market-value reference for the discounted direct-trade rows = the
+        // royal-continent average (5 royal cities, no Black Market), matching
+        // the in-game "Market Value". Falls back to the sell-order price if
+        // no cross-city est value is available yet.
+        const marketValue = estValue?.[resource]?.[target] || targetSellOrderPrice;
+        pushScenario('est3', marketValue);
+        pushScenario('est5', marketValue);
 
         if (scenarios.length === 0) continue;
 
