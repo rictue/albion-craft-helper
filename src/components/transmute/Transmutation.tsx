@@ -27,9 +27,7 @@ import { scannerRowsToCsv } from "./scanner/format";
 import { readStorage, writeStorage } from "./scanner/storage";
 import { PresetCostsEditor } from "./scanner/PresetCostsEditor";
 import { PriceMatrix } from "./scanner/PriceMatrix";
-import { QuickResults } from "./scanner/QuickResults";
 import { ScannerControls } from "./scanner/ScannerControls";
-import { BuyOrderOpportunities } from "./scanner/BuyOrderOpportunities";
 import { ChainTransmuteOpportunities } from "./scanner/ChainTransmuteOpportunities";
 import ErrorBoundary from "../common/ErrorBoundary";
 import { fetchScannerPrices, SCANNER_CITIES } from "./scanner/fetchAODPPrices";
@@ -274,7 +272,6 @@ export default function Transmutation() {
             lastFetch={lastFetch}
             fetchError={fetchError}
           />
-          <QuickResults resource={activeResource} rows={rows} settings={settings} />
           <ScannerControls
             settings={settings}
             saleMultiplier={saleMultiplier}
@@ -300,20 +297,6 @@ export default function Transmutation() {
                 customSalesTaxPct: settings.marketplaceTaxPercent,
                 customSetupFeePct: settings.setupFeePercent,
                 entrySource: settings.entryPriceSource,
-                exitSource: settings.exitPriceSource,
-              }}
-            />
-          </ErrorBoundary>
-          <ErrorBoundary compact label="Buy-order opportunities">
-            <BuyOrderOpportunities
-              priceBook={priceBook}
-              presets={presets}
-              feeSettings={{
-                saleMode: 'marketplace',
-                taxProfile: settings.taxProfile === 'normal' ? 'normal' : settings.taxProfile === 'custom' ? 'custom' : 'premium',
-                customSalesTaxPct: settings.marketplaceTaxPercent,
-                customSetupFeePct: settings.setupFeePercent,
-                entrySource: 'buyOrder',
                 exitSource: settings.exitPriceSource,
               }}
             />
