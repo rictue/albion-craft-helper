@@ -46,6 +46,16 @@ const STORAGE_KEYS = {
   fetchCity: "albion-scanner-fetch-city-v1",
 };
 
+// Resource ↔ URL slug. "Wood / Logs" contains a slash that URL-encodes to
+// %2F; Render/Cloudflare 404 on encoded slashes when the page is reloaded or
+// shared. Use clean slugs in the URL instead.
+const RESOURCE_SLUG: Record<string, string> = {
+  'Wood / Logs': 'wood', 'Ore': 'ore', 'Fiber': 'fiber', 'Hide': 'hide', 'Stone': 'stone',
+};
+const SLUG_RESOURCE: Record<string, ResourceType> = {
+  wood: 'Wood / Logs', ore: 'Ore', fiber: 'Fiber', hide: 'Hide', stone: 'Stone',
+};
+
 function resolveFetchCity(stored: unknown, fallback: string): string {
   const cities: readonly string[] = SCANNER_CITIES;
   if (typeof stored === "string" && cities.includes(stored)) return stored;
@@ -95,8 +105,12 @@ export default function Transmutation() {
     if (cityParam && (SCANNER_CITIES as readonly string[]).includes(cityParam)) {
       setFetchCity(cityParam);
     }
-    if (resourceParam && (RESOURCE_TYPES as readonly string[]).includes(resourceParam)) {
-      setActiveResource(resourceParam as ResourceType);
+    if (resourceParam) {
+      // Accept the clean slug ("hide") or, for back-compat, the old full
+      // name ("Hide" / "Wood / Logs").
+      const resolved = SLUG_RESOURCE[resourceParam]
+        ?? ((RESOURCE_TYPES as readonly string[]).includes(resourceParam) ? (resourceParam as ResourceType) : undefined);
+      if (resolved) setActiveResource(resolved);
     }
     setUrlHydrated(true);
   }, [urlHydrated, searchParams]);
@@ -105,7 +119,7 @@ export default function Transmutation() {
     if (!urlHydrated) return;
     const params = new URLSearchParams();
     if (fetchCity) params.set("city", fetchCity);
-    if (activeResource) params.set("resource", activeResource);
+    if (activeResource) params.set("resource", RESOURCE_SLUG[activeResource] ?? activeResource);
     setSearchParams(params, { replace: true });
   }, [urlHydrated, fetchCity, activeResource, setSearchParams]);
 
