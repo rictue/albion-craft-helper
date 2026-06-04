@@ -6,34 +6,27 @@ import type { ItemDefinition, Tier, Enchantment } from '../../types';
 
 // Crafting / journal fame formula.
 //
-//   journalFame = sum(resource_count × resource_item_value) × FAME_COEFF
+//   journalFame = total_material_count × FAME_MULT_PER_TIER × 2^enchant
 //
-// resource_item_value below are the GAME'S OWN item values, verified against
-// ao-bin-dumps (e.g. T4_PLANKS @itemvalue=16, T4_PLANKS_LEVEL3=128,
-// T8_PLANKS_LEVEL3=2048). They double per tier AND double per enchant level
-// — this is not an estimate, it's the exact in-game table. So once the single
-// FAME_COEFF anchor is set from one real measurement, EVERY tier/enchant is
-// computed exactly, no per-tier guessing:
-//   T4.3 Longbow = 32 × 128  = 4,096 → 5,760 fame   (measured ✓)
-//   T8.3 Longbow = 32 × 2048 = 65,536 → 92,160 fame (same scaling)
-const RESOURCE_ITEM_VALUE: Record<number, number> = {
-  2: 4, 3: 8, 4: 16, 5: 32, 6: 64, 7: 128, 8: 256,   // game @itemvalue, enchant 0
+// FAME_MULT_PER_TIER is NOT item-value-proportional. I first scaled it with
+// the game @itemvalue (×2/tier) but that badly under-counts high tiers —
+// real crafting fame grows much faster (~×2.8/tier). Anchored to two real
+// in-game measurements, both Longbow (32 planks), same enchant (.3):
+//   T4.3: 5,760 journal fame   → FameMult(4) = 5,760 / (32×8) = 22.5
+//   T8.3: 357,120 journal fame → FameMult(8) = 357,120 / (32×8) = 1,395
+//   (2× T8.3 longbows filled 12 full T8 journals + 11,160/58,590 — exact ✓)
+// T4 & T8 are measured-exact; T5–T7 are geometric-interpolated (~×2.806/tier),
+// T2/T3 extrapolated down. Update from in-game if a tier looks off.
+const FAME_MULT_PER_TIER: Record<number, number> = {
+  2: 2.85, 3: 8.02, 4: 22.5, 5: 63, 6: 177, 7: 497, 8: 1395,
 };
-const ENCHANT_IV_MULT: Record<number, number> = { 0: 1, 1: 2, 2: 4, 3: 8, 4: 16 }; // ×2 per enchant (game-exact)
-// Calibrated against real in-game observation (Jun 2026):
-//   3 × T4.3 Longbow crafts (32 planks each) filled exactly 4 full T4
-//   journals (3,600 each) + one at 2,880/3,600 = 17,280 journal fame
-//   = 5,760 JOURNAL fame per craft.
-//   recipeValue = 32 × (T4 value 16 × enchant-3 mult 8) = 4,096
-//   5,760 = 4,096 × FAME_COEFF  →  FAME_COEFF = 1.40625
-//   Reproduces it exactly: 3 × 5,760 / 3,600 = 4 full + 2,880 left over.
-//
+const ENCHANT_MULT: Record<number, number> = { 0: 1, 1: 2, 2: 4, 3: 8, 4: 16 }; // 2^enchant
+
 // CRITICAL: journals capture BASE fame — premium/focus do NOT boost journal
 // fill. The in-game craft log "+8,640 (2,880)" shows this: 8,640 is the
 // PERSONAL fame the crafter earns (premium ×1.5), while the journal only
 // took the base rate. So the journal math below must NOT apply the premium
 // multiplier; only the personal-fame readout does.
-const FAME_COEFF = 1.40625;
 // Crafting journal fame capacity per tier — read straight from in-game item
 // tooltips (T4 "Adept's Journal" = 3,600/3,600 confirmed; T5-T8 from the
 // player's own journals). Capacities scale ≈×2 per tier, NOT the ×5/×3 the
@@ -105,19 +98,13 @@ export default function JournalBoostCard({ selectedItem, tier, enchantment, quan
     return () => { cancelled = true; };
   }, [profession, tier]);
 
-  // Fame per craft is recipe-value-based — larger recipes yield more fame.
-  // Used to be a flat per-tier lookup that ignored recipe size entirely,
-  // which is why a shoes craft looked like it needed hundreds of crafts
-  // to fill a journal.
-  const resourceIV = (RESOURCE_ITEM_VALUE[tier] ?? 0) * (ENCHANT_IV_MULT[enchantment] ?? 1);
-  let recipeValue = 0;
-  for (const req of selectedItem.recipe) {
-    recipeValue += req.count * resourceIV;
-  }
+  // Fame per craft scales with total material count × the per-tier fame
+  // multiplier × 2^enchant. Bigger recipes (more materials) yield more fame.
+  const totalMaterials = selectedItem.recipe.reduce((sum, req) => sum + req.count, 0);
   // Journal fill uses BASE fame — premium does NOT boost what the journal
   // captures (verified in-game: 1× T4.3 Longbow = 5,760 journal fame, while
   // the crafter personally earns 8,640 = 5,760 × 1.5 premium).
-  const famePerCraft = recipeValue * FAME_COEFF;
+  const famePerCraft = totalMaterials * (FAME_MULT_PER_TIER[tier] ?? 0) * (ENCHANT_MULT[enchantment] ?? 1);
   const personalFamePerCraft = famePerCraft * (hasPremium ? 1.5 : 1);
   const totalFame = famePerCraft * quantity;
   const capacity = JOURNAL_CAPACITY[tier] ?? 0;
