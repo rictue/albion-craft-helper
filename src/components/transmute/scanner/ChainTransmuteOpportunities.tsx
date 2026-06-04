@@ -86,7 +86,7 @@ const EXIT_LABELS: Record<ExitMode, string> = {
 const EXIT_HINTS: Record<ExitMode, string> = {
   sellOrder:   'Post, wait',
   instantSell: 'Sell into top buy now',
-  discord:     'In-game trade at sticker price',
+  discord:     'In-game trade at market value (est)',
   est3:        'Direct trade 3% under market value (fast/bulk)',
   est5:        'Direct trade 5% under market value (fast/bulk)',
 };
@@ -243,16 +243,16 @@ export function ChainTransmuteOpportunities({ priceBook, estValue, presets, feeS
           });
         };
 
+        // Market value = royal-continent trade average (in-game "Market
+        // Value"), falling back to the sell-order price if history is missing.
+        // High-tier sell orders don't actually fill at the ask, so direct
+        // trade + the discount rows reference the market value, not the ask.
+        const marketValue = estValue?.[resource]?.[target] || targetSellOrderPrice;
         pushScenario('sellOrder',   targetSellOrderPrice);
         pushScenario('instantSell', targetBuyOrderPrice);
-        pushScenario('discord',     targetSellOrderPrice);
-        // Market-value reference for the discounted direct-trade rows = the
-        // royal-continent average (5 royal cities, no Black Market), matching
-        // the in-game "Market Value". Falls back to the sell-order price if
-        // no cross-city est value is available yet.
-        const marketValue = estValue?.[resource]?.[target] || targetSellOrderPrice;
-        pushScenario('est3', marketValue);
-        pushScenario('est5', marketValue);
+        pushScenario('discord',     marketValue);
+        pushScenario('est3',        marketValue);
+        pushScenario('est5',        marketValue);
 
         if (scenarios.length === 0) continue;
 
