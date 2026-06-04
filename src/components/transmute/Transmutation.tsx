@@ -41,7 +41,26 @@ const STORAGE_KEYS = {
   presets:   "albion-scanner-presets-v4",
   settings:  "albion-scanner-settings-v1",
   fetchCity: "albion-scanner-fetch-city-v1",
+  estValue:  "albion-scanner-estvalue-v1",
 };
+
+/** Coerce a stored est-value blob back into a full EstValueBook (every
+ *  resource key present), so a missing/partial save never crashes the chain
+ *  panel's estValue?.[resource]?.[target] lookups. */
+function normalizeEstValue(raw: unknown): EstValueBook {
+  const book = RESOURCE_TYPES.reduce((b, r) => { b[r] = {}; return b; }, {} as EstValueBook);
+  if (raw && typeof raw === "object") {
+    for (const r of RESOURCE_TYPES) {
+      const slice = (raw as Record<string, unknown>)[r];
+      if (slice && typeof slice === "object") {
+        for (const [lvl, val] of Object.entries(slice as Record<string, unknown>)) {
+          if (typeof val === "number" && val > 0) book[r][lvl] = val;
+        }
+      }
+    }
+  }
+  return book;
+}
 
 // Resource ↔ URL slug. "Wood / Logs" contains a slash that URL-encodes to
 // %2F; Render/Cloudflare 404 on encoded slashes when the page is reloaded or
@@ -82,7 +101,7 @@ export default function Transmutation() {
   // Est. market value (royal-continent avg, Black Market excluded), filled on
   // fetch. Used for the chain panel's discounted direct-trade exit rows.
   const [estValue, setEstValue] = useState<EstValueBook>(() =>
-    RESOURCE_TYPES.reduce((b, r) => { b[r] = {}; return b; }, {} as EstValueBook)
+    normalizeEstValue(readStorage<unknown>(STORAGE_KEYS.estValue, null))
   );
 
   // Auto-fill controls
@@ -170,6 +189,10 @@ export default function Transmutation() {
   useEffect(() => writeStorage(STORAGE_KEYS.presets, presets), [presets]);
   useEffect(() => writeStorage(STORAGE_KEYS.settings, settings), [settings]);
   useEffect(() => writeStorage(STORAGE_KEYS.fetchCity, fetchCity), [fetchCity]);
+  // Persist est. market value so it survives page reloads — without this the
+  // chain panel falls back to the (inflated) sell-order price after every
+  // Ctrl+R until the user fetches again.
+  useEffect(() => writeStorage(STORAGE_KEYS.estValue, estValue), [estValue]);
 
   useEffect(() => {
     if (!toast) return;

@@ -220,24 +220,36 @@ async function fetchRoyalEstValues(
     try {
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) continue;
-      const data = await res.json() as Array<{ location: string; item_id: string; quality: number; data: Array<{ avg_price: number; item_count: number }> }>;
-      // Accumulate volume-weighted price per item across royal cities (recent
-      // ~7 daily points).
-      const acc = new Map<string, { wsum: number; vol: number }>();
+      const data = await res.json() as Array<{ location: string; item_id: string; quality: number; data: Array<{ timestamp: string; avg_price: number; item_count: number }> }>;
+      // Collect daily points per item across royal cities, then volume-weight
+      // ONLY the last 7 CALENDAR days. We must align by date, not by array
+      // position: cities upload different numbers of days, so `slice(-7)` per
+      // city mixes date ranges (a sparsely-uploaded city's "last 7" can be
+      // weeks older), which drags the average toward stale, higher prices.
+      const pts = new Map<string, Array<{ day: string; price: number; count: number }>>();
       for (const entry of data) {
         if (entry.quality !== 1 || !royal.has(entry.location)) continue;
-        for (const p of entry.data.slice(-7)) {
-          if (p.avg_price > 0 && p.item_count > 0) {
-            const a = acc.get(entry.item_id) ?? { wsum: 0, vol: 0 };
-            a.wsum += p.avg_price * p.item_count;
-            a.vol += p.item_count;
-            acc.set(entry.item_id, a);
+        for (const p of entry.data) {
+          if (p.avg_price > 0 && p.item_count > 0 && p.timestamp) {
+            const arr = pts.get(entry.item_id) ?? [];
+            arr.push({ day: p.timestamp.slice(0, 10), price: p.avg_price, count: p.item_count });
+            pts.set(entry.item_id, arr);
           }
         }
       }
-      for (const [id, a] of acc) {
+      for (const [id, arr] of pts) {
         const cell = idToCell.get(id);
-        if (cell && a.vol > 0) book[cell.resource][cell.level] = Math.round(a.wsum / a.vol);
+        if (!cell) continue;
+        // Keep only points in the 7 most recent calendar days (across cities).
+        const recentDays = new Set(
+          Array.from(new Set(arr.map((p) => p.day))).sort().slice(-7),
+        );
+        let wsum = 0;
+        let vol = 0;
+        for (const p of arr) {
+          if (recentDays.has(p.day)) { wsum += p.price * p.count; vol += p.count; }
+        }
+        if (vol > 0) book[cell.resource][cell.level] = Math.round(wsum / vol);
       }
     } catch {
       // skip this batch — chain panel falls back to sell-order price
