@@ -29,7 +29,6 @@ import { PresetCostsEditor } from "./scanner/PresetCostsEditor";
 import { PriceMatrix } from "./scanner/PriceMatrix";
 import { QuickResults } from "./scanner/QuickResults";
 import { ScannerControls } from "./scanner/ScannerControls";
-import { ScannerResultsTable } from "./scanner/ScannerResultsTable";
 import { BuyOrderOpportunities } from "./scanner/BuyOrderOpportunities";
 import { ChainTransmuteOpportunities } from "./scanner/ChainTransmuteOpportunities";
 import ErrorBoundary from "../common/ErrorBoundary";
@@ -321,10 +320,6 @@ export default function Transmutation() {
           </ErrorBoundary>
           <PresetCostsEditor presets={presets} onChange={(next) => setPresets(normalizePresets(next))} />
         </div>
-      </div>
-
-      <div className="mt-4">
-        <ScannerResultsTable rows={visibleRows} />
       </div>
 
       {toast ? (
