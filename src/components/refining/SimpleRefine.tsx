@@ -757,10 +757,17 @@ export default function SimpleRefine() {
             </div>
           </div>
 
-          {/* Fee reality check — what's profit per plank under the 4 common setups */}
+          {/* Fee reality check — what's profit per plank under the 4 common setups.
+              Per-plank material cost is the GROSS input minus the return-rate
+              leftover credit (same effective-cost model as the main card), so
+              the two never disagree on small batches. */}
           <FeeRealityCheck
             sellPrice={sellPrice}
-            costBeforeFees={(result.rawCost / Math.max(1, result.entryMult) + result.prevCost / Math.max(1, result.entryMult)) / Math.max(1, simulation.totalOutput)}
+            costBeforeFees={Math.max(0,
+              (result.rawCost / Math.max(1, result.entryMult)
+                + result.prevCost / Math.max(1, result.entryMult)
+                - result.leftoverValue) / Math.max(1, simulation.totalOutput)
+            )}
             fixedFees={feePerCraft}
             unitLabel="Per plank"
           />
