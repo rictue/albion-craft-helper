@@ -437,7 +437,19 @@ export default function SimpleRefine() {
     const saleMult = getSaleMultiplier(feeSettings);
     const effectiveSellPrice = sellPrice * saleMult;
 
-    const revenue = simulation.totalOutput * effectiveSellPrice;
+    // Materials the return rate hands back but that don't complete another
+    // full craft are NOT lost — they're real inventory you reuse next batch
+    // or resell at market. Crediting them at the price you'd otherwise pay
+    // for them is the correct "effective cost = input × (1 − RR)" model.
+    // Without this, a tiny batch (e.g. 5 raw = 1 craft) shows the SAME loss
+    // with or without focus, because the higher focus return just sits as
+    // invisible leftover. We value it at the buy-side price (replacement
+    // value), not the taxed sell price, since the realistic use is to feed
+    // it back into the next run.
+    const leftoverValue = simulation.leftoverRaw * rawPrice + simulation.leftoverPrev * prevPrice;
+
+    const saleRevenue = simulation.totalOutput * effectiveSellPrice;
+    const revenue = saleRevenue + leftoverValue;
     const profit = revenue - totalCost;
     const roi = totalCost > 0 ? (profit / totalCost) * 100 : 0;
 
@@ -451,7 +463,7 @@ export default function SimpleRefine() {
     return {
       initialRaw, initialPrev,
       rawCost, prevCost, feeTotal, totalCost,
-      effectiveSellPrice, revenue, profit, roi,
+      effectiveSellPrice, revenue, saleRevenue, leftoverValue, profit, roi,
       totalFocus, profitPerUnit, decision,
       entryMult, saleMult,
     };
@@ -733,7 +745,12 @@ export default function SimpleRefine() {
               <div className="text-[10px] uppercase tracking-widest text-green-400/80 font-semibold">💸 Sell</div>
               <div className="text-xl font-black text-green-400 mt-1 tabular-nums">{formatSilver(result.revenue)}</div>
               <div className="text-[11px] text-zinc-500 mt-2 space-y-0.5">
-                <div>{simulation.totalOutput} × {formatSilver(result.effectiveSellPrice)}</div>
+                <div>{simulation.totalOutput} × {formatSilver(result.effectiveSellPrice)} = {formatSilver(result.saleRevenue)}</div>
+                {result.leftoverValue > 0 && (
+                  <div className="text-cyan-400/80" title="Materials returned by the return rate that didn't complete another craft — reusable / resellable, valued at buy price.">
+                    + {formatSilver(result.leftoverValue)} returned mats
+                  </div>
+                )}
                 <div>{sellPriceCity && <span className="text-zinc-700">@ {sellPriceCity}</span>}</div>
                 <div className="text-zinc-700 text-[10px]">×{result.saleMult.toFixed(3)} after fees</div>
               </div>
