@@ -2,6 +2,7 @@ import { useEffect, useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
 import { fetchPrices, buildPriceMap } from '../../services/api';
+import { fetchRoyalEst } from '../../services/priceHistory';
 import { calculateCrafting } from '../../utils/profitCalculator';
 import { calculateReturnRate } from '../../utils/returnRate';
 import { resolveItemId, resolveMaterialId, resolveArtifactId } from '../../utils/itemIdParser';
@@ -139,6 +140,22 @@ export default function CraftingCalculator() {
     return () => window.clearInterval(id);
   }, []);
 
+  // Est. market value per material item ID (royal-continent 7-day trade
+  // median). When the user buys materials at "est × 0.95" (a common quick-buy
+  // price via buy orders / direct trade), we price materials off this instead
+  // of the cheapest live ask. Filled on every price fetch.
+  const [materialEst, setMaterialEst] = useState<Map<string, number>>(new Map());
+  // Toggle: price materials at Est × 0.95 (the user's actual buy price) vs the
+  // cheapest live market ask. Persisted; defaults ON.
+  const [useEstMaterialBuy, setUseEstMaterialBuy] = useState<boolean>(() => {
+    try { return localStorage.getItem('albion-craft-est-material-buy') !== '0'; }
+    catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('albion-craft-est-material-buy', useEstMaterialBuy ? '1' : '0'); }
+    catch { /* localStorage unavailable */ }
+  }, [useEstMaterialBuy]);
+
   // Net silver from selling filled journals, reported upward by JournalBoostCard
   // so ProfitSummary can fold it into the combined profit figure.
   const [journalNet, setJournalNet] = useState(0);
@@ -161,13 +178,24 @@ export default function CraftingCalculator() {
         itemIds.push(mainItemId.replace('_MAIN_', '_2H_'));
       }
 
+      const materialIds: string[] = [];
       for (const req of selectedItem.recipe) {
-        itemIds.push(resolveMaterialId(req.materialBase, tier, enchantment));
+        const mid = resolveMaterialId(req.materialBase, tier, enchantment);
+        materialIds.push(mid);
+        itemIds.push(mid);
       }
 
       if (selectedItem.artifactId) {
         itemIds.push(resolveArtifactId(selectedItem.artifactId, tier));
       }
+
+      // Est. market value for the recipe materials (royal 7-day median), used
+      // when the user prices materials at est × 0.95. Runs alongside the live
+      // order fetch; failure just leaves materialEst empty (we fall back to the
+      // cheapest market ask).
+      fetchRoyalEst(materialIds)
+        .then(setMaterialEst)
+        .catch(() => setMaterialEst(new Map()));
 
       // Fetch ALL qualities. The old quality=1 filter only returned Normal
       // quality listings — but in Albion the real liquid market is quality
@@ -263,6 +291,17 @@ export default function CraftingCalculator() {
       if (k !== craftedItemId) map.set(k, v);
     });
 
+    // Est × 0.95 material pricing: when enabled, price each recipe material at
+    // its royal-continent estimated market value × 0.95 — the price you
+    // actually pay buying via buy orders / direct trade — instead of the
+    // cheapest live ask. Only overrides materials we have an est for; a manual
+    // custom price below still wins.
+    if (useEstMaterialBuy) {
+      for (const [id, est] of materialEst) {
+        if (id !== craftedItemId && est > 0) map.set(id, Math.round(est * 0.95));
+      }
+    }
+
     // Resolve sell price for crafted item. Match ONLY the exact itemId —
     // the old altId (2H_↔MAIN_) fallback cross-contaminated distinct items
     // like Battleaxe (MAIN_AXE) and Greataxe (2H_AXE), silently showing
@@ -301,7 +340,7 @@ export default function CraftingCalculator() {
     // settings.craftingCity used to be a dep back when the craft-city price
     // overrode the cross-city cheapest — that override has been removed
     // (see comment above) so craftingCity no longer affects this map.
-  }, [prices, settings.sellingLocation, customPrices, selectedItem, craftedItemId]);
+  }, [prices, settings.sellingLocation, customPrices, selectedItem, craftedItemId, materialEst, useEstMaterialBuy]);
 
   const returnRate = useMemo(() => {
     if (settings.returnRateOverride !== null) return settings.returnRateOverride / 100;
@@ -395,6 +434,33 @@ export default function CraftingCalculator() {
                 <div className="flex gap-6">
                   <TierSelector value={tier} onChange={(t: Tier) => setTier(t)} />
                   <EnchantmentSelector value={enchantment} onChange={(e: Enchantment) => setEnchantment(e)} />
+                </div>
+
+                {/* Material pricing mode — est × 0.95 (real buy-order/direct-trade
+                    price) vs cheapest live market ask. */}
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Material buy price</span>
+                  <div className="inline-flex rounded-lg border border-surface-lighter overflow-hidden text-xs">
+                    <button
+                      onClick={() => setUseEstMaterialBuy(true)}
+                      className={`px-2.5 py-1 font-semibold transition-colors ${useEstMaterialBuy ? 'bg-gold/20 text-gold' : 'text-zinc-400 hover:text-zinc-200'}`}
+                      title="Price materials at their estimated market value × 0.95 — what you pay buying via buy orders / direct trade"
+                    >
+                      Est × 0.95
+                    </button>
+                    <button
+                      onClick={() => setUseEstMaterialBuy(false)}
+                      className={`px-2.5 py-1 font-semibold transition-colors border-l border-surface-lighter ${!useEstMaterialBuy ? 'bg-gold/20 text-gold' : 'text-zinc-400 hover:text-zinc-200'}`}
+                      title="Price materials at the cheapest live sell order across the royal cities"
+                    >
+                      Cheapest ask
+                    </button>
+                  </div>
+                  {useEstMaterialBuy && (
+                    <span className="text-[10px] text-zinc-500">
+                      {materialEst.size > 0 ? 'using 7-day est' : 'no est data — using market ask'}
+                    </span>
+                  )}
                 </div>
 
                 {/* Material budget → auto-quantity helper */}
