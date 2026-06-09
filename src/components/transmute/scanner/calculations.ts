@@ -67,9 +67,13 @@ export const TRANSMUTATION_STEPS: Array<{ from: string; to: string }> = [
   { from: "8.3", to: "8.4" }
 ];
 
+// Private / direct trade = no marketplace tax, no setup fee, and (by user
+// request) NO built-in discount — the typed price is the received price.
+// Must stay in sync with PRIVATE_SALE_MULTIPLIER in utils/marketFees.ts;
+// the chain panel uses that one, this one drives the main scanner table.
 export const SALE_MULTIPLIERS: Record<Exclude<SaleMode, "custom">, number> = {
   marketplace: 0.935,
-  private: 0.95
+  private: 1.0
 };
 
 export const DEFAULT_THRESHOLDS: Thresholds = {
@@ -235,7 +239,9 @@ export function normalizePresets(value: unknown): PresetCost[] {
 }
 
 export function getSaleMultiplier(settings: ScannerSettings): number {
-  if (settings.saleMode === "private") return 0.95;
+  // Direct trade: no tax, no setup, no built-in discount (user request —
+  // the typed price IS the received price). Matches utils/marketFees.ts.
+  if (settings.saleMode === "private") return SALE_MULTIPLIERS.private;
   const setupFee =
     settings.exitPriceSource === "sellOrder" ? clamp(settings.setupFeePercent, 0, 100) : 0;
   const totalFee = clamp(settings.marketplaceTaxPercent, 0, 100) + setupFee;
@@ -243,7 +249,9 @@ export function getSaleMultiplier(settings: ScannerSettings): number {
 }
 
 export function getEntryMultiplier(settings: ScannerSettings): number {
-  if (settings.saleMode === "private") return 1;
+  // Entry side is independent of how you SELL: even when the output goes
+  // via direct trade, materials bought with a buy order still pay the
+  // marketplace setup fee. (Previously private mode skipped it.)
   const setupFee =
     settings.entryPriceSource === "buyOrder" ? clamp(settings.setupFeePercent, 0, 100) : 0;
   return 1 + setupFee / 100;

@@ -39,6 +39,15 @@ export const CITIES: CityInfo[] = [
     specializations: ['mace', 'naturestaff', 'firestaff', 'cape', 'leather_armor', 'cloth_helmet'],
   },
   {
+    id: 'Caerleon',
+    name: 'Caerleon',
+    // War Gloves (knuckles) get their crafting bonus in Caerleon, not in any
+    // royal city (wiki: War Gloves Crafter station, +production bonus in
+    // Caerleon alongside cooked food / gathering gear). Without this entry
+    // the calculator showed "no city bonus" for every knuckles weapon.
+    specializations: ['knuckles'],
+  },
+  {
     id: 'Black Market',
     name: 'Black Market',
     specializations: [],

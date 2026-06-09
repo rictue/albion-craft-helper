@@ -40,7 +40,9 @@ const JOURNAL_CAPACITY: Record<number, number> = {
 const WARRIOR = new Set(['sword', 'axe', 'mace', 'hammer', 'crossbow', 'knuckles', 'plate_helmet', 'plate_armor', 'plate_shoes']);
 const HUNTER  = new Set(['bow', 'spear', 'quarterstaff', 'dagger', 'leather_helmet', 'leather_armor', 'leather_shoes']);
 const MAGE    = new Set(['firestaff', 'holystaff', 'froststaff', 'naturestaff', 'arcanestaff', 'cursestaff', 'cloth_helmet', 'cloth_armor', 'cloth_shoes']);
-const TOOLMAKER = new Set(['bag', 'cape', 'shieldtype', 'booktype', 'torchtype', 'tool']);
+// NB: items.ts uses subcategory 'bags' (plural) — 'bag' here silently hid
+// the journal card for every Bag craft.
+const TOOLMAKER = new Set(['bags', 'cape', 'shieldtype', 'booktype', 'torchtype', 'tool']);
 
 function getProfession(subcategory: string): { id: string; name: string } | null {
   if (WARRIOR.has(subcategory)) return { id: 'WARRIOR', name: 'Warrior' };

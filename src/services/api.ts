@@ -11,7 +11,10 @@ const SERVER_URLS: Record<AlbionServer, string> = {
 const STORAGE_KEY = 'albion-server';
 
 export function getServer(): AlbionServer {
-  return (localStorage.getItem(STORAGE_KEY) as AlbionServer) || 'europe';
+  // Validate the stored value — corrupt/legacy localStorage content would
+  // otherwise make getApiBase() return undefined and break every fetch.
+  const stored = localStorage.getItem(STORAGE_KEY);
+  return stored && stored in SERVER_URLS ? (stored as AlbionServer) : 'europe';
 }
 
 export function setServer(server: AlbionServer): void {
@@ -96,7 +99,10 @@ const inFlight = new Map<string, Promise<MarketPrice[]>>();
 
 export async function fetchPrices(
   itemIds: string[],
-  locations: string[] = ['Bridgewatch', 'Fort Sterling', 'Lymhurst', 'Martlock', 'Thetford', 'Black Market'],
+  // Caerleon included: it's a real auction house and the bonus craft city
+  // for knuckles / food. Components that don't want it (outlier scans,
+  // royal-only views) filter it out themselves.
+  locations: string[] = ['Bridgewatch', 'Fort Sterling', 'Lymhurst', 'Martlock', 'Thetford', 'Caerleon', 'Black Market'],
   // Fetch ALL quality levels by default. Albion's real liquid market is
   // quality 2-3 (Good / Outstanding). With the old default of false the
   // API returned only quality 1 (Normal), which often has zero listings or
@@ -120,6 +126,7 @@ export async function fetchPrices(
   const promise = (async () => {
     // Batch in groups of 50 to stay under URL limits
     const results: MarketPrice[] = [];
+    let anyBatchFailed = false;
     for (let i = 0; i < itemIds.length; i += 50) {
       const batch = itemIds.slice(i, i + 50);
       const url = `${getApiBase()}/${batch.join(',')}.json?locations=${locations.join(',')}${qualityParam}`;
@@ -138,13 +145,21 @@ export async function fetchPrices(
         console.error('Failed to fetch prices:', error);
         // Return stale cache if available
         if (cached) return cached.data;
+        // No cache to fall back to — keep fetching the remaining batches so
+        // the caller gets as much data as possible, but remember the failure.
+        anyBatchFailed = true;
       }
     }
 
-    const now = Date.now();
-    priceCache.set(cacheKey, { data: results, fetchedAt: now });
-    lastFetchTime = now;
-    persistCache();
+    // Only cache COMPLETE responses. Caching a partial result (one batch
+    // failed mid-loop) made the missing items read as "no data" for the
+    // whole TTL — and persisted that hole to localStorage.
+    if (!anyBatchFailed) {
+      const now = Date.now();
+      priceCache.set(cacheKey, { data: results, fetchedAt: now });
+      lastFetchTime = now;
+      persistCache();
+    }
     return results;
   })();
 
@@ -183,14 +198,3 @@ export function buildPriceMap(prices: MarketPrice[], city: string, useBlackMarke
   return map;
 }
 
-export function getBuyPrice(prices: MarketPrice[], itemId: string, city: string): number {
-  const matching = prices.filter(p => p.item_id === itemId && p.city === city && p.sell_price_min > 0);
-  if (matching.length === 0) return 0;
-  return Math.min(...matching.map(p => p.sell_price_min));
-}
-
-export function getSellPrice(prices: MarketPrice[], itemId: string, city: string): number {
-  const matching = prices.filter(p => p.item_id === itemId && p.city === city && p.sell_price_min > 0);
-  if (matching.length === 0) return 0;
-  return Math.min(...matching.map(p => p.sell_price_min));
-}

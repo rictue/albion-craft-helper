@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useState } from 'react';
+import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
 import { fetchPrices, buildPriceMap } from '../../services/api';
@@ -145,6 +145,9 @@ export default function CraftingCalculator() {
   // price via buy orders / direct trade), we price materials off this instead
   // of the cheapest live ask. Filled on every price fetch.
   const [materialEst, setMaterialEst] = useState<Map<string, number>>(new Map());
+  // Monotonic id so a slow est response for a PREVIOUS item/tier can't land
+  // after a newer one and overwrite it (rapid item switching race).
+  const estRequestId = useRef(0);
   // Toggle: price materials at Est × 0.95 (the user's actual buy price) vs the
   // cheapest live market ask. Persisted; defaults ON.
   const [useEstMaterialBuy, setUseEstMaterialBuy] = useState<boolean>(() => {
@@ -192,10 +195,12 @@ export default function CraftingCalculator() {
       // Est. market value for the recipe materials (royal 7-day median), used
       // when the user prices materials at est × 0.95. Runs alongside the live
       // order fetch; failure just leaves materialEst empty (we fall back to the
-      // cheapest market ask).
+      // cheapest market ask). The request-id check drops stale responses from
+      // a previous item/tier that resolve after a newer request.
+      const reqId = ++estRequestId.current;
       fetchRoyalEst(materialIds)
-        .then(setMaterialEst)
-        .catch(() => setMaterialEst(new Map()));
+        .then((m) => { if (estRequestId.current === reqId) setMaterialEst(m); })
+        .catch(() => { if (estRequestId.current === reqId) setMaterialEst(new Map()); });
 
       // Fetch ALL qualities. The old quality=1 filter only returned Normal
       // quality listings — but in Albion the real liquid market is quality
@@ -516,6 +521,24 @@ export default function CraftingCalculator() {
               </div>
 
               <ReturnRateSlider subcategory={selectedItem.subcategory} baseId={selectedItem.baseId} itemName={selectedItem.name} />
+
+              {/* Missing-price guard: a material with no AODP price enters the
+                  math at 0 silver, which silently overstates profit. Surface
+                  it loudly instead of letting the user trust a fake number. */}
+              {result && (result.materials.some(m => m.count > 0 && m.unitPrice <= 0)
+                || (result.artifactCost != null && result.artifactCost.price <= 0)) && (
+                <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+                  <span className="text-amber-400 text-sm leading-none mt-0.5">⚠</span>
+                  <div className="text-xs text-amber-200/90">
+                    <span className="font-bold">Missing price data:</span>{' '}
+                    {[
+                      ...result.materials.filter(m => m.count > 0 && m.unitPrice <= 0).map(m => m.name),
+                      ...(result.artifactCost != null && result.artifactCost.price <= 0 ? ['Artifact'] : []),
+                    ].join(', ')}{' '}
+                    has no AODP listing — it enters the calculation at 0 silver, so the profit shown is overstated. Type the price manually in the recipe below.
+                  </div>
+                </div>
+              )}
 
               {result && (
                 <ErrorBoundary compact label="Recipe">
