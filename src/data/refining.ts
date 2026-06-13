@@ -1,6 +1,18 @@
 // Albion Online refining data with enchanted tiers
 // Enchanted refining requires enchanted raw + previous tier enchanted refined
 
+export interface HeartRecipe {
+  /** Faction heart item ID (T1 token, unenchanted regardless of output enchant). */
+  heartId: string;
+  heartName: string;
+  /** Raw resources per craft in the heart recipe (standard − 1; stone T4/T5 = 0). */
+  rawPerCraft: number;
+  /** Prev-tier refined per craft (stone heart recipes need NO prev at all). */
+  prevPerCraft: number;
+  /** Hearts consumed per craft — always 1 in game data. */
+  heartPerCraft: number;
+}
+
 export interface RefineRecipe {
   rawId: string;
   refinedId: string;
@@ -12,6 +24,13 @@ export interface RefineRecipe {
   rawPerCraft: number;
   prevPerCraft: number;
   outputPerCraft: number;
+  /**
+   * Alternative faction-heart recipe (ao-bin-dumps items.xml, verified
+   * 2026-06): exists for T4+ at enchant .0–.3 — there is NO .4 heart recipe.
+   * Non-stone: (raw − 1) + 1 heart + same prev. Stone: no prev ever, and
+   * T4/T5 stone blocks take ONLY a heart (0 raw).
+   */
+  heart?: HeartRecipe;
 }
 
 export interface ResourceType {
@@ -26,6 +45,33 @@ export interface ResourceType {
 const RAW_PER_TIER: Record<number, number> = {
   2: 1, 3: 2, 4: 2, 5: 3, 6: 4, 7: 5, 8: 5,
 };
+
+// Faction hearts per resource family (the biome's faction city token).
+const HEART_BY_RAW_PREFIX: Record<string, { id: string; name: string }> = {
+  WOOD:  { id: 'T1_FACTION_FOREST_TOKEN_1',   name: 'Treeheart' },
+  ORE:   { id: 'T1_FACTION_MOUNTAIN_TOKEN_1', name: 'Mountainheart' },
+  HIDE:  { id: 'T1_FACTION_STEPPE_TOKEN_1',   name: 'Beastheart' },
+  FIBER: { id: 'T1_FACTION_SWAMP_TOKEN_1',    name: 'Vineheart' },
+  ROCK:  { id: 'T1_FACTION_HIGHLAND_TOKEN_1', name: 'Rockheart' },
+};
+
+// Stone heart recipes break the (raw − 1) pattern — straight from items.xml:
+// T4/T5 take ONLY a heart, and no stone heart recipe uses a prev block.
+const STONE_HEART_RAW: Record<number, number> = { 4: 0, 5: 0, 6: 3, 7: 4, 8: 4 };
+
+function buildHeartRecipe(rawPrefix: string, tier: number, enchant: number): HeartRecipe | undefined {
+  if (tier < 4 || enchant > 3) return undefined; // .4 has no heart recipe in game data
+  const heart = HEART_BY_RAW_PREFIX[rawPrefix];
+  if (!heart) return undefined;
+  const isStone = rawPrefix === 'ROCK';
+  return {
+    heartId: heart.id,
+    heartName: heart.name,
+    rawPerCraft: isStone ? (STONE_HEART_RAW[tier] ?? 0) : RAW_PER_TIER[tier] - 1,
+    prevPerCraft: isStone ? 0 : 1,
+    heartPerCraft: 1,
+  };
+}
 
 function generateRecipes(
   rawPrefix: string,
@@ -51,6 +97,7 @@ function generateRecipes(
       refinedName: names.refined,
       tier, enchant: 0,
       rawPerCraft: rawCount, prevPerCraft: tier > 2 ? 1 : 0, outputPerCraft: 1,
+      heart: buildHeartRecipe(rawPrefix, tier, 0),
     });
 
     // Enchanted (1-3) only for T4+
@@ -69,6 +116,7 @@ function generateRecipes(
           refinedName: `${enchantNames[e]} ${names.refined}`,
           tier, enchant: e,
           rawPerCraft: rawCount, prevPerCraft: 1, outputPerCraft: 1,
+          heart: buildHeartRecipe(rawPrefix, tier, e),
         });
       }
     }

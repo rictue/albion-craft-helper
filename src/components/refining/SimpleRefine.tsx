@@ -45,9 +45,11 @@ interface CityPriceData {
   raw: Map<string, number>; // city → price
   prev: Map<string, number>;
   refined: Map<string, number>;
+  heart: Map<string, number>;
   rawDate: string;
   prevDate: string;
   refinedDate: string;
+  heartDate: string;
 }
 
 const FEE_SETTINGS_LS_KEY = 'albion-refine-fee-settings-v1';
@@ -87,10 +89,17 @@ export default function SimpleRefine() {
   const [customRaw, setCustomRaw] = useState<number | null>(null);
   const [customPrev, setCustomPrev] = useState<number | null>(null);
   const [customSell, setCustomSell] = useState<number | null>(null);
+  const [customHeart, setCustomHeart] = useState<number | null>(null);
   // Sticky city selections — persist across tier/enchant changes
   const [rawCitySel, setRawCitySel] = useState<string | null>(null);
   const [prevCitySel, setPrevCitySel] = useState<string | null>(null);
   const [sellCitySel, setSellCitySel] = useState<string | null>(null);
+  const [heartCitySel, setHeartCitySel] = useState<string | null>(null);
+  // Standard recipe vs the faction-heart alternative (T4+, enchant .0–.3:
+  // one heart replaces a raw resource — stone variants drop the prev block
+  // too). Hearts are cheap relative to high-tier raws, so this often flips
+  // a losing refine into profit.
+  const [recipeMode, setRecipeMode] = useState<'standard' | 'heart'>('standard');
   // Transport mount for weight calculation
   const [mount, setMount] = useState('t8ox');
   // Station fee per craft action — Albion's in-game station fee scales with
@@ -112,6 +121,22 @@ export default function SimpleRefine() {
     if (!rt) return null;
     return rt.recipes.find(r => r.tier === tier && r.enchant === enchant) || null;
   }, [resource, tier, enchant]);
+
+  // Heart mode only when the recipe actually has a heart variant (.4 has
+  // none in game data) — snap back to standard otherwise.
+  const usingHeart = recipeMode === 'heart' && !!recipe?.heart;
+  useEffect(() => {
+    if (recipeMode === 'heart' && recipe && !recipe.heart) setRecipeMode('standard');
+  }, [recipeMode, recipe]);
+
+  // Effective per-craft material counts for whichever recipe is active.
+  const counts = useMemo(() => {
+    if (!recipe) return { raw: 0, prev: 0, heart: 0 };
+    if (usingHeart && recipe.heart) {
+      return { raw: recipe.heart.rawPerCraft, prev: recipe.heart.prevPerCraft, heart: recipe.heart.heartPerCraft };
+    }
+    return { raw: recipe.rawPerCraft, prev: recipe.prevPerCraft, heart: 0 };
+  }, [recipe, usingHeart]);
 
   // Spec for current tier/resource
   const specLevel = useMemo(() => {
@@ -137,12 +162,16 @@ export default function SimpleRefine() {
     if (force) clearPriceCache();
     const ids = [recipe.rawId, recipe.refinedId];
     if (recipe.prevRefinedId) ids.push(recipe.prevRefinedId);
+    // Always fetch the heart price when a heart variant exists, so toggling
+    // recipes doesn't need a refetch.
+    if (recipe.heart) ids.push(recipe.heart.heartId);
     const data = await fetchPrices(ids, undefined, false, force);
 
     const rawMap = new Map<string, number>();
     const prevMap = new Map<string, number>();
     const refinedMap = new Map<string, number>();
-    let rawDate = '', prevDate = '', refinedDate = '';
+    const heartMap = new Map<string, number>();
+    let rawDate = '', prevDate = '', refinedDate = '', heartDate = '';
 
     for (const p of data) {
       if (p.sell_price_min <= 0 || p.city === 'Black Market') continue;
@@ -158,9 +187,13 @@ export default function SimpleRefine() {
         refinedMap.set(p.city, p.sell_price_min);
         if (!refinedDate || p.sell_price_min_date > refinedDate) refinedDate = p.sell_price_min_date;
       }
+      if (recipe.heart && p.item_id === recipe.heart.heartId) {
+        heartMap.set(p.city, p.sell_price_min);
+        if (!heartDate || p.sell_price_min_date > heartDate) heartDate = p.sell_price_min_date;
+      }
     }
 
-    setPrices({ raw: rawMap, prev: prevMap, refined: refinedMap, rawDate, prevDate, refinedDate });
+    setPrices({ raw: rawMap, prev: prevMap, refined: refinedMap, heart: heartMap, rawDate, prevDate, refinedDate, heartDate });
     setLastFetchAt(Date.now());
     setLoading(false);
   }, [recipe]);
@@ -198,9 +231,11 @@ export default function SimpleRefine() {
     setCustomRaw(null);
     setCustomPrev(null);
     setCustomSell(null);
+    setCustomHeart(null);
     setRawCitySel(null);
     setPrevCitySel(null);
     setSellCitySel(null);
+    setHeartCitySel(null);
   }, [resource]);
 
   // Also clear typed custom number on tier/enchant change, but KEEP city selection
@@ -208,12 +243,15 @@ export default function SimpleRefine() {
     setCustomRaw(null);
     setCustomPrev(null);
     setCustomSell(null);
+    setCustomHeart(null);
   }, [tier, enchant]);
 
-  // T2/T3 have no enchanted variants — reset to .0 when dropping below T4
+  // T2/T3 have no enchanted variants — reset to .0 when dropping below T4.
+  // Enchanted refined STONE BLOCKS don't exist in game data at all (enchanted
+  // rock refines into normal blocks via separate recipes), so rock is .0-only.
   useEffect(() => {
-    if (tier < 4) setEnchant(0);
-  }, [tier]);
+    if (tier < 4 || resource === 'rock') setEnchant(0);
+  }, [tier, resource]);
 
   // Persist fee settings between sessions.
   useEffect(() => {
@@ -283,14 +321,28 @@ export default function SimpleRefine() {
     if (sellCity === 'auto') return { price: bestSell?.price ?? 0, city: bestSell?.city ?? '' };
     return { price: prices?.refined.get(sellCity) ?? 0, city: sellCity };
   };
+  // Hearts: cheapest across cities by default (they're faction-city tokens,
+  // the refine city often has thin listings), same custom/sticky overrides.
+  const resolveHeart = (): { price: number; city: string } => {
+    if (customHeart != null) return { price: customHeart, city: 'Custom' };
+    if (heartCitySel && prices?.heart.has(heartCitySel)) return { price: prices.heart.get(heartCitySel) || 0, city: heartCitySel };
+    let best = { city: '', price: Infinity };
+    for (const [city, price] of prices?.heart.entries() ?? []) {
+      if (price < best.price) best = { city, price };
+    }
+    return best.price === Infinity ? { price: 0, city: '' } : best;
+  };
+
   const rawResolved = resolveRaw();
   const prevResolved = resolvePrev();
   const sellResolved = resolveSell();
+  const heartResolved = resolveHeart();
   const rawPrice = rawResolved.price;
   const rawPriceCity = rawResolved.city;
   const prevPrice = prevResolved.price;
   const sellPrice = sellResolved.price;
   const sellPriceCity = sellResolved.city;
+  const heartPrice = heartResolved.price;
 
   // LPB + RR: two variants for split focus/no-focus
   const cityBonusActive = (CITY_REFINE_BONUS[refineCity] || []).includes(resource);
@@ -339,21 +391,31 @@ export default function SimpleRefine() {
   // over-reported output by 15-30% on enchanted refining.
   const simulation = useMemo(() => {
     if (!recipe) return null;
-    const rawPerCraft = recipe.rawPerCraft;
-    const prevPerCraft = recipe.prevPerCraft;
-    const initialCrafts = Math.floor(rawCount / rawPerCraft);
+    const rawPerCraft = counts.raw;
+    const prevPerCraft = counts.prev;
+    const heartPerCraft = counts.heart;
+    // Stone T4/T5 heart recipes consume NO raw at all — the "raw amount"
+    // input then means "number of crafts" directly.
+    const initialCrafts = rawPerCraft > 0 ? Math.floor(rawCount / rawPerCraft) : rawCount;
 
     let raw = initialCrafts * rawPerCraft;
     let prev = initialCrafts * prevPerCraft;
+    // Hearts return with the resource return rate just like raw/prev
+    // (player-verified in game).
+    let heart = initialCrafts * heartPerCraft;
     let focusRemaining = useFocus && focusCostPerCraft > 0 ? focusBudget : 0;
     let totalFocusCrafts = 0;
     let totalNoFocusCrafts = 0;
     const passes: Array<{ pass: number; crafts: number; focusCrafts: number; noFocusCrafts: number; rawUsed: number; prevUsed: number; rawBack: number; prevBack: number; mode: 'focus' | 'normal' | 'mixed' }> = [];
 
     for (let pass = 1; pass <= 30; pass++) {
-      const fromRaw = Math.floor(raw / rawPerCraft);
+      const fromRaw = rawPerCraft > 0 ? Math.floor(raw / rawPerCraft) : Infinity;
       const fromPrev = prevPerCraft > 0 ? Math.floor(prev / prevPerCraft) : Infinity;
-      const crafts = Math.min(fromRaw, fromPrev);
+      const fromHeart = heartPerCraft > 0 ? Math.floor(heart / heartPerCraft) : Infinity;
+      let crafts = Math.min(fromRaw, fromPrev, fromHeart);
+      // All-Infinity can only happen on the heart-only stone recipe once the
+      // pools are fractional — treat as done.
+      if (!Number.isFinite(crafts)) crafts = pass === 1 ? initialCrafts : 0;
       if (crafts <= 0) break;
 
       // Split this pass by remaining focus budget
@@ -364,12 +426,15 @@ export default function SimpleRefine() {
 
       const rawUsed = crafts * rawPerCraft;
       const prevUsed = crafts * prevPerCraft;
+      const heartUsed = crafts * heartPerCraft;
       // Return materials at the rate matching how each sub-segment crafted
       const rawBack = focusCraftsThisPass * rawPerCraft * rrFocus + noFocusCraftsThisPass * rawPerCraft * rrNoFocus;
       const prevBack = focusCraftsThisPass * prevPerCraft * rrFocus + noFocusCraftsThisPass * prevPerCraft * rrNoFocus;
+      const heartBack = focusCraftsThisPass * heartPerCraft * rrFocus + noFocusCraftsThisPass * heartPerCraft * rrNoFocus;
 
       raw = raw - rawUsed + rawBack;
       prev = prev - prevUsed + prevBack;
+      heart = heart - heartUsed + heartBack;
       focusRemaining -= focusCraftsThisPass * focusCostPerCraft;
       totalFocusCrafts += focusCraftsThisPass;
       totalNoFocusCrafts += noFocusCraftsThisPass;
@@ -385,6 +450,10 @@ export default function SimpleRefine() {
         noFocusCrafts: noFocusCraftsThisPass,
         rawUsed, prevUsed, rawBack, prevBack, mode,
       });
+
+      // Heart-only recipe (stone T4/T5): every pool is Infinity-gated, so
+      // without this the loop would re-run initialCrafts forever.
+      if (rawPerCraft === 0 && prevPerCraft === 0 && heartPerCraft === 0) break;
     }
 
     const totalOutput = totalFocusCrafts + totalNoFocusCrafts;
@@ -401,8 +470,9 @@ export default function SimpleRefine() {
       passes,
       leftoverRaw: raw,
       leftoverPrev: prev,
+      leftoverHeart: heart,
     };
-  }, [recipe, rawCount, useFocus, focusBudget, focusCostPerCraft, rrFocus, rrNoFocus]);
+  }, [recipe, counts, rawCount, useFocus, focusBudget, focusCostPerCraft, rrFocus, rrNoFocus]);
 
   // Back-compat view for UI — derives from simulation instead of pre-computing
   const focusSplit = useMemo(() => {
@@ -416,21 +486,27 @@ export default function SimpleRefine() {
 
   // Financial results
   const result = useMemo(() => {
-    if (!recipe || !simulation || rawPrice === 0 || sellPrice === 0) return null;
+    if (!recipe || !simulation || sellPrice === 0) return null;
+    // Raw price must exist whenever the active recipe consumes raw (the
+    // stone T4/T5 heart recipes consume none, so don't block on it there).
+    if (counts.raw > 0 && rawPrice === 0) return null;
 
-    const initialRaw = simulation.initialCrafts * recipe.rawPerCraft;
-    const initialPrev = simulation.initialCrafts * recipe.prevPerCraft;
+    const initialRaw = simulation.initialCrafts * counts.raw;
+    const initialPrev = simulation.initialCrafts * counts.prev;
+    const initialHeart = simulation.initialCrafts * counts.heart;
 
     // Entry-side multiplier: if the user posts a buy order for raw materials
     // they pay an extra setup fee on top of the sticker price.
     const entryMult = getEntryMultiplier(feeSettings);
     const rawCost = initialRaw * rawPrice * entryMult;
     const prevCost = initialPrev * prevPrice * entryMult;
+    const heartCost = initialHeart * heartPrice * entryMult;
+    const missingHeartPrice = counts.heart > 0 && heartPrice === 0;
     // Station fee is paid per craft ACTION, including reinvest passes.
     // Previously we only charged initial crafts, which understated fees by
     // ~2× when RR is high. Now we charge all chain crafts.
     const feeTotal = simulation.totalOutput * feePerCraft;
-    const totalCost = rawCost + prevCost + feeTotal;
+    const totalCost = rawCost + prevCost + heartCost + feeTotal;
 
     // Sale-side multiplier handles all four cases: marketplace prem/normal,
     // sell order vs instant sell, and direct trade (no tax, full price).
@@ -446,7 +522,9 @@ export default function SimpleRefine() {
     // invisible leftover. We value it at the buy-side price (replacement
     // value), not the taxed sell price, since the realistic use is to feed
     // it back into the next run.
-    const leftoverValue = simulation.leftoverRaw * rawPrice + simulation.leftoverPrev * prevPrice;
+    const leftoverValue = simulation.leftoverRaw * rawPrice
+      + simulation.leftoverPrev * prevPrice
+      + simulation.leftoverHeart * heartPrice;
 
     const saleRevenue = simulation.totalOutput * effectiveSellPrice;
     const revenue = saleRevenue + leftoverValue;
@@ -461,23 +539,23 @@ export default function SimpleRefine() {
     const decision = getDecision(profitPerUnit, SILVER_PER_UNIT_THRESHOLDS);
 
     return {
-      initialRaw, initialPrev,
-      rawCost, prevCost, feeTotal, totalCost,
+      initialRaw, initialPrev, initialHeart,
+      rawCost, prevCost, heartCost, missingHeartPrice, feeTotal, totalCost,
       effectiveSellPrice, revenue, saleRevenue, leftoverValue, profit, roi,
       totalFocus, profitPerUnit, decision,
       entryMult, saleMult,
     };
-  }, [recipe, simulation, rawPrice, prevPrice, sellPrice, feePerCraft, feeSettings, focusSplit]);
+  }, [recipe, simulation, counts, rawPrice, prevPrice, sellPrice, heartPrice, feePerCraft, feeSettings, focusSplit]);
 
   // Max raw the current focus budget can fully cover. Beyond this, reinvest
   // crafts run focus-free at the lower no-focus RR — which is usually a loss.
   // total crafts = initial / (1 - rrFocus); for all to be focused we need
   // total <= floor(budget / focusPerCraft), so initial <= that × (1 - rrFocus).
   const maxRawForFocusBudget = useMemo(() => {
-    if (!recipe || !useFocus || focusCostPerCraft <= 0) return 0;
+    if (!recipe || !useFocus || focusCostPerCraft <= 0 || counts.raw <= 0) return 0;
     const maxFocusCrafts = Math.floor(focusBudget / focusCostPerCraft);
-    return Math.max(0, Math.floor(maxFocusCrafts * (1 - rrFocus) * recipe.rawPerCraft));
-  }, [recipe, useFocus, focusCostPerCraft, focusBudget, rrFocus]);
+    return Math.max(0, Math.floor(maxFocusCrafts * (1 - rrFocus) * counts.raw));
+  }, [recipe, counts.raw, useFocus, focusCostPerCraft, focusBudget, rrFocus]);
 
   // Stale price warning (>6h old). Uses the shared AODP-aware parser so
   // the user's timezone doesn't inflate ages by +3h (UTC+3 Turkey).
@@ -533,15 +611,47 @@ export default function SimpleRefine() {
                   <button
                     key={e}
                     onClick={() => setEnchant(e)}
-                    disabled={tier < 4 && e > 0}
+                    disabled={(tier < 4 || resource === 'rock') && e > 0}
+                    title={resource === 'rock' && e > 0 ? 'Enchanted stone blocks do not exist — enchanted rock refines into normal blocks' : undefined}
                     className={`h-9 rounded-lg text-xs font-bold transition-all
                       ${enchant === e ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'}
-                      ${tier < 4 && e > 0 ? 'opacity-25 cursor-not-allowed' : ''}`}
+                      ${(tier < 4 || resource === 'rock') && e > 0 ? 'opacity-25 cursor-not-allowed' : ''}`}
                   >
                     .{e}
                   </button>
                 ))}
               </div>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">
+                Recipe
+                {!recipe?.heart && <span className="ml-2 text-zinc-600 normal-case">(.4 has no heart recipe)</span>}
+              </label>
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  onClick={() => setRecipeMode('standard')}
+                  className={`h-9 rounded-lg text-xs font-bold transition-all ${!usingHeart ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'}`}
+                >
+                  Standard
+                </button>
+                <button
+                  onClick={() => setRecipeMode('heart')}
+                  disabled={!recipe?.heart}
+                  title={recipe?.heart
+                    ? `${recipe.heart.rawPerCraft} raw + 1 ${recipe.heart.heartName}${recipe.heart.prevPerCraft > 0 ? ' + 1 prev' : ''} per craft`
+                    : 'No faction-heart recipe for .4 enchant'}
+                  className={`h-9 rounded-lg text-xs font-bold transition-all ${usingHeart ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-[color:var(--color-bg-overlay)] text-zinc-500 border border-[color:var(--color-border)] hover:text-zinc-300'} ${!recipe?.heart ? 'opacity-25 cursor-not-allowed' : ''}`}
+                >
+                  ♥ {recipe?.heart?.heartName ?? 'Heart'}
+                </button>
+              </div>
+              {usingHeart && recipe?.heart && (
+                <div className="text-[10px] text-rose-300/80 mt-1 leading-snug">
+                  {recipe.heart.rawPerCraft} raw + 1 {recipe.heart.heartName}
+                  {recipe.heart.prevPerCraft > 0 ? ' + 1 prev tier' : ' (no prev needed)'} per craft.
+                  Hearts return with the resource return rate.
+                </div>
+              )}
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-1.5">Raw resource amount</label>
@@ -721,11 +831,22 @@ export default function SimpleRefine() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
               <div className="text-[10px] uppercase tracking-widest text-red-400/80 font-semibold">💰 Buy</div>
-              <div className="text-xl font-black text-zinc-100 mt-1 tabular-nums">{formatSilver(result.rawCost + result.prevCost)}</div>
+              <div className="text-xl font-black text-zinc-100 mt-1 tabular-nums">{formatSilver(result.rawCost + result.prevCost + result.heartCost)}</div>
               <div className="text-[11px] text-zinc-500 mt-2 space-y-0.5">
-                <div>{result.initialRaw} raw × {formatSilver(rawPrice)} {rawPriceCity && <span className="text-zinc-700">@ {rawPriceCity}</span>}</div>
+                {result.initialRaw > 0 && (
+                  <div>{result.initialRaw} raw × {formatSilver(rawPrice)} {rawPriceCity && <span className="text-zinc-700">@ {rawPriceCity}</span>}</div>
+                )}
                 {result.initialPrev > 0 && (
                   <div>{result.initialPrev} prev × {formatSilver(prevPrice)}</div>
+                )}
+                {result.initialHeart > 0 && (
+                  <div className="text-rose-300/90">
+                    {result.initialHeart} {recipe.heart?.heartName ?? 'heart'} × {formatSilver(heartPrice)}
+                    {heartResolved.city && <span className="text-zinc-700"> @ {heartResolved.city}</span>}
+                  </div>
+                )}
+                {result.missingHeartPrice && (
+                  <div className="text-amber-400 text-[10px]">⚠ Heart price missing — enter it manually below, cost is understated.</div>
                 )}
                 <div className="text-zinc-700 text-[10px]">+ {formatSilver(result.feeTotal)} fees</div>
               </div>
@@ -764,8 +885,7 @@ export default function SimpleRefine() {
           <FeeRealityCheck
             sellPrice={sellPrice}
             costBeforeFees={Math.max(0,
-              (result.rawCost / Math.max(1, result.entryMult)
-                + result.prevCost / Math.max(1, result.entryMult)
+              ((result.rawCost + result.prevCost + result.heartCost) / Math.max(1, result.entryMult)
                 - result.leftoverValue) / Math.max(1, simulation.totalOutput)
             )}
             fixedFees={feePerCraft}
@@ -795,7 +915,7 @@ export default function SimpleRefine() {
                 onReset={() => { setCustomRaw(null); setRawCitySel(null); }}
                 allCities={prices?.raw}
               />
-              {recipe.prevPerCraft > 0 && (
+              {counts.prev > 0 && (
                 <PriceInput
                   label="Prev Tier Price"
                   itemId={recipe.prevRefinedId}
@@ -809,6 +929,22 @@ export default function SimpleRefine() {
                   onPickCity={(city) => { setPrevCitySel(city); setCustomPrev(null); }}
                   onReset={() => { setCustomPrev(null); setPrevCitySel(null); }}
                   allCities={prices?.prev}
+                />
+              )}
+              {usingHeart && recipe.heart && (
+                <PriceInput
+                  label={`${recipe.heart.heartName} Price`}
+                  itemId={recipe.heart.heartId}
+                  effectivePrice={heartPrice}
+                  effectiveCity={heartResolved.city}
+                  defaultPrice={heartPrice}
+                  defaultCity={heartResolved.city}
+                  customValue={customHeart}
+                  stickyCity={heartCitySel}
+                  onTypeNumber={(v) => { setCustomHeart(v); if (v != null) setHeartCitySel(null); }}
+                  onPickCity={(city) => { setHeartCitySel(city); setCustomHeart(null); }}
+                  onReset={() => { setCustomHeart(null); setHeartCitySel(null); }}
+                  allCities={prices?.heart}
                 />
               )}
               <PriceInput
@@ -924,7 +1060,10 @@ export default function SimpleRefine() {
                 </tbody>
               </table>
               <div className="text-[10px] text-zinc-600 mt-3 flex items-center gap-3">
-                <span>Leftover: {simulation.leftoverRaw.toFixed(1)} raw, {simulation.leftoverPrev.toFixed(1)} prev</span>
+                <span>
+                  Leftover: {simulation.leftoverRaw.toFixed(1)} raw, {simulation.leftoverPrev.toFixed(1)} prev
+                  {usingHeart && `, ${simulation.leftoverHeart.toFixed(1)} heart`}
+                </span>
               </div>
             </div>
           </details>
